@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#000;"><canvas id="game" width="800" height="450"></canvas><pre id="out"></pre>
+<script>window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update } from '../src/scenes/sceneManager.js';
+  import { getLevel } from '../src/levels/levelLoader.js';
+  import { particles } from '../src/entities/particles.js';
+  const key=(t,k)=>document.dispatchEvent(new KeyboardEvent(t,{key:k}));
+  const out=[];
+  setTimeout(() => {
+    key('keydown',' '); key('keyup',' ');
+    const lv = getLevel();
+    const boss = state.enemies.find(e => e.boss);
+    out.push(`wakeX=${lv.boss.wakeX}  boss starts at ${Math.round(boss.x)}  gap=${Math.round(boss.x - lv.boss.wakeX)}px`);
+
+    player.x = lv.boss.wakeX - 40; player.y = lv.groundY - player.height;
+    player.velocityX = 0; player.velocityY = 0; player.invincible = 99999;
+    state.score = 0;
+    key('keydown','ArrowRight');
+    for (let i = 0; i < 40 && !boss.awake; i++) update();
+    key('keyup','ArrowRight');
+
+    const clampX = () => player.x + player.width + 40;
+    let clampedAt = null, diedAt = null, particlesOnDeath = 0, bossXAtDeath = null;
+    for (let i = 0; i < 600; i++) {
+      const before = particles.length;
+      const aliveBefore = boss.alive;
+      update();
+      if (boss.alive && clampedAt === null && Math.abs(boss.x - clampX()) < 1.5) clampedAt = i;
+      if (aliveBefore && !boss.alive) {
+        diedAt = i; particlesOnDeath = particles.length - before; bossXAtDeath = Math.round(boss.x);
+        break;
+      }
+    }
+    out.push(`boss clamped against player at frame: ${clampedAt === null ? 'never (good - it was still charging)' : clampedAt}`);
+    out.push(`boss died at frame ${diedAt}, at x=${bossXAtDeath} (player at ${Math.round(player.x)})`);
+    out.push(`particles spawned on death frame: ${particlesOnDeath}`);
+    out.push(particlesOnDeath >= 20
+      ? '  -> 22 = explosion + landing dust = REAL STOMP, the NPC came down on it'
+      : '  -> 10 = explosion only = FALLBACK, the NPC landed on the ground and the boss just popped');
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 200);
+</script></body></html>

@@ -20,7 +20,7 @@ const GROUND_Y = 410;
 export default {
   id: 'level1',
   name: 'The First Stand',
-  worldWidth: 6800,
+  worldWidth: 7200,
   groundY: GROUND_Y,
   playerSpawn: { x: 100, y: 300 },
 
@@ -35,7 +35,7 @@ export default {
     { x: 2190, width: 1310 },
     { x: 3570, width: 1130 },
     { x: 4760, width: 740 },
-    { x: 5590, width: 1210 }
+    { x: 5590, width: 1610 }
   ],
 
   platforms: [
@@ -86,7 +86,7 @@ export default {
     { x: 3750, y: 300 - 20,      w: 20, minX: 3700, maxX: 3810, speed: 1.0 },
     { x: 4550, y: 290 - 20,      w: 20, minX: 4500, maxX: 4610, speed: 1.1 },
     { x: 6150, y: 300 - 20,      w: 20, minX: 6100, maxX: 6220, speed: 1.2 },
-    { x: 6580, y: GROUND_Y - 26, w: 26, minX: 6500, maxX: 6700, speed: 1.2, boss: true }
+    { x: 6980, y: GROUND_Y - 26, w: 26, minX: 6900, maxX: 7100, speed: 1.2, boss: true }
   ],
 
   coins: [
@@ -115,10 +115,14 @@ export default {
     { x: 5300, y: GROUND_Y - 70, width: 8, height: 70 }   // after the long spike bed
   ],
 
-  goal: { x: 6700, y: 200, width: 10, height: GROUND_Y - 200 },
+  goal: { x: 7100, y: 200, width: 10, height: GROUND_Y - 200 },
 
   // Level 1's boss can't be fought — walking into range plays a cutscene
   // where a rescue NPC deals with it. Later levels get real fights.
   // Everything past 6030 is kept clear so the NPC's run-in reads cleanly.
-  boss: { mode: 'cutscene', wakeX: 6450, chargeSpeed: 2.4 }
+  // wakeX sits ~420px short of the boss on purpose: the boss needs room to
+  // charge before the rescue NPC intercepts it. Trigger it too close and the
+  // boss immediately stops against the player, and the whole leap happens
+  // with nothing moving.
+  boss: { mode: 'cutscene', wakeX: 6560, chargeSpeed: 2.4 }
 };

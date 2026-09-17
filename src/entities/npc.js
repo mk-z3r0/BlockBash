@@ -42,7 +42,18 @@ export function updateRescueNPC(npc, viewWidth, cameraX) {
     }
   } else if (npc.state === 'jumping') {
     npc.velocityY += 0.68;
-    npc.x += npc.jumpVX;
+    // Steer toward the boss mid-flight instead of committing to a fixed
+    // horizontal speed. A fixed one only reaches ~82px in the ~41 frames of
+    // airtime, which lands the stomp only if the boss happens to charge the
+    // remaining distance itself — it doesn't once it's stopped against the
+    // player, and then the leap falls short. This is scripted choreography;
+    // the hit is supposed to connect wherever the boss ended up.
+    if (boss && boss.alive) {
+      const drift = (boss.x + boss.w / 2) - (npc.x + npc.width / 2);
+      npc.x += Math.max(-10, Math.min(10, drift * 0.12));
+    } else {
+      npc.x += npc.jumpVX;
+    }
     npc.y += npc.velocityY;
     if (boss && boss.alive && npc.velocityY > 0) {
       const npcCX = npc.x + npc.width / 2;

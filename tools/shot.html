@@ -1,16 +1,33 @@
 <!DOCTYPE html>
-<html><body style="margin:0;background:#0a0d1c;">
-<canvas id="game" width="800" height="450"></canvas>
+<!-- Screenshot helper. Needs the local server running.
+     tools/shot.html?x=4980        - park the player at x and render
+     tools/shot.html?cutscene=240  - run the boss cutscene to frame N and render -->
+<html><body style="margin:0;background:#0a0d1c;"><canvas id="game" width="800" height="450"></canvas>
 <script type="module" src="../src/main.js"></script>
 <script type="module">
   import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
   import { update } from '../src/scenes/sceneManager.js';
-  const x = Number(new URLSearchParams(location.search).get('x') || 100);
+  import { getLevel } from '../src/levels/levelLoader.js';
+  const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+  const q = new URLSearchParams(location.search);
+
   setTimeout(() => {
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
-    document.dispatchEvent(new KeyboardEvent('keyup', { key: ' ' }));
-    player.x = x; player.y = 340; player.velocityY = 0; player.invincible = 9999;
-    for (let i = 0; i < 90; i++) update();   // settle the camera
+    key('keydown', ' '); key('keyup', ' ');
+    const lv = getLevel();
+
+    if (q.has('cutscene')) {
+      const boss = state.enemies.find(e => e.boss);
+      player.x = lv.boss.wakeX - 40; player.y = lv.groundY - player.height;
+      player.velocityX = 0; player.velocityY = 0;
+      key('keydown', 'ArrowRight');
+      for (let i = 0; i < 40 && !boss.awake; i++) update();
+      key('keyup', 'ArrowRight');
+      for (let i = 0; i < Number(q.get('cutscene')); i++) update();
+    } else {
+      player.x = Number(q.get('x') || 100); player.y = 340;
+      player.velocityY = 0; player.invincible = 9999;
+      for (let i = 0; i < 90; i++) update();   // settle the camera
+    }
   }, 150);
-</script>
-</body></html>
+</script></body></html>
