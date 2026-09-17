@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Block Bash</title>
+<style>
+  :root {
+    --bg-deep: #0a0d1c;
+    --bg-panel: #0f1428;
+    --line: #1e2a4a;
+    --square: #f2c14e;
+    --square-dark: #c99a2e;
+    --sphere: #ff4d8d;
+    --sphere-dark: #a12d5c;
+    --coin: #5ee7ff;
+    --check: #8effc0;
+    --text: #e8ecf7;
+    --text-dim: #7a84a8;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--bg-deep) 0%, #060810 100%);
+    font-family: 'Trebuchet MS', 'Segoe UI', Arial, sans-serif;
+    color: var(--text);
+  }
+
+  .frame {
+    position: relative;
+    padding: 18px;
+    background: var(--bg-panel);
+    border: 2px solid var(--line);
+    clip-path: polygon(0 12px, 12px 0, calc(100% - 12px) 0, 100% 12px, 100% calc(100% - 12px), calc(100% - 12px) 100%, 12px 100%, 0 calc(100% - 12px));
+  }
+
+  h1 {
+    margin: 0 0 4px 0;
+    font-size: 34px;
+    letter-spacing: 4px;
+    font-weight: 900;
+    text-align: center;
+  }
+  h1 .b1 { color: var(--square); }
+  h1 .b2 { color: var(--sphere); }
+
+  .tagline {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 13px;
+    margin: 0 0 14px 0;
+    letter-spacing: 1px;
+  }
+
+  canvas {
+    display: block;
+    background: #10162c;
+    border: 3px solid var(--line);
+  }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 6px 16px;
+    color: var(--text-dim);
+    font-size: 12px;
+    margin-top: 10px;
+    letter-spacing: 0.5px;
+  }
+</style>
+</head>
+<body>
+
+<div class="frame">
+  <h1><span class="b1">BLOCK</span> <span class="b2">BASH</span></h1>
+  <p class="tagline">the squares defend their corners</p>
+  <canvas id="game" width="800" height="450"></canvas>
+  <div class="controls">
+    <span>&larr; &rarr; / A D — move</span>
+    <span>SPACE / &uarr; / W — jump</span>
+    <span>B — bazooka</span>
+    <span>M — mute</span>
+    <span>R — restart</span>
+  </div>
+</div>
+
+<script type="module" src="src/main.js"></script>
+
+</body>
+</html>
