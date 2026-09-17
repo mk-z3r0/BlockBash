@@ -3,9 +3,9 @@ import { ctx, VIEW_HEIGHT, drawStickLegs, drawMuscleArm } from '../engine/render
 import {
   GRAVITY_UP, GRAVITY_DOWN, ACCEL, FRICTION, TURN_ACCEL, MAX_SPEED,
   JUMP_FORCE, JUMP_CUT_MULTIPLIER, COYOTE_FRAMES, JUMP_BUFFER_FRAMES,
-  WORLD_WIDTH, isColliding
+  isColliding
 } from '../engine/physics.js';
-import { platforms, trickLip, updateDynamicPlatforms } from '../levels/level1.js';
+import { getLevel } from '../levels/levelLoader.js';
 import { spawnDust } from './particles.js';
 import { playJump } from '../audio/sfx.js';
 
@@ -57,6 +57,7 @@ export function resetPlayer() {
 // death, checkpoints, bazooka firing) are the caller's job — see
 // scenes/playingScene.js.
 export function updatePlayer(inputLocked) {
+  const level = getLevel();
   const left = !inputLocked && (keys['ArrowLeft'] || keys['a']);
   const right = !inputLocked && (keys['ArrowRight'] || keys['d']);
 
@@ -108,16 +109,14 @@ export function updatePlayer(inputLocked) {
 
   // --- world bounds ---
   if (player.x < 0) { player.x = 0; player.velocityX = 0; }
-  if (player.x + player.width > WORLD_WIDTH) { player.x = WORLD_WIDTH - player.width; player.velocityX = 0; }
-
-  // level's moving platforms react to the player's position/airborne state
-  // (using isOnGround as it stood at the end of last frame, on purpose)
-  const trickLipDelta = updateDynamicPlatforms(player);
+  if (player.x + player.width > level.worldWidth) {
+    player.x = level.worldWidth - player.width;
+    player.velocityX = 0;
+  }
 
   // --- platform collisions ---
   player.isOnGround = false;
-  let standingPlatform = null;
-  for (const platform of platforms) {
+  for (const platform of level.platforms) {
     if (platform.width <= 1) continue; // a fully retracted ledge is not solid
     if (isColliding(player, platform)) {
       const overlapLeft   = (player.x + player.width) - platform.x;
@@ -130,7 +129,6 @@ export function updatePlayer(inputLocked) {
         player.y = platform.y - player.height;
         player.velocityY = 0;
         player.isOnGround = true;
-        standingPlatform = platform;
       } else if (minOverlap === overlapBottom && player.velocityY < 0) {
         player.y = platform.y + platform.height;
         player.velocityY = 0;
@@ -142,11 +140,6 @@ export function updatePlayer(inputLocked) {
         player.velocityX = 0;
       }
     }
-  }
-
-  // ride the trick lip smoothly instead of being left behind as it eases back
-  if (standingPlatform === trickLip) {
-    player.x += trickLipDelta;
   }
 
   // --- landing dust: a puff sized to how hard the landing was ---

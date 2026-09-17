@@ -5,6 +5,22 @@ import { spawnExplosion } from './particles.js';
 import { playStomp, playSurprise } from '../audio/sfx.js';
 import { state } from '../state.js';
 
+// Builds live enemies from a level's raw spawn data.
+export function spawnEnemies(spawns) {
+  return spawns.map(e => ({
+    ...e,
+    alive: true,
+    squish: 0,
+    baseY: e.y,
+    baseX: e.x,
+    hopVY: 0,
+    hopTimer: 90 + Math.floor(Math.random() * 150), // ticks down to the next surprise hop
+    shout: 0,
+    awake: false,   // boss only: has the chainsaw come out yet
+    sawRev: 0       // boss only: chainsaw spin/buzz timer
+  }));
+}
+
 // Boss movement/attack timing is driven by the cutscene state machine in
 // scenes/playingScene.js, not by the patrol AI here — see the `enemy.boss`
 // branch below, which just backs off while a cutscene is in control.

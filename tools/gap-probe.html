@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#000;">
+<canvas id="game" width="800" height="450"></canvas>
+<pre id="out"></pre>
+<script>window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERROR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update } from '../src/scenes/sceneManager.js';
+  import { getLevel } from '../src/levels/levelLoader.js';
+
+  const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+
+  setTimeout(() => {
+    key('keydown', ' '); key('keyup', ' ');
+    const lv = getLevel();
+    const ground = lv.platforms.filter(p => p.ground).sort((a,b)=>a.x-b.x);
+
+    const gaps = [];
+    ground.forEach((s,i) => {
+      if (i === 0) return;
+      const prev = ground[i-1];
+      const edge = prev.x + prev.width;
+      if (s.x - edge > 2) gaps.push({ edge, landing: s.x, size: s.x - edge, farEnd: s.x + s.width, runwayFrom: prev.x });
+    });
+
+    // jump styles: [px before the edge to jump, frames to hold jump]
+    const styles = { 'edge+long': [0, 22], 'early+long': [45, 22], 'edge+short': [0, 8] };
+
+    function attempt(gap, lead, hold) {
+      // start on the segment that leads into this gap, never across an earlier one
+      player.x = Math.max(gap.runwayFrom + 2, gap.edge - 200);
+      player.y = lv.groundY - player.height;
+      player.velocityX = 0; player.velocityY = 0; player.invincible = 999;
+      state.lives = 99;
+      state.enemies.forEach(e => e.alive = false);
+      const livesBefore = state.lives;
+      key('keydown', 'ArrowRight');
+      let jumped = false, h = 0, result = 'no result';
+      for (let i = 0; i < 240; i++) {
+        if (!jumped && player.isOnGround && player.x + player.width >= gap.edge - lead) {
+          key('keydown', ' '); jumped = true; h = hold;
+        }
+        if (h > 0 && --h === 0) key('keyup', ' ');
+        update();
+        if (state.lives < livesBefore) { result = 'FELL'; break; }
+        if (jumped && player.isOnGround && player.x > gap.landing) {
+          result = `landed +${Math.round(player.x - gap.landing)}px`; break;
+        }
+      }
+      key('keyup', ' '); key('keyup', 'ArrowRight');
+      return result;
+    }
+
+    const lines = gaps.map(g => {
+      const res = Object.entries(styles).map(([n, [l, h]]) => `${n}: ${attempt(g, l, h)}`);
+      return `gap ${g.edge}-${g.landing} (${g.size}px, far ledge ends ${g.farEnd})\n    ` + res.join('\n    ');
+    });
+    document.getElementById('out').textContent = lines.join('\n') +
+      '\nerrors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none');
+  }, 200);
+</script>
+</body></html>

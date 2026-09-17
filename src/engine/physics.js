@@ -10,8 +10,6 @@ export const JUMP_CUT_MULTIPLIER = 0.6; // releasing jump early cuts upward velo
 export const COYOTE_FRAMES = 9;     // grace window to still jump just after walking off a ledge
 export const JUMP_BUFFER_FRAMES = 6; // grace window: a jump press just before landing still fires
 export const STOMP_BOUNCE = -8;
-export const WORLD_WIDTH = 3200;
-export const GROUND_Y = 410;
 
 export function isColliding(a, b) {
   return (

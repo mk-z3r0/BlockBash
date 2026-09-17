@@ -1,6 +1,7 @@
 import { ctx } from '../engine/renderer.js';
 import { drawStickLegs, drawMuscleArm } from '../engine/renderer.js';
-import { STOMP_BOUNCE, GROUND_Y } from '../engine/physics.js';
+import { STOMP_BOUNCE } from '../engine/physics.js';
+import { getLevel } from '../levels/levelLoader.js';
 import { spawnExplosion, spawnDust } from './particles.js';
 import { playStomp } from '../audio/sfx.js';
 import { state } from '../state.js';
@@ -12,7 +13,7 @@ import { state } from '../state.js';
 export function createRescueNPC(spawnX) {
   return {
     x: spawnX,
-    y: GROUND_Y - 44,
+    y: getLevel().groundY - 44,
     width: 44, height: 44,
     velocityX: 8.5,
     velocityY: 0,
@@ -27,6 +28,7 @@ export function createRescueNPC(spawnX) {
 // Returns true once the NPC has run off-screen and should be discarded.
 export function updateRescueNPC(npc, viewWidth, cameraX) {
   const boss = state.enemies.find(e => e.boss);
+  const groundY = getLevel().groundY;
 
   if (npc.state === 'running') {
     npc.x += npc.velocityX;
@@ -59,8 +61,8 @@ export function updateRescueNPC(npc, viewWidth, cameraX) {
         npc.timer = 0;
       }
     }
-    if (!npc.stomped && npc.y + npc.height >= GROUND_Y) {
-      npc.y = GROUND_Y - npc.height;
+    if (!npc.stomped && npc.y + npc.height >= groundY) {
+      npc.y = groundY - npc.height;
       npc.velocityY = 0;
       if (boss && boss.alive) {
         boss.alive = false;
@@ -76,8 +78,8 @@ export function updateRescueNPC(npc, viewWidth, cameraX) {
   } else if (npc.state === 'landing') {
     npc.velocityY += 0.68;
     npc.y += npc.velocityY;
-    if (npc.y + npc.height >= GROUND_Y) {
-      npc.y = GROUND_Y - npc.height;
+    if (npc.y + npc.height >= groundY) {
+      npc.y = groundY - npc.height;
       npc.velocityY = 0;
       npc.velocityX = 0;
       npc.state = 'posing';

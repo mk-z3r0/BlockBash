@@ -1,13 +1,13 @@
 import { ctx } from '../engine/renderer.js';
 import { isColliding } from '../engine/physics.js';
-import { createCoins } from '../levels/level1.js';
+import { getLevel } from '../levels/levelLoader.js';
 import { playCoin } from '../audio/sfx.js';
 import { state } from '../state.js';
 
 export let coins = [];
 
 export function resetCoins() {
-  coins = createCoins();
+  coins = getLevel().coinSpawns.map(([x, y]) => ({ x, y, size: 12, collected: false }));
 }
 
 export function updateCoins(player) {

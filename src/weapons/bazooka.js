@@ -1,6 +1,7 @@
 import { ctx } from '../engine/renderer.js';
 import { keys } from '../engine/input.js';
-import { isColliding, WORLD_WIDTH } from '../engine/physics.js';
+import { isColliding } from '../engine/physics.js';
+import { getLevel } from '../levels/levelLoader.js';
 import { spawnExplosion } from '../entities/particles.js';
 import { playMissile, playExplosion, playDeflect } from '../audio/sfx.js';
 import { showToast, toast } from '../ui/hud.js';
@@ -44,7 +45,8 @@ export function updateMissiles() {
       spawnExplosion(missile.x, missile.y, '#7a84a8');
     }
   }
-  state.missiles = state.missiles.filter(m => m.x > -50 && m.x < WORLD_WIDTH + 50);
+  const worldWidth = getLevel().worldWidth;
+  state.missiles = state.missiles.filter(m => m.x > -50 && m.x < worldWidth + 50);
 
   for (const missile of state.missiles) {
     if (!missile.hit) {

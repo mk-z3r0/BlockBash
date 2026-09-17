@@ -1,20 +1,19 @@
 import { ctx, VIEW_WIDTH, drawBackground } from '../engine/renderer.js';
-import { isColliding, WORLD_WIDTH } from '../engine/physics.js';
+import { isColliding } from '../engine/physics.js';
 import { camera, updateCamera, resetCamera } from '../engine/camera.js';
 import { state } from '../state.js';
 import {
   player, resetPlayer, updatePlayer, drawPlayer, drawPlayerShout,
   setRespawnPoint, resetDustTimer
 } from '../entities/player.js';
-import { updateEnemies, drawEnemies } from '../entities/enemy.js';
+import { updateEnemies, drawEnemies, spawnEnemies } from '../entities/enemy.js';
 import { createRescueNPC, updateRescueNPC, drawRescueNPC } from '../entities/npc.js';
 import { updateParticles, drawParticles, resetParticles, spawnExplosion } from '../entities/particles.js';
 import { resetCoins, updateCoins, drawCoins } from '../entities/coins.js';
 import { updateBazookaInput, updateMissiles, drawMissiles } from '../weapons/bazooka.js';
-import {
-  goal, checkpoint, createEnemies, resetDynamicPlatforms,
-  drawPlatforms, drawGoal, drawCheckpoint, BOSS_WAKE_X, BOSS_CHARGE_SPEED
-} from '../levels/level1.js';
+import { loadLevel, getLevel } from '../levels/levelLoader.js';
+import { drawPlatforms, drawGoal, drawCheckpoints } from '../levels/levelRenderer.js';
+import level1 from '../levels/data/level1.js';
 import { showToast, updateToast, drawHUD, toast } from '../ui/hud.js';
 import { playHit, playCheckpoint, playChainsawStart, playChainsawLoop, playExplosion, playWin, playGameOver } from '../audio/sfx.js';
 import { switchTo } from './sceneManager.js';
@@ -63,9 +62,14 @@ function loseLife() {
 }
 
 function updateCutscene() {
+  const bossConfig = getLevel().boss;
+  // levels with no boss, or with a boss meant to be fought rather than
+  // watched (Phase 4), never run this cutscene
+  if (!bossConfig || bossConfig.mode !== 'cutscene') return;
+
   if (cutscene === null) {
     const boss = state.enemies.find(e => e.boss && e.alive);
-    if (boss && player.x + player.width > BOSS_WAKE_X) {
+    if (boss && player.x + player.width > bossConfig.wakeX) {
       cutscene = 'freeze';
       cutsceneTimer = 0;
       player.velocityX = 0;
@@ -97,7 +101,7 @@ function updateCutscene() {
     player.shout = 30;
     const boss = state.enemies.find(e => e.boss && e.alive);
     if (boss) {
-      boss.speed = -BOSS_CHARGE_SPEED;
+      boss.speed = -bossConfig.chargeSpeed;
       boss.x += boss.speed;
       boss.sawRev++;
       if (boss.sawRev % 26 === 0) playChainsawLoop();
@@ -147,14 +151,15 @@ function updateCutscene() {
 function resetGame() {
   state.score = 0;
   state.lives = 3;
-  state.enemies = createEnemies();
+
+  const level = loadLevel(level1);
+  state.enemies = spawnEnemies(level.enemySpawns);
   resetCoins();
   state.missiles = [];
   resetParticles();
   resetDustTimer();
   resetBossAndCutscene();
-  resetDynamicPlatforms(); // also clears checkpoint.activated
-  setRespawnPoint(100, 300);
+  setRespawnPoint(level.playerSpawn.x, level.playerSpawn.y);
   resetPlayer();
   resetCamera();
   state.gameState = 'playing';
@@ -166,7 +171,7 @@ export function drawWorldAndHUD() {
   ctx.save();
   ctx.translate(-camera.x, 0);
   drawPlatforms();
-  drawCheckpoint();
+  drawCheckpoints();
   drawGoal();
   drawCoins(state.frameCount);
   drawEnemies(state.frameCount, cutscene === 'done');
@@ -195,11 +200,13 @@ export const playingScene = {
       if (state.gameState !== 'playing') return;
     }
 
-    if (!checkpoint.activated && isColliding(player, checkpoint)) {
-      checkpoint.activated = true;
-      setRespawnPoint(checkpoint.x, checkpoint.y - 20);
-      showToast('CHECKPOINT REACHED', 90);
-      playCheckpoint();
+    for (const checkpoint of getLevel().checkpoints) {
+      if (!checkpoint.activated && isColliding(player, checkpoint)) {
+        checkpoint.activated = true;
+        setRespawnPoint(checkpoint.x, checkpoint.y - 20);
+        showToast('CHECKPOINT REACHED', 90);
+        playCheckpoint();
+      }
     }
 
     updateCutscene();
@@ -216,6 +223,7 @@ export const playingScene = {
     updateParticles();
     updateCoins(player);
 
+    const goal = getLevel().goal;
     if (isColliding(player, goal)) {
       if (bossActive()) {
         // the sphere body-blocks the flag — taunt and shove the player back
@@ -231,7 +239,7 @@ export const playingScene = {
     }
 
     updateToast();
-    updateCamera(player.x, VIEW_WIDTH, WORLD_WIDTH);
+    updateCamera(player.x, VIEW_WIDTH, getLevel().worldWidth);
   },
 
   draw: drawWorldAndHUD,
