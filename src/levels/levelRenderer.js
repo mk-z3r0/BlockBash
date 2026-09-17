@@ -97,6 +97,39 @@ export function drawPlatforms() {
   drawHazardStripes(platforms);
 }
 
+const SPIKE_HEIGHT = 16;
+const SPIKE_TOOTH = 16; // target width per tooth; actual width divides evenly
+
+export function drawHazards() {
+  for (const h of getLevel().hazards) {
+    if (h.type !== 'spikes') continue;
+
+    // dark mounting band, so spikes read as sitting ON the surface
+    ctx.fillStyle = '#2d3340';
+    ctx.fillRect(h.x, h.y - 3, h.width, 4);
+
+    const count = Math.max(1, Math.round(h.width / SPIKE_TOOTH));
+    const w = h.width / count;
+    const grad = ctx.createLinearGradient(0, h.y - SPIKE_HEIGHT, 0, h.y);
+    grad.addColorStop(0, '#e8eef8');
+    grad.addColorStop(1, '#5b6678');
+
+    for (let i = 0; i < count; i++) {
+      const x = h.x + i * w;
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.moveTo(x, h.y);
+      ctx.lineTo(x + w / 2, h.y - SPIKE_HEIGHT);
+      ctx.lineTo(x + w, h.y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#3a4a82';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+}
+
 export function drawGoal() {
   const { goal } = getLevel();
   ctx.fillStyle = '#5ee7ff';

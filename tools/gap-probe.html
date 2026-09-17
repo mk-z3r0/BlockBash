@@ -11,54 +11,116 @@
   import { getLevel } from '../src/levels/levelLoader.js';
 
   const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+  const out = [];
 
   setTimeout(() => {
     key('keydown', ' '); key('keyup', ' ');
     const lv = getLevel();
     const ground = lv.platforms.filter(p => p.ground).sort((a,b)=>a.x-b.x);
+    const solidAt = x => ground.some(p => x >= p.x && x <= p.x + p.width);
+    const spikeAt = x => lv.hazards.some(h => x >= h.x - 2 && x <= h.x + h.width + 2);
 
+    function place(x, y) {
+      player.x = x; player.y = y;
+      player.velocityX = 0; player.velocityY = 0;
+      player.invincible = 0; player.isOnGround = false;
+      state.lives = 99;
+    }
+
+    // isolated jump tests measure geometry, so patrolling spheres in the
+    // runway would just add noise
+    const clearEnemies = () => state.enemies.forEach(e => { e.alive = false; });
+
+    // never start a runway on top of an earlier hazard
+    function runwayStart(triggerX, segStart) {
+      const prevHazardEnd = lv.hazards
+        .filter(h => h.x + h.width < triggerX)
+        .reduce((m, h) => Math.max(m, h.x + h.width + 12), 0);
+      return Math.max(segStart + 2, prevHazardEnd, triggerX - 200);
+    }
+
+    // ---- 1. gap clearance ----
     const gaps = [];
     ground.forEach((s,i) => {
       if (i === 0) return;
-      const prev = ground[i-1];
-      const edge = prev.x + prev.width;
-      if (s.x - edge > 2) gaps.push({ edge, landing: s.x, size: s.x - edge, farEnd: s.x + s.width, runwayFrom: prev.x });
+      const prev = ground[i-1], edge = prev.x + prev.width;
+      if (s.x - edge > 2) gaps.push({ edge, landing: s.x, size: s.x - edge, from: prev.x });
     });
 
-    // jump styles: [px before the edge to jump, frames to hold jump]
-    const styles = { 'edge+long': [0, 22], 'early+long': [45, 22], 'edge+short': [0, 8] };
-
-    function attempt(gap, lead, hold) {
-      // start on the segment that leads into this gap, never across an earlier one
-      player.x = Math.max(gap.runwayFrom + 2, gap.edge - 200);
-      player.y = lv.groundY - player.height;
-      player.velocityX = 0; player.velocityY = 0; player.invincible = 999;
-      state.lives = 99;
-      state.enemies.forEach(e => e.alive = false);
-      const livesBefore = state.lives;
+    function jumpTest(triggerX, fromX, targetX, lead, hold) {
+      place(runwayStart(triggerX, fromX), lv.groundY - player.height);
+      clearEnemies();
+      const lives0 = state.lives;
       key('keydown', 'ArrowRight');
-      let jumped = false, h = 0, result = 'no result';
-      for (let i = 0; i < 240; i++) {
-        if (!jumped && player.isOnGround && player.x + player.width >= gap.edge - lead) {
+      let jumped = false, h = 0, res = 'no result';
+      for (let i = 0; i < 260; i++) {
+        if (!jumped && player.isOnGround && player.x + player.width >= triggerX - lead) {
           key('keydown', ' '); jumped = true; h = hold;
         }
         if (h > 0 && --h === 0) key('keyup', ' ');
         update();
-        if (state.lives < livesBefore) { result = 'FELL'; break; }
-        if (jumped && player.isOnGround && player.x > gap.landing) {
-          result = `landed +${Math.round(player.x - gap.landing)}px`; break;
-        }
+        if (state.lives < lives0) { res = 'DIED'; break; }
+        if (jumped && player.isOnGround && player.x > targetX) { res = `ok +${Math.round(player.x - targetX)}`; break; }
       }
-      key('keyup', ' '); key('keyup', 'ArrowRight');
-      return result;
+      key('keyup',' '); key('keyup','ArrowRight');
+      return res;
     }
 
-    const lines = gaps.map(g => {
-      const res = Object.entries(styles).map(([n, [l, h]]) => `${n}: ${attempt(g, l, h)}`);
-      return `gap ${g.edge}-${g.landing} (${g.size}px, far ledge ends ${g.farEnd})\n    ` + res.join('\n    ');
+    const styles = [['edge+long',0,22], ['early+long',45,22], ['edge+short',0,8]];
+    out.push('== GAPS ==');
+    gaps.forEach(g => {
+      const r = styles.map(([n,l,h]) => `${n}:${jumpTest(g.edge, g.from, g.landing, l, h)}`);
+      out.push(`  ${g.edge}-${g.landing} (${g.size}px)  ${r.join('  ')}`);
     });
-    document.getElementById('out').textContent = lines.join('\n') +
-      '\nerrors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none');
+
+    // ---- 2. spike clearance (only the ones meant to be jumped) ----
+    out.push('== SPIKES ==');
+    lv.hazards.forEach(hz => {
+      const seg = ground.find(p => hz.x >= p.x && hz.x <= p.x + p.width);
+      if (hz.width > 150) { out.push(`  ${hz.x}-${hz.x+hz.width} (${hz.width}px): platform crossing, tested below`); return; }
+      const r = styles.map(([n,l,h]) => `${n}:${jumpTest(hz.x, seg.x, hz.x + hz.width, l, h)}`);
+      out.push(`  ${hz.x}-${hz.x+hz.width} (${hz.width}px)  ${r.join('  ')}`);
+    });
+
+    // ---- 2b. how wide is the timing window on each spike? ----
+    out.push('== SPIKE TIMING WINDOW (px of lead before the spikes) ==');
+    lv.hazards.forEach(hz => {
+      if (hz.width > 150) return;
+      const seg = ground.find(p => hz.x >= p.x && hz.x <= p.x + p.width);
+      const okLeads = [];
+      for (let lead = 0; lead <= 160; lead += 10) {
+        if (jumpTest(hz.x, seg.x, hz.x + hz.width, lead, 22).startsWith('ok')) okLeads.push(lead);
+      }
+      const span = okLeads.length ? `${okLeads[0]}-${okLeads[okLeads.length-1]}px` : 'NONE';
+      out.push(`  ${hz.x}-${hz.x+hz.width} (${hz.width}px): works jumping ${span}  (${okLeads.length}/17 timings)`);
+    });
+
+    // ---- 3. autoplay: how far, and where does it die ----
+    out.push('== AUTOPLAY ==');
+    place(lv.playerSpawn.x, lv.playerSpawn.y);
+    state.lives = 99;
+    state.enemies.forEach(e => { e.alive = true; });
+    key('keydown', 'ArrowRight');
+    let maxX = player.x, hold = 0, lives0 = state.lives, deaths = [];
+    for (let i = 0; i < 12000; i++) {
+      if (player.isOnGround && hold === 0) {
+        const ahead = player.x + player.width + 28;
+        const enemyAhead = state.enemies.some(e => e.alive && !e.boss &&
+          e.x > player.x && e.x - (player.x + player.width) < 58 && Math.abs(e.y - player.y) < 40);
+        if (!solidAt(ahead) || spikeAt(ahead) || enemyAhead) { key('keydown',' '); hold = 16; }
+      }
+      if (hold > 0 && --hold === 0) key('keyup', ' ');
+      const beforeX = player.x;   // loseLife() teleports to the checkpoint
+      update();
+      if (state.lives < lives0) { deaths.push(Math.round(beforeX)); lives0 = state.lives; }
+      if (player.x > maxX) maxX = player.x;
+      if (state.gameState !== 'playing') break;
+    }
+    out.push(`  furthest: ${Math.round(maxX)} / goal ${lv.goal.x}   deaths: ${deaths.length}`);
+    out.push(`  died near x: ${deaths.length ? deaths.join(', ') : 'never'}`);
+    out.push(`  gameState: ${state.gameState}`);
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
   }, 200);
 </script>
 </body></html>

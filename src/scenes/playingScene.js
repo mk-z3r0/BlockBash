@@ -12,7 +12,7 @@ import { updateParticles, drawParticles, resetParticles, spawnExplosion } from '
 import { resetCoins, updateCoins, drawCoins } from '../entities/coins.js';
 import { updateBazookaInput, updateMissiles, drawMissiles } from '../weapons/bazooka.js';
 import { loadLevel, getLevel } from '../levels/levelLoader.js';
-import { drawPlatforms, drawGoal, drawCheckpoints } from '../levels/levelRenderer.js';
+import { drawPlatforms, drawGoal, drawCheckpoints, drawHazards } from '../levels/levelRenderer.js';
 import level1 from '../levels/data/level1.js';
 import { showToast, updateToast, drawHUD, toast } from '../ui/hud.js';
 import { playHit, playCheckpoint, playChainsawStart, playChainsawLoop, playExplosion, playWin, playGameOver } from '../audio/sfx.js';
@@ -171,6 +171,7 @@ export function drawWorldAndHUD() {
   ctx.save();
   ctx.translate(-camera.x, 0);
   drawPlatforms();
+  drawHazards();
   drawCheckpoints();
   drawGoal();
   drawCoins(state.frameCount);
@@ -195,6 +196,12 @@ export const playingScene = {
     updateBazookaInput(player, inputLocked);
 
     if (fellInPit) {
+      playHit();
+      loseLife();
+      if (state.gameState !== 'playing') return;
+    }
+
+    if (player.invincible <= 0 && getLevel().hazards.some(h => isColliding(player, h.hitbox))) {
       playHit();
       loseLife();
       if (state.gameState !== 'playing') return;
