@@ -17,6 +17,7 @@ import { levels } from '../levels/registry.js';
 import { showToast, updateToast, drawHUD, toast } from '../ui/hud.js';
 import { playHit, playCheckpoint, playChainsawStart, playChainsawLoop, playExplosion, playWin, playGameOver } from '../audio/sfx.js';
 import { switchTo } from './sceneManager.js';
+import { recordProgress } from '../save.js';
 
 // --- Cutscene state machine (the chainsaw-boss showdown): null (not
 // started) -> 'freeze' -> 'charge' -> 'rescue' -> 'done'. Scoped to this
@@ -52,6 +53,7 @@ function resetBossAndCutscene() {
 function loseLife() {
   state.lives--;
   if (state.lives <= 0) {
+    recordProgress(state.currentLevelIndex, state.score);
     state.gameState = 'gameover';
     playGameOver();
     switchTo('gameover');
@@ -154,6 +156,7 @@ function updateCutscene() {
 // level" and "retry the level I died on" share.
 function startLevel(index) {
   state.currentLevelIndex = index;
+  recordProgress(index, state.score);
 
   const level = loadLevel(levels[index]);
   state.enemies = spawnEnemies(level.enemySpawns);
@@ -264,6 +267,7 @@ export const playingScene = {
         startLevel(state.currentLevelIndex + 1);
         return;
       } else {
+        recordProgress(state.currentLevelIndex, state.score);
         state.gameState = 'win';
         playWin();
         switchTo('win');

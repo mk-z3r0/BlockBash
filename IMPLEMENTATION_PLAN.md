@@ -26,7 +26,7 @@ tools/        gap-probe, cutscene-probe, shot  (dev tools, need the server runni
 |---|---|
 | 0 — module split + scene manager | done |
 | 1 — data-driven levels, loader, transitions | steps 1–4 done — loader, renderer, spikes, level 1 extended |
-| **Milestone: Level 1 complete** | **not yet reached** — progression + versioned save, and the retrofit checklist, remain |
+| **Milestone: Level 1 complete** | **not yet reached** — progression + versioned save are done; the retrofit checklist remains |
 | 2+ (level tool, chamfers, enemies, weapons, octagons, world manipulation, polish) | not started, re-scoped by the design doc, blocked on the milestone |
 
 Level 1 runs 0–7200px: pits and passive spheres, then a spike half, then an
@@ -112,17 +112,25 @@ are the milestone above; step 3 onward is what comes after — starting with
 the level tool, built early on Mike's call rather than waiting until hand-
 authoring starts hurting.
 
-**1. Finish Phase 1 — progression + save**
-`startNewRun()` vs `loadLevel()`; game over restarts the *current* level, never
-level 1. Coin counter on the HUD, coins→extra lives thresholds. 7-level registry.
+**1. Finish Phase 1 — progression + save** — done
+`startLevel()`/`retryCurrentLevel()`/`startNewRun()` (src/scenes/playingScene.js)
+replaced one resetGame() that couldn't tell "new run" from "same-level retry"
+apart. Game over restarts the *current* level, never level 1 — verified with
+tools/progression-probe.html by forcing a 2-level registry at runtime, since
+that branch is a no-op with only one real level to observe. Coin counter +
+coins→extra-life thresholds on the HUD. A 1-entry level registry
+(src/levels/registry.js) exists and is what the level-transition logic reads
+from, ready for level 2 to just be appended.
 
-Save via localStorage, wrapped in try/catch (it throws in private browsing) —
-**and versioned from the start.** Every save carries a `saveVersion` field; on
-load, a mismatch means "reset," never "crash" or "load anyway and hope."
-Level data *will* change under existing saves — a moved platform, a
-rebalanced enemy, a level added — and there's no save yet to migrate, so this
-is free today and a real bug hunt if it's bolted on after saves exist in the
-wild.
+Save via localStorage (src/save.js), wrapped in try/catch — it throws
+outright in private browsing — **and versioned from the start**: every save
+carries a `saveVersion` field, and a mismatch means "reset," never "crash" or
+"load anyway and hope." Tracks furthest level reached and best score;
+recorded at level-advance, win, and game-over. Shown on the title screen when
+a save exists. Verified with tools/save-probe.html: round-trip, a lower score
+never regresses the best, a version mismatch or corrupted/malformed JSON both
+reset cleanly instead of trusting bad data, and a simulated storage failure
+(private browsing) doesn't crash the game.
 
 **2. Level 1 retrofit**
 See the checklist below. This is what turns "concept test" into "finished

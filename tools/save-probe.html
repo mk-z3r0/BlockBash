@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#000;"><canvas id="game" width="800" height="450"></canvas><pre id="out"></pre>
+<script>window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  import { loadSave, recordProgress } from '../src/save.js';
+  const out = [];
+  localStorage.removeItem('blockbash-save');
+
+  // --- 1. fresh load, no save present ---
+  out.push('1. fresh: ' + JSON.stringify(loadSave()));
+
+  // --- 2. round trip via recordProgress ---
+  recordProgress(0, 150);
+  out.push('2. after recordProgress(0, 150): ' + JSON.stringify(loadSave()));
+  recordProgress(0, 90); // lower score, same level - should NOT regress bestScore
+  out.push('3. after recordProgress(0, 90) [lower score]: ' + JSON.stringify(loadSave()));
+  recordProgress(0, 300);
+  out.push('4. after recordProgress(0, 300) [higher score]: ' + JSON.stringify(loadSave()));
+
+  // --- 3. version mismatch: old/foreign save data gets reset, not trusted ---
+  localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 999, furthestLevelIndex: 6, bestScore: 9999 }));
+  out.push('5. version-mismatch load: ' + JSON.stringify(loadSave()) + '  <-- must be defaults, not level 6/score 9999');
+
+  // --- 4. corrupted JSON ---
+  localStorage.setItem('blockbash-save', '{not valid json!!');
+  out.push('6. corrupted-JSON load: ' + JSON.stringify(loadSave()) + '  <-- must be defaults, no throw');
+
+  // --- 5. malformed shape (right version, wrong field types) ---
+  localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 'two', bestScore: null }));
+  out.push('7. malformed-shape load: ' + JSON.stringify(loadSave()) + '  <-- must be defaults');
+
+  // --- 6. storage throws outright (private browsing simulation) ---
+  localStorage.removeItem('blockbash-save');
+  const realGet = Storage.prototype.getItem, realSet = Storage.prototype.setItem;
+  Storage.prototype.getItem = function() { throw new DOMException('blocked'); };
+  Storage.prototype.setItem = function() { throw new DOMException('blocked'); };
+  let threw = false;
+  try {
+    recordProgress(2, 500);
+    out.push('8. recordProgress with storage throwing: ' + JSON.stringify(loadSave()) + '  <-- no throw, defaults');
+  } catch (e) { threw = true; out.push('8. THREW: ' + e.message); }
+  Storage.prototype.getItem = realGet; Storage.prototype.setItem = realSet;
+  out.push('9. storage-throw scenario crashed the game: ' + threw);
+
+  // --- 7. integration: does an actual playthrough persist? ---
+  localStorage.removeItem('blockbash-save');
+  setTimeout(async () => {
+    const { player } = await import('../src/entities/player.js');
+    const { state } = await import('../src/state.js');
+    const { update } = await import('../src/scenes/sceneManager.js');
+    const { getLevel } = await import('../src/levels/levelLoader.js');
+    const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+
+    key('keydown', ' '); key('keyup', ' '); // title -> playing
+    state.score = 555;
+    state.enemies.forEach(e => e.alive = false);
+    const lv = getLevel();
+    player.x = lv.goal.x; player.y = lv.goal.y + 5; player.velocityX = 0; player.velocityY = 0;
+    update();
+    out.push('10. real playthrough to the win screen: gameState=' + state.gameState);
+    out.push('11. what actually landed in localStorage: ' + localStorage.getItem('blockbash-save'));
+
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 200);
+</script></body></html>
