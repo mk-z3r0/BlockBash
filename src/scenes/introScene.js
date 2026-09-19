@@ -45,9 +45,14 @@ const HOUSE_GROUND_Y = VIEW_HEIGHT * 0.78;
 // nothing else needs 3D yet.
 // ============================================
 const CAM_DIST = 480;
-const CAM_TILT = -0.32; // fixed downward camera tilt, a flattering 3/4 view
-const ROT_SPEED = 0.0021; // slow — a pan, not a spin
-const PLANET_BASE_ANGLE = 0.5;
+const CAM_TILT = -0.52; // ~30 degrees above the horizon, more top-down
+const ROT_SPEED = 0.0004; // slow — a pan, not a spin (was 0.0021, an 81% cut)
+// Chosen so the exploding corner ends up well-framed (centered, and its
+// face pointing most directly at the camera) right at EXPLOSION_FRAME,
+// given the current ROT_SPEED — solved with tools/corner-angle-probe.html
+// rather than eyeballed. It also happens to frame the opening shot well;
+// if either ROT_SPEED or EXPLOSION_FRAME changes, re-run that probe.
+const PLANET_BASE_ANGLE = 2.1;
 
 function normalize3(x, y, z) {
   const l = Math.hypot(x, y, z) || 1;
@@ -95,10 +100,12 @@ function makeFace(axis, sign) {
   return { verts, normal, craters: makeCraters(), damaged: false };
 }
 function makeCraters() {
-  const n = 2 + Math.floor(Math.random() * 3);
+  // Many small, fine specks rather than a few big holes — the original
+  // read as cheese, not a rocky/worn surface.
+  const n = 34 + Math.floor(Math.random() * 16);
   const spots = [];
   for (let i = 0; i < n; i++) {
-    spots.push({ u: 0.2 + Math.random() * 0.6, v: 0.2 + Math.random() * 0.6, r: 0.06 + Math.random() * 0.08 });
+    spots.push({ u: 0.06 + Math.random() * 0.88, v: 0.06 + Math.random() * 0.88, r: 0.01 + Math.random() * 0.016 });
   }
   return spots;
 }
@@ -126,12 +133,19 @@ function buildChamferedFaces() {
   for (const f of faces) {
     const idx = f.verts.findIndex(isCorner);
     if (idx === -1) continue;
-    // the two edge-points belonging to this face, in an order that keeps
-    // the polygon loop non-self-intersecting
+    // The two edge-points belonging to this face, in the order that keeps
+    // the polygon loop simple (non-self-intersecting): each one has to sit
+    // next to whichever original neighbor it's closest to, or the new
+    // 5-gon's edges cross themselves — a bowtie, which is exactly what was
+    // "artifacting" at the explosion. Traced by hand: for the x+ face,
+    // verts[1] differs from the corner in z (it's the "z-neighbor") and
+    // verts[3] differs in y (the "y-neighbor"), so the replacement must go
+    // [alongZ, alongY] — toward verts[1] first, then toward verts[3]. Same
+    // reasoning for z+. y+ already happened to have this right.
     const replacement =
-      f.normal.x === 1 ? [alongY, alongZ] :
+      f.normal.x === 1 ? [alongZ, alongY] :
       f.normal.y === 1 ? [alongZ, alongX] :
-      [alongX, alongY]; // normal.z === 1
+      [alongY, alongX]; // normal.z === 1
     f.verts.splice(idx, 1, ...replacement);
     f.craters = f.craters.filter(c => Math.hypot(c.u - 0.85, c.v - 0.85) > 0.25); // clear craters near the cut
   }
@@ -181,10 +195,11 @@ function makeStars() {
 // A handful converge on the corner that's about to blow off (in the cube's
 // LOCAL unit space, so they rotate consistently with the planet); the rest
 // drift toward random points on random faces — "many spheres descend," not
-// all aimed at once. Each starts from a genuinely far random point in 3D,
-// which is what makes them grow correctly as they approach: the same
-// project() the planet uses naturally shrinks distant points and grows near
-// ones, so there's no separate "size over time" hack to keep in sync.
+// all aimed at once. Their screen position comes from the same 3D pipeline
+// as the planet (so the path correctly tracks the rotating cube), but their
+// SIZE is deliberately NOT derived from perspective — see drawSpheres().
+// They should read as landing and disappearing into the surface, not as
+// approaching the camera and growing.
 function makeSpheres() {
   const arr = [];
   for (let i = 0; i < 11; i++) {
@@ -216,7 +231,7 @@ function makeSpheres() {
       y: targetLocal.y + targetNormal.y * 0.14,
       z: targetLocal.z + targetNormal.z * 0.14
     };
-    arr.push({ start, target, size: targeted ? 8 : 4.5 });
+    arr.push({ start, target, size: targeted ? 15 : 10 });
   }
   return arr;
 }
@@ -274,7 +289,7 @@ function drawPlanet(angleY, scale) {
         const local = bilerp(f.verts, c.u, c.v);
         const camP = toCameraSpace(local, angleY, scale);
         const p = project(camP);
-        ctx.fillStyle = `rgba(90, 65, 20, ${0.3 + intensity * 0.15})`;
+        ctx.fillStyle = `rgba(90, 65, 20, ${0.4 + intensity * 0.2})`;
         ctx.beginPath();
         ctx.ellipse(p.x, p.y, c.r * scale * avgScale, c.r * scale * avgScale * 0.65, 0, 0, Math.PI * 2);
         ctx.fill();
@@ -288,13 +303,22 @@ function drawSpheres(angleY, scale, progress) {
     const local = lerp3(s.start, s.target, progress);
     const cam = toCameraSpace(local, angleY, scale);
     const p = project(cam);
-    const r = s.size * p.scale;
+
+    // Size is explicitly a function of landing progress, NOT perspective —
+    // they read as landing and disappearing into the surface, not as
+    // approaching the camera and growing. Eased so most of the shrink
+    // happens late, like slowing into a landing rather than shrinking at a
+    // constant rate.
+    const shrink = Math.pow(Math.max(0, 1 - progress), 0.6);
+    const r = s.size * shrink;
+    if (r < 0.6) continue; // landed — nothing left to draw
+
     const grad = ctx.createRadialGradient(p.x - r * 0.3, p.y - r * 0.3, 1, p.x, p.y, r);
     grad.addColorStop(0, '#ff9fc4');
     grad.addColorStop(1, '#a12d5c');
     ctx.fillStyle = grad;
     ctx.beginPath();
-    ctx.arc(p.x, p.y, Math.max(0.5, r), 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
     ctx.fill();
   }
 }

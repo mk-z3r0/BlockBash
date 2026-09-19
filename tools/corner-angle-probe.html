@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html><body><pre id="out">loading</pre>
+<script type="module">
+  // reproduce the exact transform pipeline from introScene.js to find which
+  // angleY actually centers the exploding corner on screen
+  const CAM_DIST = 480, CAM_TILT = -0.52, VIEW_W = 800, VIEW_H = 450;
+  const CX = VIEW_W / 2, CY = VIEW_H * 0.44;
+  function rotY(p, a) { const c = Math.cos(a), s = Math.sin(a); return { x: p.x * c + p.z * s, y: p.y, z: -p.x * s + p.z * c }; }
+  function rotX(p, a) { const c = Math.cos(a), s = Math.sin(a); return { x: p.x, y: p.y * c - p.z * s, z: p.y * s + p.z * c }; }
+  function project(p) { const f = CAM_DIST / (CAM_DIST + p.z); return { x: CX + p.x * f, y: CY + p.y * f, scale: f }; }
+
+  const corner = { x: 1, y: 1, z: 1 };
+  const scale = 105;
+  const out = [];
+  for (let deg = 0; deg <= 360; deg += 15) {
+    const a = deg * Math.PI / 180;
+    const scaled = { x: corner.x * scale, y: corner.y * scale, z: corner.z * scale };
+    const cam = rotX(rotY(scaled, a), CAM_TILT);
+    const p = project(cam);
+    const onscreen = p.x > 60 && p.x < VIEW_W - 60 && p.y > 40 && p.y < VIEW_H - 40;
+    const frontFacing = cam.z < 0;
+    out.push(`angleY=${deg}deg (${a.toFixed(3)}rad): screen=(${p.x.toFixed(0)},${p.y.toFixed(0)}) camZ=${cam.z.toFixed(1)} ${frontFacing ? 'front' : 'BACK'} ${onscreen ? 'onscreen' : 'off'}`);
+  }
+  document.getElementById('out').textContent = out.join('\n');
+</script></body></html>
