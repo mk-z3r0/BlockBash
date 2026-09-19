@@ -199,13 +199,43 @@ reports how many jump timings actually clear each obstacle. Headless Chromium
 barely fires `requestAnimationFrame`, so ticking `update()` by hand is the only
 way to simulate more than a frame or two.
 
-- **Jump arc:** rises ~146px, carries ~162px horizontally, ~45 frames airborne.
+- **Jump arc:** rises ~144px, ~47 frames airborne regardless of speed. Horizontal
+  carry depends on which speed cap is active — walk ~93.5px, run ~168px (same
+  physics, just a lower speed cap; see physics.js). Any gap/hazard analysis
+  needs both numbers now, not one.
 - **Never put a platform directly above a jump-off point.** The player rises
   into it and a correctly-timed jump becomes a death. This caused the worst bug
   in level 1.
-- **Jumpable spike beds cap at ~60px.** Wider and jumping early enough to clear
-  lands you mid-bed; the window of workable timings collapses (a 100px bed
-  leaves ~44px of window, a 60px bed ~80px).
+- **Jumpable spike beds cap at ~60px at run speed.** Wider and jumping early
+  enough to clear lands you mid-bed; the window of workable timings collapses
+  (a 100px bed leaves ~44px of window, a 60px bed ~80px). At walk speed the
+  ceiling is far lower — walk's own max carry (~93.5px) is the hard limit, so
+  anything approaching that width is effectively a run-only bed regardless of
+  timing.
+- **At walk speed, jump right at the edge — never early.** There's no carry to
+  spare, so an early jump wastes distance you don't have and reliably falls
+  short; at run speed the extra ~75px of carry makes early jumps forgiving.
+  This is a real second skill axis (precision vs. commitment), not just "run
+  goes further" — confirmed by sweeping jump timing across a range of
+  lead/hold combinations, not assumed. Don't put the first walk/run-relevant
+  obstacle in a level somewhere a new player hasn't had room to discover this;
+  level 1's very first gap had to be narrowed for exactly this reason.
+- **Don't test spike-bed clearance with `player.invincible` set high as a
+  "safety" value.** The real hazard-death check is itself gated on
+  `invincible<=0`, so a high value silently defeats it and the player walks
+  through spikes unharmed in the test — every spike-bed measurement in an
+  earlier pass was invalid this way before it was caught. Falling into a gap
+  is a different, invincibility-independent check (`player.y` past the bottom
+  of the screen), so gap results aren't affected by this trap. Set it to 0.
+- **A fixed-lookahead autoplay bot is not a reliable per-obstacle judge of
+  difficulty at a speed it wasn't tuned for.** One bot (fixed lookahead
+  distance + hold duration) can clear the whole level at run speed with zero
+  deaths while failing almost everything at walk speed — not because walk is
+  broken, but because the bot's specific strategy (jump N px early) is the
+  wrong technique at walk speed specifically. Trust a full-level clean run for
+  "is this level beatable"; don't trust one bot's per-obstacle pass/fail as
+  "is this obstacle beatable at this speed" without also sweeping actual
+  timing windows directly.
 - **Wider hazards get crossed via platforms,** not jumped.
 - **Keep landing zones clear of the next hazard.** A hard jump carries 162px —
   don't let a full-power leap off a pit land in spikes.
