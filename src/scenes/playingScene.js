@@ -20,6 +20,7 @@ import { playHit, playCheckpoint, playChainsawStart, playChainsawLoop, playExplo
 import { startMusic } from '../audio/audio.js';
 import { switchTo } from './sceneManager.js';
 import { recordProgress } from '../save.js';
+import { drawOverlay } from '../ui/overlays.js';
 
 // --- Cutscene state machine (the chainsaw-boss showdown): null (not
 // started) -> 'freeze' -> 'charge' -> 'rescue' -> 'done'. Scoped to this
@@ -28,6 +29,12 @@ import { recordProgress } from '../save.js';
 let cutscene = null;
 let cutsceneTimer = 0;
 let rescueNPC = null;
+
+// Pause is a flag, not a scene transition — switching away from 'playing'
+// and back would re-run enter(), which always means "start a run" or
+// "retry the level," neither of which is "resume where I was." A flag
+// sidesteps that entirely: update() just does nothing while paused.
+let paused = false;
 
 function bossActive() {
   // the boss blocks the flag until the cutscene NPC has dealt with it
@@ -160,6 +167,7 @@ function startLevel(index) {
   state.currentLevelIndex = index;
   recordProgress(index, state.score);
   startMusic(); // idempotent — no-op on retries once it's already playing
+  paused = false;
 
   const level = loadLevel(levels[index]);
   state.enemies = spawnEnemies(level.enemySpawns);
@@ -220,6 +228,7 @@ export const playingScene = {
   },
 
   update() {
+    if (paused) return;
     state.frameCount++;
     const inputLocked = !!(cutscene && cutscene !== 'done');
 
@@ -284,9 +293,20 @@ export const playingScene = {
     updateCamera(player.x, VIEW_WIDTH, getLevel().worldWidth);
   },
 
-  draw: drawWorldAndHUD,
+  draw() {
+    drawWorldAndHUD();
+    if (paused) {
+      drawOverlay('PAUSED', 'Press ESC or START to resume', `Score ${state.score} · Level ${state.currentLevelIndex + 1}`, '#5ee7ff');
+    }
+  },
 
-  handleKeyDown(e) {
+  handleKeyDown(e, alreadyDown) {
+    if (e.key === 'Escape' && !alreadyDown) {
+      paused = !paused;
+      return;
+    }
+    if (paused) return; // no other input does anything while paused
+
     // secret unlock (parents only): Shift+K calls the sphere off so the flag
     // works, or skips the cutscene if it's playing
     if (e.shiftKey && (e.key === 'K' || e.key === 'k') && cutscene && cutscene !== 'done') {

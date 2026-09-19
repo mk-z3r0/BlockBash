@@ -34,6 +34,9 @@
 
   .frame {
     position: relative;
+    /* border-box is global, so this has to include the padding below —
+       otherwise the frame ends up narrower than the 800px canvas inside it */
+    max-width: calc(800px + 2 * 18px);
     padding: 18px;
     background: var(--bg-panel);
     border: 2px solid var(--line);
@@ -66,6 +69,11 @@
 
   .controls {
     display: flex;
+    /* a fixed width, not just flex-wrap, so wrapping has an unambiguous
+       boundary to wrap against — .frame is a shrink-to-fit flex child of
+       body (align-items:center), so its width chain doesn't reliably
+       constrain this without something concrete to anchor to */
+    width: 800px;
     flex-wrap: wrap;
     justify-content: space-between;
     gap: 6px 16px;
@@ -85,10 +93,13 @@
   <div class="controls">
     <span>&larr; &rarr; / A D — move</span>
     <span>SPACE / &uarr; / W — jump</span>
+    <span>SHIFT — run</span>
     <span>B — bazooka</span>
+    <span>ESC — pause</span>
     <span>M — mute</span>
     <span>R — restart</span>
   </div>
+  <p class="tagline" style="margin-top:6px;">Xbox controller: A jump &middot; B run &middot; X bazooka &middot; Start pause</p>
 </div>
 
 <script type="module" src="src/main.js"></script>

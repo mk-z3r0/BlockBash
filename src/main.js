@@ -1,4 +1,5 @@
 import { initInput } from './engine/input.js';
+import { pollGamepad } from './engine/gamepad.js';
 import { initAudio, resumeAudioIfSuspended, toggleMute } from './audio/audio.js';
 import { bufferJump } from './entities/player.js';
 import { registerScene, switchTo, update, draw, handleKeyDown } from './scenes/sceneManager.js';
@@ -43,6 +44,7 @@ initInput({
 switchTo('title');
 
 function gameLoop() {
+  pollGamepad();
   update();
   draw();
   requestAnimationFrame(gameLoop);

@@ -1,7 +1,8 @@
 import { keys } from '../engine/input.js';
 import { ctx, VIEW_HEIGHT, drawStickLegs, drawMuscleArm } from '../engine/renderer.js';
 import {
-  GRAVITY_UP, GRAVITY_DOWN, ACCEL, FRICTION, TURN_ACCEL, MAX_SPEED,
+  GRAVITY_UP, GRAVITY_DOWN, ACCEL, FRICTION, TURN_ACCEL,
+  WALK_MAX_SPEED, RUN_MAX_SPEED,
   JUMP_FORCE, JUMP_CUT_MULTIPLIER, COYOTE_FRAMES, JUMP_BUFFER_FRAMES,
   isColliding
 } from '../engine/physics.js';
@@ -60,6 +61,8 @@ export function updatePlayer(inputLocked) {
   const level = getLevel();
   const left = !inputLocked && (keys['ArrowLeft'] || keys['a']);
   const right = !inputLocked && (keys['ArrowRight'] || keys['d']);
+  const running = !inputLocked && keys['Shift'];
+  const maxSpeed = running ? RUN_MAX_SPEED : WALK_MAX_SPEED;
 
   if (left && !right) {
     if (player.velocityX > 0) player.velocityX -= TURN_ACCEL; // reversing: extra kick to kill old momentum
@@ -73,7 +76,7 @@ export function updatePlayer(inputLocked) {
     if (player.velocityX > 0) player.velocityX = Math.max(0, player.velocityX - FRICTION);
     else if (player.velocityX < 0) player.velocityX = Math.min(0, player.velocityX + FRICTION);
   }
-  player.velocityX = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, player.velocityX));
+  player.velocityX = Math.max(-maxSpeed, Math.min(maxSpeed, player.velocityX));
 
   // --- coyote time: still allowed to jump briefly after leaving a ledge ---
   if (player.isOnGround) player.coyoteTimer = COYOTE_FRAMES;

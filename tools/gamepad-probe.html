@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#000;">
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true }));</script>
+<canvas id="game" width="800" height="450"></canvas><pre id="out"></pre>
+<script>window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update } from '../src/scenes/sceneManager.js';
+  import { keys } from '../src/engine/input.js';
+  import { pollGamepad } from '../src/engine/gamepad.js';
+  const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+  const out = [];
+
+  // A fake gamepad the poll loop reads via navigator.getGamepads() — no
+  // real hardware is available in headless testing, so this exercises the
+  // polling/edge-detection/synthetic-dispatch logic directly. It does NOT
+  // prove real Xbox hardware behaves identically; that only Mike can check.
+  const fakePad = {
+    connected: true,
+    buttons: Array.from({ length: 16 }, () => ({ pressed: false })),
+    axes: [0, 0]
+  };
+  navigator.getGamepads = () => [fakePad];
+  const tick = () => { pollGamepad(); update(); };
+
+  setTimeout(() => {
+    key('keydown', ' '); key('keyup', ' '); // title -> playing
+    state.enemies.forEach(e => e.alive = false);
+    player.x = 1000; player.y = 380; player.velocityX = 0; player.velocityY = 0; player.invincible = 9999;
+    tick();
+
+    // --- A (index 0) press should register as keys[' '] ---
+    fakePad.buttons[0].pressed = true;
+    tick();
+    out.push('1. A pressed: keys[" "]=' + !!keys[' '] + '  (must be true)');
+    fakePad.buttons[0].pressed = false;
+    tick();
+    out.push('2. A released: keys[" "]=' + !!keys[' '] + '  (must be false)');
+
+    // --- left stick should drive movement ---
+    player.x = 1000; player.velocityX = 0;
+    fakePad.axes[0] = -1; // full left
+    for (let i = 0; i < 40; i++) tick();
+    out.push('3. stick full left for 40 ticks: velocityX=' + player.velocityX.toFixed(2) + '  (must be negative, walk-capped near -2.0)');
+    fakePad.axes[0] = 0;
+
+    // --- B (run) should raise the speed cap ---
+    player.x = 1000; player.velocityX = 0;
+    fakePad.axes[0] = -1;
+    fakePad.buttons[1].pressed = true; // B = run
+    for (let i = 0; i < 40; i++) tick();
+    out.push('4. stick left + B held for 40 ticks: velocityX=' + player.velocityX.toFixed(2) + '  (must be more negative than step 3 — run-capped near -3.6)');
+    fakePad.axes[0] = 0; fakePad.buttons[1].pressed = false;
+
+    // --- X (action) should fire the bazooka ---
+    import('../src/state.js').then(({ state }) => {
+      const missilesBefore = state.missiles.length;
+      fakePad.buttons[2].pressed = true; // X
+      tick();
+      out.push('5. X pressed: missiles ' + missilesBefore + ' -> ' + state.missiles.length + '  (must increase)');
+      fakePad.buttons[2].pressed = false;
+      tick();
+
+      // --- Start (menu) should pause ---
+      const frameBefore = state.frameCount;
+      fakePad.buttons[9].pressed = true; // Start
+      tick();
+      fakePad.buttons[9].pressed = false;
+      tick();
+      const frameAfterToggle = state.frameCount;
+      for (let i = 0; i < 20; i++) tick();
+      out.push('6. after Start toggled pause: frameCount stayed at ' + frameAfterToggle + ' -> ' + state.frameCount + '  (must NOT advance while paused)');
+
+      // unpause
+      fakePad.buttons[9].pressed = true;
+      tick();
+      fakePad.buttons[9].pressed = false;
+      tick();
+      const frameResumed1 = state.frameCount;
+      for (let i = 0; i < 10; i++) tick();
+      out.push('7. after Start toggled again (unpause): frameCount ' + frameResumed1 + ' -> ' + state.frameCount + '  (must advance again)');
+
+      out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+      document.getElementById('out').textContent = out.join('\n');
+    });
+  }, 200);
+</script></body></html>

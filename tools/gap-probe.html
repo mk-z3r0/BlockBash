@@ -51,7 +51,7 @@
       place(runwayStart(triggerX, fromX), lv.groundY - player.height);
       clearEnemies();
       const lives0 = state.lives;
-      key('keydown', 'ArrowRight');
+      key('keydown', 'ArrowRight'); key('keydown', 'Shift'); // hold run throughout, matching how a player would actually cross the gaps now that walk is slower
       let jumped = false, h = 0, res = 'no result';
       for (let i = 0; i < 260; i++) {
         if (!jumped && player.isOnGround && player.x + player.width >= triggerX - lead) {
@@ -100,7 +100,7 @@
     place(lv.playerSpawn.x, lv.playerSpawn.y);
     state.lives = 99;
     state.enemies.forEach(e => { e.alive = true; });
-    key('keydown', 'ArrowRight');
+    key('keydown', 'ArrowRight'); key('keydown', 'Shift'); // hold run throughout, matching how a player would actually cross the gaps now that walk is slower
     let maxX = player.x, hold = 0, lives0 = state.lives, deaths = [];
     for (let i = 0; i < 12000; i++) {
       if (player.isOnGround && hold === 0) {
