@@ -13,7 +13,7 @@ import { resetCoins, updateCoins, drawCoins } from '../entities/coins.js';
 import { updateBazookaInput, updateMissiles, drawMissiles } from '../weapons/bazooka.js';
 import { loadLevel, getLevel } from '../levels/levelLoader.js';
 import { drawPlatforms, drawGoal, drawCheckpoints, drawHazards } from '../levels/levelRenderer.js';
-import level1 from '../levels/data/level1.js';
+import { levels } from '../levels/registry.js';
 import { showToast, updateToast, drawHUD, toast } from '../ui/hud.js';
 import { playHit, playCheckpoint, playChainsawStart, playChainsawLoop, playExplosion, playWin, playGameOver } from '../audio/sfx.js';
 import { switchTo } from './sceneManager.js';
@@ -148,11 +148,14 @@ function updateCutscene() {
   }
 }
 
-function resetGame() {
-  state.score = 0;
-  state.lives = 3;
+// Loads whichever level is at `index` into the current run, without
+// touching score or lives — those persist across a level transition and
+// only reset with the run itself. This is what both "advance to the next
+// level" and "retry the level I died on" share.
+function startLevel(index) {
+  state.currentLevelIndex = index;
 
-  const level = loadLevel(level1);
+  const level = loadLevel(levels[index]);
   state.enemies = spawnEnemies(level.enemySpawns);
   resetCoins();
   state.missiles = [];
@@ -163,7 +166,21 @@ function resetGame() {
   resetPlayer();
   resetCamera();
   state.gameState = 'playing';
-  showToast('', 0);
+  showToast(level.name.toUpperCase(), 100);
+}
+
+// Same level, fresh attempt — what a game-over retry does. Never sends the
+// player back to level 1 just because they ran out of lives.
+function retryCurrentLevel() {
+  state.score = 0;
+  state.lives = 3;
+  startLevel(state.currentLevelIndex);
+}
+
+// A brand new playthrough — what the title screen starts.
+function startNewRun() {
+  state.currentLevelIndex = 0;
+  retryCurrentLevel();
 }
 
 export function drawWorldAndHUD() {
@@ -186,7 +203,12 @@ export function drawWorldAndHUD() {
 }
 
 export const playingScene = {
-  enter: resetGame,
+  // data.retry: same level, fresh score/lives (a game-over retry).
+  // Anything else (title screen, or no data at all): a brand new run.
+  enter(data) {
+    if (data && data.retry) retryCurrentLevel();
+    else startNewRun();
+  },
 
   update() {
     state.frameCount++;
@@ -237,6 +259,9 @@ export const playingScene = {
         player.x = goal.x - player.width - 30;
         player.velocityX = 0;
         if (toast.timer <= 0) showToast("THE SPHERE WON'T LET YOU", 80);
+      } else if (state.currentLevelIndex + 1 < levels.length) {
+        startLevel(state.currentLevelIndex + 1);
+        return;
       } else {
         state.gameState = 'win';
         playWin();

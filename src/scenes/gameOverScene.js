@@ -10,7 +10,7 @@ export const gameOverScene = {
   },
   handleKeyDown(e) {
     if (e.key === 'r' || e.key === 'R' || e.key === ' ' || e.key === 'Enter') {
-      switchTo('playing');
+      switchTo('playing', { retry: true });
     }
   }
 };
