@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#000;"><canvas id="game" width="800" height="450"></canvas><pre id="out"></pre>
+<script>window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERR: '+(e.message||e.error)+' @ '+e.filename+':'+e.lineno));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  import { update } from '../src/scenes/sceneManager.js';
+  setTimeout(() => {
+    for (let i = 0; i < 1050; i++) update(); // run the whole cutscene through, twice over for margin
+    document.getElementById('out').textContent = 'ran 1050 ticks. errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none');
+  }, 150);
+</script></body></html>

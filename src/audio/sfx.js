@@ -69,6 +69,28 @@ export function playCheckpoint() {
   tone(523.25, t, 0.1, 'square', 0.16, sfxGain, 4000);
   tone(659.25, t + 0.1, 0.16, 'square', 0.16, sfxGain, 4000);
 }
+export function playSpaceAmbient() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  // a slow, low swell — not a loop, just enough sustain to read as
+  // "establishing shot" rather than a one-shot blip
+  tone(65, t, 2.2, 'sine', 0.1, sfxGain, 300);
+  tone(98, t + 0.15, 2.0, 'sine', 0.07, sfxGain, 400);
+}
+export function playApproach() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  noiseBurst(t, 1.4, 0.1, sfxGain, 'bandpass', 1200);
+  tone(180, t, 1.2, 'sawtooth', 0.08, sfxGain, 800, 340);
+}
+export function playRumble() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  // lower and longer than playExplosion — meant to feel felt-through-the-
+  // floor rather than heard, for the shockwave reaching the house
+  tone(55, t, 1.1, 'sine', 0.24, sfxGain, 220);
+  noiseBurst(t, 0.9, 0.16, sfxGain, 'lowpass', 300);
+}
 export function playExtraLife() {
   if (!audioCtx) return;
   const t = audioCtx.currentTime;

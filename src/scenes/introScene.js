@@ -1,37 +1,164 @@
 // The opening cutscene: a cube planet floating in space, spheres descending
 // on it, a corner blown off, then a hard cut to ground level — the player
-// feels it, and walks out of their block house into the game. Plays once
-// ever (see save.js's hasSeenIntro), skippable any time with a key press.
+// feels it, reacts, and walks out of their block house into the game. Plays
+// once ever (see save.js's hasSeenIntro), skippable any time with a key
+// press.
 //
 // Non-gameplay, so it renders nothing like the side-scroller: this is its
 // own small scene with its own timed beats, the same shape as the boss
 // cutscene's state machine in playingScene.js but for an entirely different
 // visual (a planet in space, not a platformer level).
+//
+// The planet is real, if minimal, 3D: a rotating cube built from actual
+// vertices/faces/normals, projected with a simple weak-perspective camera
+// (see project() below) — not a flat square with a fake pan. That's what
+// makes "slow pan around the planet" and spheres correctly shrinking with
+// distance as they approach possible at all; faking either in pure 2D was
+// what the first version did and it read as flat.
 import { ctx, VIEW_WIDTH, VIEW_HEIGHT, drawStickLegs, drawMuscleArm } from '../engine/renderer.js';
 import { spawnExplosion, spawnDust, updateParticles, drawParticles, resetParticles } from '../entities/particles.js';
-import { playExplosion } from '../audio/sfx.js';
+import { playExplosion, playSpaceAmbient, playApproach, playRumble, playSurprise } from '../audio/sfx.js';
 import { drawBlockHouse } from './blockHouse.js';
 import { switchTo } from './sceneManager.js';
 import { markIntroSeen } from '../save.js';
 
-// Beat boundaries, in frames at 60fps — ~13s total, a deliberate slow burn.
-const P1_PLANET_END = 200;   // wide shot, planet alone
-const P2_DESCENT_END = 440;  // spheres arrive
-const P3_IMPACT_END = 540;   // convergence + explosion
-const P4_HOUSE_END = 640;    // hard cut, felt the shockwave
-const P5_WALKOUT_END = 780;  // door opens, steps outside
-const EXPLOSION_FRAME = 500;
+// ============================================
+// Beat boundaries, in frames at 60fps — a deliberate slow burn, ~17s total.
+// ============================================
+const P1_PLANET_END = 260;    // wide shot, planet alone, slow pan begins
+const EXPLOSION_FRAME = 640;  // spheres have converged; the corner blows off
+const P3_IMPACT_END = 680;    // hard cut to the house — no crossfade
+const SHAKE_DURATION = 70;    // the shockwave reaching the house — visible
+const BUBBLE_START = P3_IMPACT_END + SHAKE_DURATION + 20; // a beat to settle first
+const BUBBLE_DURATION = 80;
+const DOOR_OPEN_AT = BUBBLE_START + BUBBLE_DURATION;
+const WALK_DURATION = 160;
+const P5_END = DOOR_OPEN_AT + WALK_DURATION;
 
 const PLANET_CX = VIEW_WIDTH / 2;
 const PLANET_CY = VIEW_HEIGHT * 0.44;
 const HOUSE_GROUND_Y = VIEW_HEIGHT * 0.78;
+
+// ============================================
+// Minimal 3D: rotate a unit cube, weak-perspective project it. Just enough
+// linear algebra for this one scene — not a general math module, since
+// nothing else needs 3D yet.
+// ============================================
+const CAM_DIST = 480;
+const CAM_TILT = -0.32; // fixed downward camera tilt, a flattering 3/4 view
+const ROT_SPEED = 0.0021; // slow — a pan, not a spin
+const PLANET_BASE_ANGLE = 0.5;
+
+function normalize3(x, y, z) {
+  const l = Math.hypot(x, y, z) || 1;
+  return { x: x / l, y: y / l, z: z / l };
+}
+const LIGHT = normalize3(-0.45, -0.6, 0.65);
+
+function rotateY(p, a) {
+  const c = Math.cos(a), s = Math.sin(a);
+  return { x: p.x * c + p.z * s, y: p.y, z: -p.x * s + p.z * c };
+}
+function rotateX(p, a) {
+  const c = Math.cos(a), s = Math.sin(a);
+  return { x: p.x, y: p.y * c - p.z * s, z: p.y * s + p.z * c };
+}
+function dot3(a, b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+function lerp3(a, b, t) {
+  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t };
+}
+// projects a point already in camera space (post-rotation) to screen coords
+function project(p) {
+  const f = CAM_DIST / (CAM_DIST + p.z);
+  return { x: PLANET_CX + p.x * f, y: PLANET_CY + p.y * f, scale: f };
+}
+// applies the scene's current camera transform (pan + fixed tilt + zoom) to
+// a point in the cube's local unit space
+function toCameraSpace(p, angleY, scale) {
+  const scaled = { x: p.x * scale, y: p.y * scale, z: p.z * scale };
+  return rotateX(rotateY(scaled, angleY), CAM_TILT);
+}
+
+// One unit-cube face: 4 corners (consistent winding) + outward normal.
+function makeFace(axis, sign) {
+  const other = { x: ['y', 'z'], y: ['x', 'z'], z: ['x', 'y'] }[axis];
+  const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+  const verts = corners.map(([a, b]) => {
+    const p = { x: 0, y: 0, z: 0 };
+    p[axis] = sign;
+    p[other[0]] = a * sign; // flips winding per sign so all faces point outward
+    p[other[1]] = b;
+    return p;
+  });
+  const normal = { x: 0, y: 0, z: 0 };
+  normal[axis] = sign;
+  return { verts, normal, craters: makeCraters(), damaged: false };
+}
+function makeCraters() {
+  const n = 2 + Math.floor(Math.random() * 3);
+  const spots = [];
+  for (let i = 0; i < n; i++) {
+    spots.push({ u: 0.2 + Math.random() * 0.6, v: 0.2 + Math.random() * 0.6, r: 0.06 + Math.random() * 0.08 });
+  }
+  return spots;
+}
+
+const BASE_FACES = [
+  makeFace('x', 1), makeFace('x', -1),
+  makeFace('y', 1), makeFace('y', -1),
+  makeFace('z', 1), makeFace('z', -1)
+];
+
+// The corner that blows off: (1,1,1) in unit space. Truncating it replaces
+// that vertex with 3 new points along its 3 edges on the faces that share
+// it (x+, y+, z+), turning those quads into pentagons, and adds one new
+// triangular "raw" face where the corner used to be.
+const CHAMFER_FRAC = 0.4;
+function buildChamferedFaces() {
+  const corner = { x: 1, y: 1, z: 1 };
+  const alongZ = lerp3(corner, { x: 1, y: 1, z: -1 }, CHAMFER_FRAC);
+  const alongY = lerp3(corner, { x: 1, y: -1, z: 1 }, CHAMFER_FRAC);
+  const alongX = lerp3(corner, { x: -1, y: 1, z: 1 }, CHAMFER_FRAC);
+
+  const faces = BASE_FACES.map(f => ({ ...f, verts: f.verts.slice() }));
+  const isCorner = v => v.x === 1 && v.y === 1 && v.z === 1;
+
+  for (const f of faces) {
+    const idx = f.verts.findIndex(isCorner);
+    if (idx === -1) continue;
+    // the two edge-points belonging to this face, in an order that keeps
+    // the polygon loop non-self-intersecting
+    const replacement =
+      f.normal.x === 1 ? [alongY, alongZ] :
+      f.normal.y === 1 ? [alongZ, alongX] :
+      [alongX, alongY]; // normal.z === 1
+    f.verts.splice(idx, 1, ...replacement);
+    f.craters = f.craters.filter(c => Math.hypot(c.u - 0.85, c.v - 0.85) > 0.25); // clear craters near the cut
+  }
+
+  faces.push({
+    verts: [alongZ, alongY, alongX],
+    normal: normalize3(1, 1, 1),
+    craters: [],
+    damaged: true
+  });
+  return faces;
+}
+const CHAMFERED_FACES = buildChamferedFaces();
+
+function bilerp(corners, u, v) {
+  const top = lerp3(corners[0], corners[1], u);
+  const bot = lerp3(corners[3], corners[2], u);
+  return lerp3(top, bot, v);
+}
 
 let t = 0;
 let stars = [];
 let spheres = [];
 let cornerBlownOff = false;
 let shakeUntil = 0;
-let walker = null; // the tiny figure that steps out of the house
+let bubbleActive = false;
+let walker = null;
 
 function finish() {
   markIntroSeen();
@@ -51,25 +178,45 @@ function makeStars() {
   return arr;
 }
 
-// A handful converge on the corner that's about to blow off; the rest just
-// drift past the planet — "many spheres descend," not all aimed at once.
+// A handful converge on the corner that's about to blow off (in the cube's
+// LOCAL unit space, so they rotate consistently with the planet); the rest
+// drift toward random points on random faces — "many spheres descend," not
+// all aimed at once. Each starts from a genuinely far random point in 3D,
+// which is what makes them grow correctly as they approach: the same
+// project() the planet uses naturally shrinks distant points and grows near
+// ones, so there's no separate "size over time" hack to keep in sync.
 function makeSpheres() {
-  const cornerX = PLANET_CX + Math.cos(-Math.PI / 4) * 90;
-  const cornerY = PLANET_CY + Math.sin(-Math.PI / 4) * 90;
   const arr = [];
   for (let i = 0; i < 11; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const dist = VIEW_WIDTH * 0.75;
-    const startX = PLANET_CX + Math.cos(angle) * dist;
-    const startY = PLANET_CY * 0.6 + Math.sin(angle) * dist * 0.5 - 40;
     const targeted = i < 4;
-    arr.push({
-      startX, startY,
-      x: startX, y: startY,
-      targetX: targeted ? cornerX : PLANET_CX + (Math.random() - 0.5) * 130,
-      targetY: targeted ? cornerY : PLANET_CY + (Math.random() - 0.5) * 130,
-      size: targeted ? 7 : 4 + Math.random() * 3
-    });
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    // in cube-radii, pre-scale. Capped so even at max cube zoom (scale~110)
+    // the scaled magnitude stays well under CAM_DIST (480) — otherwise a
+    // point with z crossing -CAM_DIST sends the perspective divide negative
+    // and flings the sphere to a huge mirrored position instead of just
+    // being safely offscreen.
+    const dist = 2.0 + Math.random() * 1.1;
+    const start = {
+      x: dist * Math.sin(phi) * Math.cos(theta),
+      y: dist * Math.sin(phi) * Math.sin(theta),
+      z: dist * Math.cos(phi)
+    };
+    let targetLocal, targetNormal;
+    if (targeted) {
+      targetLocal = { x: 1, y: 1, z: 1 };
+      targetNormal = normalize3(1, 1, 1);
+    } else {
+      const face = BASE_FACES[Math.floor(Math.random() * 6)];
+      targetLocal = bilerp(face.verts, 0.2 + Math.random() * 0.6, 0.2 + Math.random() * 0.6);
+      targetNormal = face.normal;
+    }
+    const target = {
+      x: targetLocal.x + targetNormal.x * 0.14,
+      y: targetLocal.y + targetNormal.y * 0.14,
+      z: targetLocal.z + targetNormal.z * 0.14
+    };
+    arr.push({ start, target, size: targeted ? 8 : 4.5 });
   }
   return arr;
 }
@@ -86,61 +233,68 @@ function drawStarfield() {
   ctx.globalAlpha = 1;
 }
 
-// The planet: a square, on purpose — "a cube-shaped planet" per the design
-// doc, and it means the corner it loses is drawn with the exact same 45°
-// chamfer the game's damage language uses everywhere else (see
-// IMPLEMENTATION_PLAN.md's chamfer decision). First thing the player ever
-// sees is the shape that later means "sphere damage."
-function drawPlanet(size) {
-  const half = size / 2;
-  const cut = cornerBlownOff ? size * 0.22 : 0;
-
-  ctx.save();
-  const grad = ctx.createRadialGradient(
-    PLANET_CX - half * 0.3, PLANET_CY - half * 0.3, size * 0.1,
-    PLANET_CX, PLANET_CY, size * 0.9
-  );
-  grad.addColorStop(0, '#f2c14e');
-  grad.addColorStop(1, '#8a6a2e');
-  ctx.fillStyle = grad;
-
-  ctx.beginPath();
-  ctx.moveTo(PLANET_CX - half, PLANET_CY - half + cut);
-  ctx.lineTo(PLANET_CX - half + cut, PLANET_CY - half);
-  ctx.lineTo(PLANET_CX + half, PLANET_CY - half);
-  ctx.lineTo(PLANET_CX + half, PLANET_CY + half);
-  ctx.lineTo(PLANET_CX - half, PLANET_CY + half);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = '#c99a2e';
-  ctx.lineWidth = 3;
-  ctx.stroke();
-
-  if (cornerBlownOff) {
-    // a jagged crack line near the break, distinguishing "just exploded"
-    // from a clean intentional cut
-    ctx.strokeStyle = '#5b3f1a';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(PLANET_CX - half + cut * 0.6, PLANET_CY - half + cut * 1.4);
-    ctx.lineTo(PLANET_CX - half + cut * 1.3, PLANET_CY - half + cut * 0.7);
-    ctx.lineTo(PLANET_CX - half + cut * 0.9, PLANET_CY - half + cut * 0.3);
-    ctx.stroke();
-  }
-  ctx.restore();
+function mixGold(intensity) {
+  const lo = [138, 106, 46], hi = [255, 224, 150];
+  const c = lo.map((v, i) => Math.round(v + (hi[i] - v) * intensity));
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
 }
 
-function drawSpheres(progress) {
+// Draws the rotating cube: transforms + backface-culls + depth-sorts every
+// face, fills each with lighting-based shading, then a light crater texture
+// so it doesn't read as flat color. First thing the player ever sees is the
+// same 45-degree corner cut the game's damage language uses everywhere
+// else, once the explosion lands.
+function drawPlanet(angleY, scale) {
+  const faces = cornerBlownOff ? CHAMFERED_FACES : BASE_FACES;
+
+  const camFaces = faces.map(f => {
+    const camVerts = f.verts.map(v => toCameraSpace(v, angleY, scale));
+    const camNormal = rotateX(rotateY(f.normal, angleY), CAM_TILT);
+    const avgZ = camVerts.reduce((s, p) => s + p.z, 0) / camVerts.length;
+    return { ...f, camVerts, camNormal, avgZ };
+  }).filter(f => f.camNormal.z < -0.05); // visible faces point back toward the camera
+
+  camFaces.sort((a, b) => b.avgZ - a.avgZ); // paint far-to-near
+
+  for (const f of camFaces) {
+    const proj = f.camVerts.map(project);
+    const intensity = Math.max(0.12, dot3(f.camNormal, LIGHT));
+    ctx.fillStyle = f.damaged ? '#3a2a14' : mixGold(intensity);
+    ctx.beginPath();
+    proj.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = f.damaged ? '#1c1408' : '#5b3f1a';
+    ctx.lineWidth = f.damaged ? 1 : 1.5;
+    ctx.stroke();
+
+    if (!f.damaged && f.verts.length === 4) {
+      const avgScale = proj.reduce((s, p) => s + p.scale, 0) / proj.length;
+      for (const c of f.craters) {
+        const local = bilerp(f.verts, c.u, c.v);
+        const camP = toCameraSpace(local, angleY, scale);
+        const p = project(camP);
+        ctx.fillStyle = `rgba(90, 65, 20, ${0.3 + intensity * 0.15})`;
+        ctx.beginPath();
+        ctx.ellipse(p.x, p.y, c.r * scale * avgScale, c.r * scale * avgScale * 0.65, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+}
+
+function drawSpheres(angleY, scale, progress) {
   for (const s of spheres) {
-    const x = s.startX + (s.targetX - s.startX) * progress;
-    const y = s.startY + (s.targetY - s.startY) * progress;
-    s.x = x; s.y = y;
-    const grad = ctx.createRadialGradient(x - s.size * 0.3, y - s.size * 0.3, 1, x, y, s.size);
+    const local = lerp3(s.start, s.target, progress);
+    const cam = toCameraSpace(local, angleY, scale);
+    const p = project(cam);
+    const r = s.size * p.scale;
+    const grad = ctx.createRadialGradient(p.x - r * 0.3, p.y - r * 0.3, 1, p.x, p.y, r);
     grad.addColorStop(0, '#ff9fc4');
     grad.addColorStop(1, '#a12d5c');
     ctx.fillStyle = grad;
     ctx.beginPath();
-    ctx.arc(x, y, s.size, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, Math.max(0.5, r), 0, Math.PI * 2);
     ctx.fill();
   }
 }
@@ -148,10 +302,9 @@ function drawSpheres(progress) {
 // A tiny stand-in figure — same limb art the player/enemies/NPC share, but
 // this is its own lightweight object, not the real gameplay player. The
 // cutscene shouldn't depend on entities/player.js's gameplay-only state.
-function drawWalker(x, groundY, frame, facing) {
+function drawWalker(x, groundY, frame, facing, moving) {
   const legLength = 9;
   const w = 22, h = 22;
-  const moving = true;
   const legSwing = moving ? Math.sin(frame * 0.5) * 14 : 4;
 
   ctx.save();
@@ -164,8 +317,22 @@ function drawWalker(x, groundY, frame, facing) {
   ctx.strokeStyle = '#c99a2e';
   ctx.lineWidth = 2;
   ctx.strokeRect(-w / 2, -h / 2, w, h);
-  drawMuscleArm(0, -h * 0.1 * 0.1, facing * (w / 2 + 14), -h * 0.35 * 0.1);
+  drawMuscleArm(0, -h * 0.01, facing * (w / 2 + 14), -h * 0.035);
   ctx.restore();
+  ctx.restore();
+}
+
+function drawExclamation(x, y, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = '#fffbe0';
+  ctx.beginPath();
+  ctx.arc(x, y, 12, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#ff4d8d';
+  ctx.font = 'bold 18px Trebuchet MS, Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('!', x, y + 6);
   ctx.restore();
 }
 
@@ -176,55 +343,67 @@ export const introScene = {
     spheres = makeSpheres();
     cornerBlownOff = false;
     shakeUntil = 0;
+    bubbleActive = false;
     walker = null;
     resetParticles();
+    playSpaceAmbient();
   },
 
   update() {
     t++;
 
+    if (t === P1_PLANET_END) playApproach();
+
     if (t === EXPLOSION_FRAME) {
-      const cornerX = PLANET_CX + Math.cos(-Math.PI / 4) * 90;
-      const cornerY = PLANET_CY + Math.sin(-Math.PI / 4) * 90;
-      spawnExplosion(cornerX, cornerY, '#ffdf7a');
-      spawnExplosion(cornerX, cornerY, '#f2c14e');
+      const angleY = PLANET_BASE_ANGLE + t * ROT_SPEED;
+      const scale = 90 + Math.min(1, t / EXPLOSION_FRAME) * 20;
+      const cam = toCameraSpace({ x: 1, y: 1, z: 1 }, angleY, scale);
+      const p = project(cam);
+      spawnExplosion(p.x, p.y, '#ffdf7a');
+      spawnExplosion(p.x, p.y, '#f2c14e');
       cornerBlownOff = true;
       playExplosion();
     }
 
     if (t === P3_IMPACT_END) {
-      shakeUntil = t + 26; // the shockwave reaching the house
+      shakeUntil = t + SHAKE_DURATION;
+      playRumble();
     }
-    if (shakeUntil > t && shakeUntil - 8 <= t) {
-      spawnDust(VIEW_WIDTH / 2 + (Math.random() - 0.5) * 140, HOUSE_GROUND_Y - 90, 1,
-        { spread: 1.5, size: 6, life: 30, color: 'rgba(200, 180, 150, 0.8)' });
+    if (shakeUntil > t && (shakeUntil - t) % 6 === 0) {
+      spawnDust(VIEW_WIDTH / 2 + (Math.random() - 0.5) * 150, HOUSE_GROUND_Y - 90, 2,
+        { spread: 1.8, size: 7, life: 34, color: 'rgba(200, 180, 150, 0.85)' });
     }
 
-    if (t === P4_HOUSE_END) {
-      walker = { offset: 0 }; // distance from the doorway, not an absolute x
+    if (t === BUBBLE_START) {
+      bubbleActive = true;
+      playSurprise();
     }
-    if (walker && t > P4_HOUSE_END) {
-      const progress = (t - P4_HOUSE_END) / (P5_WALKOUT_END - P4_HOUSE_END);
+    if (t === DOOR_OPEN_AT) {
+      bubbleActive = false;
+      walker = { offset: 0 };
+    }
+    if (walker && t > DOOR_OPEN_AT) {
+      const progress = Math.min(1, (t - DOOR_OPEN_AT) / WALK_DURATION);
       walker.offset = progress * 90;
     }
 
     updateParticles();
 
-    if (t >= P5_WALKOUT_END) finish();
+    if (t >= P5_END) finish();
   },
 
   draw() {
     if (t < P3_IMPACT_END) {
-      // --- space: planet, stars, descending spheres ---
+      // --- space: rotating planet, stars, descending spheres ---
       drawStarfield();
 
-      const growth = Math.min(1, t / P2_DESCENT_END);
-      const size = 130 + growth * 40;
-      drawPlanet(size);
+      const angleY = PLANET_BASE_ANGLE + t * ROT_SPEED;
+      const scale = 90 + Math.min(1, t / EXPLOSION_FRAME) * 20;
+      drawPlanet(angleY, scale);
 
       if (t > 30) {
-        const descentProgress = Math.min(1, Math.max(0, (t - P1_PLANET_END) / (P3_IMPACT_END - P1_PLANET_END)));
-        drawSpheres(descentProgress);
+        const descentProgress = Math.min(1, Math.max(0, (t - P1_PLANET_END) / (EXPLOSION_FRAME - P1_PLANET_END)));
+        drawSpheres(angleY, scale, descentProgress);
       }
       drawParticles();
 
@@ -236,7 +415,8 @@ export const introScene = {
       // --- ground: the house, hard-cut from space, no crossfade ---
       ctx.save();
       if (shakeUntil > t) {
-        const mag = ((shakeUntil - t) / 26) * 5;
+        const decay = (shakeUntil - t) / SHAKE_DURATION;
+        const mag = decay * 12; // a clearly visible shake, not a subtle jitter
         ctx.translate((Math.random() - 0.5) * mag, (Math.random() - 0.5) * mag);
       }
 
@@ -255,13 +435,22 @@ export const introScene = {
       ctx.fillStyle = '#1c2547';
       ctx.fillRect(0, HOUSE_GROUND_Y, VIEW_WIDTH, VIEW_HEIGHT - HOUSE_GROUND_Y);
 
-      const doorOpen = t >= P4_HOUSE_END;
+      const doorOpen = t >= DOOR_OPEN_AT;
       const { doorX } = drawBlockHouse(VIEW_WIDTH / 2, HOUSE_GROUND_Y, 2.1, { doorOpen });
 
       drawParticles();
 
+      if (t >= BUBBLE_START && t < DOOR_OPEN_AT) {
+        const fadeIn = Math.min(1, (t - BUBBLE_START) / 15);
+        const fadeOut = Math.min(1, (DOOR_OPEN_AT - t) / 15);
+        drawExclamation(doorX, HOUSE_GROUND_Y - 70, Math.min(fadeIn, fadeOut));
+      }
+
       if (walker) {
-        drawWalker(doorX + walker.offset, HOUSE_GROUND_Y, t, 1);
+        drawWalker(doorX + walker.offset, HOUSE_GROUND_Y, t, 1, true);
+      } else if (t >= P3_IMPACT_END + 6) {
+        // standing just inside the doorway, reacting, before stepping out
+        drawWalker(doorX, HOUSE_GROUND_Y, t, 1, false);
       }
 
       ctx.restore();
