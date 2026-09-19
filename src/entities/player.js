@@ -152,8 +152,11 @@ export function updatePlayer(inputLocked) {
   }
   player.wasOnGround = player.isOnGround;
 
-  // --- running dust: puffs kicked up behind the player while moving on the ground ---
-  if (player.isOnGround && Math.abs(player.velocityX) > 0.6) {
+  // --- running dust: puffs kicked up behind the player while running on
+  // the ground. Gated on the run input itself, not just speed — walking
+  // already clears the old 0.6 speed threshold on its own now that walk
+  // is slower but still >0.6, so speed alone doesn't distinguish them. ---
+  if (player.isOnGround && running && Math.abs(player.velocityX) > 0.6) {
     dustTimer--;
     if (dustTimer <= 0) {
       dustTimer = 3;

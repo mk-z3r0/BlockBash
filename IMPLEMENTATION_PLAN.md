@@ -266,7 +266,9 @@ polls each frame and dispatches synthetic keydown/keyup events on button
 transitions, so the rest of the game (movement, jump buffering, bazooka,
 pause) treats a controller as just another source feeding the same `keys`
 state real keyboard input already populates — no consumer code had to
-change. A=jump, B=run, X=bazooka, Start=menu/pause, stick+d-pad=move.
+change. A=run, B=jump, X=bazooka, Start=menu/pause, stick+d-pad=move — A/B
+match physical position (bottom/right), not the letter each maps to on a
+Nintendo pad; matching by letter put run and jump backwards, per playtest.
 
 Movement gained a walk/run split: walk is the new slower default
 (`WALK_MAX_SPEED`), holding run raises the cap to `RUN_MAX_SPEED`, which
@@ -278,7 +280,11 @@ against a patrolling enemy).
 
 Menu/pause exists now (Escape / gamepad Start) — a flag in playingScene,
 not a full menu system. That's the "menu key" satisfied minimally; a real
-options/settings menu is still future scope.
+options/settings menu is still future scope. Mike's flagged wanting music/
+sfx volume sliders specifically, accessible from that eventual menu —
+noted for whenever it gets built, not needed yet. `audio.js` already has
+separate `musicGain`/`sfxGain` nodes, so this is a small addition once
+there's a menu screen to put the sliders on — no audio-graph rework needed.
 
 **Caveat:** none of this can be verified against real hardware here — no
 physical controller can be attached in this environment. The polling/

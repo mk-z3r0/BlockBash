@@ -12,9 +12,17 @@
 // 3=Y, 9=Start. Left stick is axes[0] (x); the d-pad is buttons 12-15.
 const DEADZONE = 0.35;
 
+// Run/jump are swapped from a first pass that mapped by LETTER (Xbox A =
+// "A button" = jump, matching SMB3's A=jump by name). SMB3's layout is
+// actually defined by physical POSITION on a Nintendo pad: bottom button =
+// run, right button = jump. Xbox's bottom-position button is confusingly
+// also named "A" — same name, different physical slot — so matching by
+// name put them backwards relative to the felt-in-hand layout the SMB3
+// reference was supposed to give. This matches by position instead: bottom
+// button (Xbox A) = run, right button (Xbox B) = jump.
 const BUTTON_MAP = [
-  { key: ' ',          read: pad => !!pad.buttons[0]?.pressed },                                  // A: jump
-  { key: 'Shift',       read: pad => !!pad.buttons[1]?.pressed },                                 // B: run
+  { key: 'Shift',       read: pad => !!pad.buttons[0]?.pressed },                                 // A (bottom): run
+  { key: ' ',          read: pad => !!pad.buttons[1]?.pressed },                                  // B (right): jump
   { key: 'b',           read: pad => !!pad.buttons[2]?.pressed },                                 // X: action/weapon
   { key: 'Escape',      read: pad => !!pad.buttons[9]?.pressed },                                 // Start: menu/pause
   { key: 'ArrowLeft',   read: pad => !!pad.buttons[14]?.pressed || pad.axes[0] < -DEADZONE },

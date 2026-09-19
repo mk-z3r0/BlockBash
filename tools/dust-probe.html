@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#000;">
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true }));</script>
+<canvas id="game" width="800" height="450"></canvas><pre id="out"></pre>
+<script>window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update } from '../src/scenes/sceneManager.js';
+  import { particles } from '../src/entities/particles.js';
+  const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+  const out = [];
+
+  setTimeout(() => {
+    key('keydown', ' '); key('keyup', ' '); // title -> playing
+    state.enemies.forEach(e => e.alive = false);
+    // settle on flat ground, no jumping, so only running-dust can fire
+    player.x = 100; player.y = 388; player.velocityX = 0; player.velocityY = 0;
+    for (let i = 0; i < 10; i++) update(); // let it land/settle
+
+    // --- walking (no Shift) at speed above the old 0.6 threshold ---
+    particles.length = 0;
+    key('keydown', 'ArrowRight');
+    for (let i = 0; i < 60; i++) update();
+    out.push('1. walking only, 60 ticks: velocityX=' + player.velocityX.toFixed(2) + '  particles=' + particles.length + '  (must be 0 — no run dust while walking)');
+    key('keyup', 'ArrowRight');
+
+    // --- running (Shift held) ---
+    particles.length = 0;
+    key('keydown', 'ArrowRight'); key('keydown', 'Shift');
+    for (let i = 0; i < 60; i++) update();
+    out.push('2. running (Shift held), 60 ticks: velocityX=' + player.velocityX.toFixed(2) + '  particles=' + particles.length + '  (must be > 0 — dust while running)');
+    key('keyup', 'ArrowRight'); key('keyup', 'Shift');
+
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 200);
+</script></body></html>
