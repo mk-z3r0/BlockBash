@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<!-- Measures every gap and jumpable spike bed at BOTH walk and run speed,
+     across several jump-timing styles, to find out exactly what the new
+     walk/run split changed about level 1's difficulty — rather than
+     guessing from the jump-arc math alone. -->
+<html><body style="margin:0;background:#000;">
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true }));</script>
+<canvas id="game" width="800" height="450"></canvas><pre id="out"></pre>
+<script>window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update } from '../src/scenes/sceneManager.js';
+  import { getLevel } from '../src/levels/levelLoader.js';
+
+  const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+  const out = [];
+
+  setTimeout(() => {
+    key('keydown', ' '); key('keyup', ' '); // title -> playing
+    const lv = getLevel();
+    const ground = lv.platforms.filter(p => p.ground).sort((a,b) => a.x - b.x);
+
+    const gaps = [];
+    ground.forEach((s, i) => {
+      if (i === 0) return;
+      const prev = ground[i - 1], edge = prev.x + prev.width;
+      if (s.x - edge > 2) gaps.push({ kind: 'gap', edge, landing: s.x, size: s.x - edge, runwayFrom: prev.x });
+    });
+
+    function attempt(triggerX, runwayFrom, targetX, lead, hold, run) {
+      player.x = Math.max(runwayFrom + 2, triggerX - 220);
+      player.y = lv.groundY - player.height;
+      // invincible must be 0, not a high "safety" value — a high value was
+      // the actual bug that invalidated every spike-bed result: the real
+      // game's hazard-death check is itself gated on invincible<=0, so a
+      // "safe" 999 let the player walk straight through spikes unharmed.
+      // Falling into a gap is a different, invincibility-independent check
+      // (player.y past the bottom of the screen), which is why gap results
+      // were never affected by this.
+      player.velocityX = 0; player.velocityY = 0; player.invincible = 0;
+      state.lives = 99;
+      state.enemies.forEach(e => e.alive = false);
+      key('keydown', 'ArrowRight');
+      if (run) key('keydown', 'Shift');
+      let jumped = false, h = 0, res = 'no result';
+      for (let i = 0; i < 260; i++) {
+        if (!jumped && player.isOnGround && player.x + player.width >= triggerX - lead) {
+          key('keydown', ' '); jumped = true; h = hold;
+        }
+        if (h > 0 && --h === 0) key('keyup', ' ');
+        update();
+        if (state.lives < 99) { res = 'DIED'; break; }
+        if (jumped && player.isOnGround && player.x > targetX) { res = `ok +${Math.round(player.x - targetX)}`; break; }
+      }
+      key('keyup', ' '); key('keyup', 'ArrowRight'); key('keyup', 'Shift');
+      return res;
+    }
+
+    const styles = [['edge+long', 0, 22], ['early+long', 45, 22], ['edge+short', 0, 8]];
+
+    function summarize(label, triggerX, runwayFrom, targetX) {
+      const walkResults = styles.map(([n, l, h]) => attempt(triggerX, runwayFrom, targetX, l, h, false));
+      const runResults = styles.map(([n, l, h]) => attempt(triggerX, runwayFrom, targetX, l, h, true));
+      const walkOk = walkResults.filter(r => r.startsWith('ok')).length;
+      const runOk = runResults.filter(r => r.startsWith('ok')).length;
+      out.push(`${label}`);
+      out.push(`    WALK: ${walkOk}/3 clear  [${walkResults.join(', ')}]`);
+      out.push(`    RUN:  ${runOk}/3 clear  [${runResults.join(', ')}]`);
+    }
+
+    out.push('=== GAPS ===');
+    gaps.forEach(g => summarize(`gap ${g.edge}-${g.landing} (${g.size}px)`, g.edge, g.runwayFrom, g.landing));
+
+    out.push('=== JUMPABLE SPIKE BEDS (skipping the 340px platform-crossing one) ===');
+    lv.hazards.forEach(hz => {
+      if (hz.width > 150) { out.push(`spikes ${hz.x}-${hz.x+hz.width} (${hz.width}px): platform crossing, not a jump target`); return; }
+      const seg = ground.find(p => hz.x >= p.x && hz.x <= p.x + p.width);
+      summarize(`spikes ${hz.x}-${hz.x + hz.width} (${hz.width}px)`, hz.x, seg ? seg.x : hz.x - 200, hz.x + hz.width);
+    });
+
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 200);
+</script></body></html>

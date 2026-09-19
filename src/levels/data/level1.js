@@ -14,6 +14,18 @@
 // above a jump-off point. The player rises ~146px on a full jump, so a
 // platform overhead turns a correct-timing jump into a head-bonk and a death.
 // Every platform here is clear of the corridor above a pit or a spike bed.
+//
+// Walk vs run (added once the run button existed): walk's max jump carry is
+// ~93.5px, run's is ~168px (same jump physics, just the horizontal speed
+// cap differs — see physics.js). Measured every gap and spike bed at both
+// speeds with tools/walk-run-probe.html rather than guessing from that
+// number alone. Result: level 1's gaps already split naturally into
+// walk-viable and run-required just from their widths (70/90px gaps
+// effectively need run; 40/55/60px gaps clear on foot, though walk leaves
+// so little margin that some — the first gap especially — need the jump
+// timed right at the edge, not early; see that gap's own comment for why
+// that's a feature, not a bug). The one deliberate addition is the 4320
+// spike bed, widened specifically to require run — see its own comment.
 
 const GROUND_Y = 410;
 
@@ -30,12 +42,24 @@ export default {
   // first floating platform at x:150, so it never overlaps real geometry.
   house: { x: 55 },
 
-  // Gaps: 500-580 (80), 1350-1390 (40), 1500-1560 (60), 2150-2190 (40),
-  // 3500-3570 (70), 4700-4760 (60), 5500-5590 (90). A full-speed jump
-  // carries ~162px, so all of these have real margin.
+  // Gaps: 500-555 (55), 1350-1390 (40), 1500-1560 (60), 2150-2190 (40),
+  // 3500-3570 (70), 4700-4760 (60), 5500-5590 (90). Run's jump carries
+  // ~168px, walk's only ~93.5px (same jump physics, lower speed cap — see
+  // physics.js) — measured every one of these at both speeds with
+  // tools/walk-run-probe.html rather than assuming from width alone.
+  //
+  // The first gap (500-555) is narrower than the others on purpose: it's
+  // the very first obstacle after leaving the house, and gating the run
+  // mechanic behind the first thing a new player meets is bad onboarding,
+  // even in a level that's meant to mix walk- and run-only jumps. It was
+  // 80px originally — walk-viable only on a knife's edge (confirmed two
+  // ways: 1/3 canned timings landed it by a single pixel, and an adaptive
+  // autoplay bot couldn't clear it consistently either). Narrowed so it's
+  // comfortably walkable; the run requirement shows up properly at
+  // 3500-3570 and 5500-5590 once the player's had room to get their bearings.
   ground: [
     { x: 0,    width: 500 },
-    { x: 580,  width: 770 },
+    { x: 555,  width: 795 },
     { x: 1390, width: 110 },   // stepping-stone island
     { x: 1560, width: 590 },
     { x: 2190, width: 1310 },
@@ -68,10 +92,14 @@ export default {
 
   hazards: [
     { type: 'spikes', x: 3980, width: 48 },   // the teaching spike: wide runway, open landing
-    // 60px is the beginner ceiling for a jumpable bed: the jump arc carries
-    // ~162px, so a wider bed means jumping early lands you mid-spikes and the
-    // window of workable timings collapses
-    { type: 'spikes', x: 4320, width: 60 },
+    // Widened from 60 to 90px specifically to make this one require run —
+    // walk's max jump carry is ~93.5px (vs run's ~168px), so 90px leaves
+    // walk no real margin (measured: 0/3 timings clear it on foot, same as
+    // the 90px gap at 5500), while run still clears it with room to spare.
+    // Deliberately the first hard gate: level 1's other three jumpable
+    // spike beds (48-60px) all clear on foot, so this is the one spot that
+    // actually teaches "sometimes you need to hold run," not just permits it.
+    { type: 'spikes', x: 4320, width: 90 },
     // the long bed — crossed via stepping stones, not jumped. It starts well
     // clear of the 4700 pit: a full-power jump off that lip carries ~162px,
     // and landing in spikes because you jumped hard is a rotten way to die.
@@ -95,24 +123,35 @@ export default {
     { x: 6980, y: GROUND_Y - 26, w: 26, minX: 6900, maxX: 7100, speed: 1.2, boss: true }
   ],
 
+  // Two tiers, deliberately: coins near groundY (~396, genuinely collectible
+  // while walking — no jump needed at all) vs coins tied to a platform or a
+  // hazard-clearing jump (the existing higher ones, unchanged — reaching
+  // those already requires the skill it should). Level 1 keeps that split
+  // simple; later levels should widen the gap between the two tiers rather
+  // than add a third.
   coins: [
-    // first half
+    // first half — platform/jump tier (unchanged)
     [180, 280], [230, 280], [680, 260], [730, 260],
     [920, 190], [1170, 280], [1220, 280], [1530, 240],
     [1580, 240], [1770, 160], [2075, 260], [2125, 260],
     [2370, 220], [2620, 160], [2870, 260], [2920, 260],
-    [1000, 380], [1900, 380], [2900, 380],
-    // second half — arcs over each hazard telegraph the jump
+    // first half — walkable tier: open ground, no platform or hazard nearby
+    [800, 396], [1000, 396], [1900, 396], [2720, 396], [2900, 396],
+
+    // second half — arcs over each hazard telegraph the jump (jump tier,
+    // unchanged in height; the 4320 trio widened in x to match that spike
+    // bed's new 90px width)
     [3740, 265], [3780, 265],
     [3960, 350], [4004, 315], [4048, 350],
     [4180, 365], [4230, 365],
-    [4330, 340], [4350, 305], [4370, 340],
+    [4335, 345], [4365, 300], [4395, 345],
     [4540, 255], [4580, 255],
-    [5010, 305], [5170, 305], [5320, 370],
-    [5620, 360], [5660, 360],
+    [5010, 305], [5170, 305],
     [5710, 340], [5745, 340], [5865, 340], [5995, 340],
     [6140, 265], [6180, 265],
-    [6400, 370], [6450, 370], [6500, 370]
+    // second half — walkable tier
+    [5320, 396], [5620, 396], [5660, 396],
+    [6400, 396], [6450, 396], [6500, 396]
   ],
 
   checkpoints: [

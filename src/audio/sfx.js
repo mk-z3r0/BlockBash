@@ -73,34 +73,34 @@ export function playSpaceAmbient() {
   if (!audioCtx) return;
   const t = audioCtx.currentTime;
   // a slow, low swell — not a loop, just enough sustain to read as
-  // "establishing shot" rather than a one-shot blip. Gains raised from the
-  // first pass (0.1/0.07) — noticeably quiet against the punchier gameplay
-  // sfx and the music that kicks in once the level starts, per playtest.
-  tone(65, t, 2.2, 'sine', 0.2, sfxGain, 300);
-  tone(98, t + 0.15, 2.0, 'sine', 0.15, sfxGain, 400);
+  // "establishing shot" rather than a one-shot blip. Gains raised twice now
+  // (0.1/0.07 originally, then 0.2/0.15) — still reads as background under
+  // the gameplay music per playtest, needs to actually grab attention.
+  tone(65, t, 2.2, 'sine', 0.32, sfxGain, 300);
+  tone(98, t + 0.15, 2.0, 'sine', 0.26, sfxGain, 400);
 }
 export function playApproach() {
   if (!audioCtx) return;
   const t = audioCtx.currentTime;
-  noiseBurst(t, 1.4, 0.22, sfxGain, 'bandpass', 1200);
-  tone(180, t, 1.2, 'sawtooth', 0.18, sfxGain, 800, 340);
+  noiseBurst(t, 1.4, 0.36, sfxGain, 'bandpass', 1200);
+  tone(180, t, 1.2, 'sawtooth', 0.3, sfxGain, 800, 340);
 }
 export function playRumble() {
   if (!audioCtx) return;
   const t = audioCtx.currentTime;
   // lower and longer than playExplosion — meant to feel felt-through-the-
   // floor rather than heard, for the shockwave reaching the house
-  tone(55, t, 1.1, 'sine', 0.3, sfxGain, 220);
-  noiseBurst(t, 0.9, 0.22, sfxGain, 'lowpass', 300);
+  tone(55, t, 1.1, 'sine', 0.42, sfxGain, 220);
+  noiseBurst(t, 0.9, 0.34, sfxGain, 'lowpass', 300);
 }
 export function playDoorOpen() {
   if (!audioCtx) return;
   const t = audioCtx.currentTime;
   // a short creak — filtered noise with a rising pitch, plus a soft low
   // thud as it settles open
-  noiseBurst(t, 0.35, 0.22, sfxGain, 'bandpass', 700);
-  tone(140, t, 0.25, 'triangle', 0.2, sfxGain, 500, 220);
-  tone(90, t + 0.28, 0.18, 'sine', 0.22, sfxGain, 300);
+  noiseBurst(t, 0.35, 0.34, sfxGain, 'bandpass', 700);
+  tone(140, t, 0.25, 'triangle', 0.3, sfxGain, 500, 220);
+  tone(90, t + 0.28, 0.18, 'sine', 0.32, sfxGain, 300);
 }
 export function playExtraLife() {
   if (!audioCtx) return;

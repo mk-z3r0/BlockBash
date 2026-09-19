@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<!-- Per-obstacle walk-vs-run test using the SAME adaptive jump strategy as
+     gap-probe's full-level autoplay (proven, by that autoplay's clean run,
+     to represent competent play) — rather than the fixed timing styles in
+     walk-run-probe.html, which turned out to be a poor fit for spike-jump
+     timing specifically (see level1.js's git history for why). -->
+<html><body style="margin:0;background:#000;">
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true }));</script>
+<canvas id="game" width="800" height="450"></canvas><pre id="out"></pre>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update } from '../src/scenes/sceneManager.js';
+  import { getLevel } from '../src/levels/levelLoader.js';
+  const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+  const out = [];
+
+  setTimeout(() => {
+    key('keydown', ' '); key('keyup', ' ');
+    const lv = getLevel();
+    const ground = lv.platforms.filter(p => p.ground);
+    const solidAt = x => ground.some(p => x >= p.x && x <= p.x + p.width);
+    const spikeAt = x => lv.hazards.some(h => x >= h.x - 2 && x <= h.x + h.width + 2);
+
+    function attempt(startX, endX, run) {
+      player.x = startX; player.y = lv.groundY - player.height;
+      player.velocityX = 0; player.velocityY = 0; player.invincible = 0;
+      state.lives = 99;
+      state.enemies.forEach(e => e.alive = false);
+      key('keydown', 'ArrowRight');
+      if (run) key('keydown', 'Shift');
+      let hold = 0, lives0 = 99, result = 'timed out';
+      for (let i = 0; i < 300; i++) {
+        if (player.isOnGround && hold === 0) {
+          const ahead = player.x + player.width + 24;
+          if (!solidAt(ahead) || spikeAt(ahead)) { key('keydown', ' '); hold = 16; }
+        }
+        if (hold > 0 && --hold === 0) key('keyup', ' ');
+        update();
+        if (state.lives < lives0) { result = 'DIED'; break; }
+        if (player.x > endX) { result = 'CLEAR'; break; }
+      }
+      key('keyup', ' '); key('keyup', 'ArrowRight'); key('keyup', 'Shift');
+      return result;
+    }
+
+    out.push('=== per-obstacle, adaptive-strategy walk vs run ===');
+    const spots = [
+      ['gap 500-555',    420, 620],
+      ['gap 1350-1390', 1250, 1450],
+      ['gap 1500-1560', 1400, 1620],
+      ['gap 2150-2190', 2050, 2250],
+      ['gap 3500-3570', 3400, 3630],
+      ['gap 4700-4760', 4600, 4820],
+      ['gap 5500-5590', 5400, 5650],
+      ['spike 3980-4028',  3900, 4090],
+      ['spike 4320-4410',  4230, 4470],
+      ['spike 5700-5760',  5620, 5820],
+      ['spike 5850-5900',  5780, 5960],
+      ['spike 5980-6030',  5920, 6090]
+    ];
+    for (const [label, s, e] of spots) {
+      out.push(`${label}:  WALK=${attempt(s, e, false)}   RUN=${attempt(s, e, true)}`);
+    }
+    document.getElementById('out').textContent = out.join('\n');
+  }, 200);
+</script></body></html>
