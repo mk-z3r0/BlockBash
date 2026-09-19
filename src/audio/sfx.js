@@ -69,6 +69,13 @@ export function playCheckpoint() {
   tone(523.25, t, 0.1, 'square', 0.16, sfxGain, 4000);
   tone(659.25, t + 0.1, 0.16, 'square', 0.16, sfxGain, 4000);
 }
+export function playExtraLife() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  // a bright rising run — distinct from checkpoint (2 notes, square) and
+  // win (longer, square): triangle tone, quick 1-up feel
+  [659.25, 783.99, 1046.5].forEach((f, i) => tone(f, t + i * 0.09, 0.14, 'triangle', 0.2, sfxGain, 5000));
+}
 export function playWin() {
   if (!audioCtx) return;
   const t = audioCtx.currentTime;

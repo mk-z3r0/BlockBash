@@ -7,6 +7,7 @@ export const state = {
   gameState: 'title', // 'title' | 'playing' | 'win' | 'gameover'
   score: 0,
   lives: 3,
+  coinsCollected: 0,
   currentLevelIndex: 0,
   enemies: [],
   missiles: []

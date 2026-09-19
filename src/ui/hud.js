@@ -19,6 +19,16 @@ export function drawHUD() {
   ctx.textAlign = 'left';
   ctx.fillText('SCORE  ' + state.score, 14, 26);
 
+  ctx.save();
+  ctx.translate(20, 44);
+  ctx.rotate(Math.PI / 4);
+  ctx.fillStyle = '#5ee7ff';
+  ctx.fillRect(-5, -5, 10, 10);
+  ctx.restore();
+  ctx.fillStyle = '#5ee7ff';
+  ctx.font = 'bold 14px Trebuchet MS, Arial, sans-serif';
+  ctx.fillText(String(state.coinsCollected), 34, 49);
+
   for (let i = 0; i < state.lives; i++) {
     ctx.fillStyle = '#f2c14e';
     ctx.fillRect(VIEW_WIDTH - 30 - i * 26, 12, 16, 16);

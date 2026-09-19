@@ -1,8 +1,17 @@
 import { ctx } from '../engine/renderer.js';
 import { isColliding } from '../engine/physics.js';
 import { getLevel } from '../levels/levelLoader.js';
-import { playCoin } from '../audio/sfx.js';
+import { playCoin, playExtraLife } from '../audio/sfx.js';
+import { showToast } from '../ui/hud.js';
 import { state } from '../state.js';
+
+// Coins accumulate across a whole run, not just one level — reset alongside
+// score/lives in playingScene's retryCurrentLevel/startNewRun, never on a
+// plain level-to-level advance. Tuned against level 1's ~45 coins so a full
+// clear earns more than one extra life without maxing out MAX_LIVES on its
+// own (see the Level 1 retrofit checklist in IMPLEMENTATION_PLAN.md).
+const COINS_PER_LIFE = 20;
+const MAX_LIVES = 9; // also keeps the HUD's life-icon row from running off-canvas
 
 export let coins = [];
 
@@ -17,7 +26,14 @@ export function updateCoins(player) {
     if (isColliding(player, cBox)) {
       coin.collected = true;
       state.score += 10;
+      state.coinsCollected++;
       playCoin();
+
+      if (state.coinsCollected % COINS_PER_LIFE === 0 && state.lives < MAX_LIVES) {
+        state.lives++;
+        showToast('EXTRA LIFE!', 100);
+        playExtraLife();
+      }
     }
   }
 }

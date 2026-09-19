@@ -174,6 +174,7 @@ function startLevel(index) {
 function retryCurrentLevel() {
   state.score = 0;
   state.lives = 3;
+  state.coinsCollected = 0;
   startLevel(state.currentLevelIndex);
 }
 

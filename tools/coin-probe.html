@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#000;"><canvas id="game" width="800" height="450"></canvas><pre id="out"></pre>
+<script>window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update } from '../src/scenes/sceneManager.js';
+  import { coins } from '../src/entities/coins.js';
+  const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+  const out = [];
+
+  function collectOne() {
+    const c = coins.find(c => !c.collected);
+    if (!c) return false;
+    player.x = c.x - player.width / 2; player.y = c.y - player.height / 2;
+    player.velocityX = 0; player.velocityY = 0;
+    update();
+    return true;
+  }
+
+  setTimeout(() => {
+    key('keydown', ' '); key('keyup', ' ');
+    player.invincible = 99999;
+    state.enemies.forEach(e => e.alive = false);
+
+    out.push(`level has ${coins.length} coins, MAX_LIVES check via 25 collections`);
+    let livesLog = [];
+    for (let i = 0; i < 25 && collectOne(); i++) {
+      livesLog.push(state.lives);
+    }
+    out.push(`coinsCollected=${state.coinsCollected}  score=${state.score}  lives=${state.lives}`);
+    out.push(`lives after each pickup: ${livesLog.join(',')}`);
+    out.push(`expected: lives jumps from 3->4 right after the 20th pickup (index 19, 0-based)`);
+    out.push(`20th pickup lives value: ${livesLog[19]}  (should be 4)`);
+    out.push(`19th pickup lives value: ${livesLog[18]}  (should be 3, still)`);
+
+    // reset behavior: drive an actual game-over the way the real game
+    // would (a fatal fall), not by poking state.gameState directly —
+    // that doesn't move the scene manager's active scene, so 'r' would
+    // silently no-op against playingScene.handleKeyDown instead.
+    state.lives = 1;
+    player.invincible = 0;
+    player.y = 10000;
+    update();
+    out.push(`after fatal fall: lives=${state.lives} (scene should now be gameover)`);
+    key('keydown', 'r'); key('keyup', 'r');
+    out.push(`after game-over retry: coinsCollected=${state.coinsCollected} lives=${state.lives} score=${state.score}`);
+
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+    window.__done = true;
+  }, 200);
+</script></body></html>
