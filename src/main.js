@@ -7,7 +7,6 @@ import { titleScene } from './scenes/titleScene.js';
 import { playingScene } from './scenes/playingScene.js';
 import { winScene } from './scenes/winScene.js';
 import { gameOverScene } from './scenes/gameOverScene.js';
-import { loadSave } from './save.js';
 
 registerScene('intro', introScene);
 registerScene('title', titleScene);
@@ -41,7 +40,7 @@ initInput({
   }
 });
 
-switchTo(loadSave().hasSeenIntro ? 'title' : 'intro');
+switchTo('title');
 
 function gameLoop() {
   update();

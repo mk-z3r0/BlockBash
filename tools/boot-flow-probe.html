@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#000;"><canvas id="game" width="800" height="450"></canvas><pre id="out"></pre>
+<script>window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  import { getCurrentName } from '../src/scenes/sceneManager.js';
+  import { audioCtx, isMusicPlaying } from '../src/audio/audio.js';
+  import * as audio from '../src/audio/audio.js';
+  const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+  const out = [];
+
+  setTimeout(() => {
+    out.push('1. fresh boot: scene=' + getCurrentName() + '  (must be title)');
+
+    key('keydown', ' '); key('keyup', ' ');
+    out.push('2. after pressing start from title: scene=' + getCurrentName() + '  (must be intro, first time)');
+    out.push('   audio unlocked: ' + !!audio.audioCtx + '  music playing: ' + audio.isMusicPlaying() + '  (audio yes - real keypress; music NO - not gameplay yet)');
+
+    // skip the intro
+    key('keydown', 'x'); key('keyup', 'x');
+    out.push('3. after skipping intro: scene=' + getCurrentName() + '  (must be playing, not title)');
+    out.push('   music playing: ' + audio.isMusicPlaying() + '  (must be true now)');
+
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 200);
+</script></body></html>

@@ -190,7 +190,9 @@ let walker = null;
 
 function finish() {
   markIntroSeen();
-  switchTo('title');
+  // straight into a run — the title screen already sent the player here
+  // specifically to start one; going back to title would undo that
+  switchTo('playing');
 }
 
 function makeStars() {

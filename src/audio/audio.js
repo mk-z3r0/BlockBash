@@ -10,7 +10,13 @@ let noiseBuffer = null;
 let musicTimer = null;
 let nextNoteTime = 0;
 let step16 = 0;
+let musicStarted = false;
 
+// Sets up the audio graph and unlocks the context — required before ANY
+// sound (sfx or music) can play, but does not itself start the background
+// track. Call this on a user gesture; call startMusic() separately once
+// gameplay actually begins (see playingScene.js's startLevel) — title
+// screens and cutscenes should stay quiet apart from their own sfx.
 export function initAudio() {
   if (audioCtx) return;
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -31,10 +37,21 @@ export function initAudio() {
   noiseBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate * dur, audioCtx.sampleRate);
   const data = noiseBuffer.getChannelData(0);
   for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+}
 
+// Starts the background loop. Idempotent — safe to call on every level
+// start (including retries) without restarting or stuttering the music
+// once it's already playing.
+export function startMusic() {
+  if (!audioCtx || musicStarted) return;
+  musicStarted = true;
   nextNoteTime = audioCtx.currentTime + 0.1;
   step16 = 0;
   musicTimer = setInterval(scheduleMusic, 25);
+}
+
+export function isMusicPlaying() {
+  return musicStarted;
 }
 
 export function resumeAudioIfSuspended() {

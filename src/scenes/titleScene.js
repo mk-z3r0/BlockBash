@@ -36,7 +36,9 @@ export const titleScene = {
   },
   handleKeyDown(e) {
     if (e.key === ' ' || e.key === 'Enter') {
-      switchTo('playing');
+      // the opening cutscene plays once, the first time a run is started —
+      // after that, starting from title goes straight into gameplay
+      switchTo(save && save.hasSeenIntro ? 'playing' : 'intro');
     }
   }
 };

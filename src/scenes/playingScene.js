@@ -17,6 +17,7 @@ import { drawBlockHouse } from './blockHouse.js';
 import { levels } from '../levels/registry.js';
 import { showToast, updateToast, drawHUD, toast } from '../ui/hud.js';
 import { playHit, playCheckpoint, playChainsawStart, playChainsawLoop, playExplosion, playWin, playGameOver } from '../audio/sfx.js';
+import { startMusic } from '../audio/audio.js';
 import { switchTo } from './sceneManager.js';
 import { recordProgress } from '../save.js';
 
@@ -158,6 +159,7 @@ function updateCutscene() {
 function startLevel(index) {
   state.currentLevelIndex = index;
   recordProgress(index, state.score);
+  startMusic(); // idempotent — no-op on retries once it's already playing
 
   const level = loadLevel(levels[index]);
   state.enemies = spawnEnemies(level.enemySpawns);
