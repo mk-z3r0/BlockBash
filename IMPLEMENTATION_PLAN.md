@@ -259,6 +259,34 @@ multiplayer, sound direction.
 
 ---
 
+## Controller and movement (done, 2026-09-19)
+
+Xbox/standard-mapping gamepad support landed via `engine/gamepad.js`: it
+polls each frame and dispatches synthetic keydown/keyup events on button
+transitions, so the rest of the game (movement, jump buffering, bazooka,
+pause) treats a controller as just another source feeding the same `keys`
+state real keyboard input already populates — no consumer code had to
+change. A=jump, B=run, X=bazooka, Start=menu/pause, stick+d-pad=move.
+
+Movement gained a walk/run split: walk is the new slower default
+(`WALK_MAX_SPEED`), holding run raises the cap to `RUN_MAX_SPEED`, which
+deliberately equals the old flat speed constant exactly (same acceleration
+too) so running reproduces level 1's already-validated feel rather than
+approximating it — see physics.js's comment for the one real mistake this
+caught (a faster run *ramp* alone was enough to shift a jump's timing
+against a patrolling enemy).
+
+Menu/pause exists now (Escape / gamepad Start) — a flag in playingScene,
+not a full menu system. That's the "menu key" satisfied minimally; a real
+options/settings menu is still future scope.
+
+**Caveat:** none of this can be verified against real hardware here — no
+physical controller can be attached in this environment. The polling/
+dispatch logic was verified with a mocked gamepad object standing in for
+real input. Whether an actual Xbox controller behaves identically, and
+whether a gamepad button press counts as a valid autoplay gesture in every
+browser, needs a real playtest.
+
 ## Parked: touch controls
 
 A standalone mobile-demo prototype (separate Claude Artifact, not in this
@@ -268,7 +296,8 @@ worth reusing. Its physics were a simplified throwaway (flat velocity, no
 coyote time/jump buffer/variable jump height), not our real model — don't
 port those.
 
-Belongs in step 9 alongside gamepad support, in `engine/input.js` +
-`index.html`. Open question for whenever it's picked up: show the buttons
-always, or only on detected touch devices (leaning touch-only, to keep the
-keyboard experience uncluttered) — not yet decided.
+Gamepad support (above) is done; this is the remaining piece of step 9's
+input work, in `engine/input.js` + `index.html`. Open question for whenever
+it's picked up: show the buttons always, or only on detected touch devices
+(leaning touch-only, to keep the keyboard experience uncluttered) — not yet
+decided.
