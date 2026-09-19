@@ -25,11 +25,15 @@ tools/        gap-probe, cutscene-probe, shot  (dev tools, need the server runni
 | Phase | Status |
 |---|---|
 | 0 — module split + scene manager | done |
-| 1 — data-driven levels, loader, transitions, save | steps 1–4 done; **progression + save remain** |
-| 2+ | not started, re-scoped by the design doc |
+| 1 — data-driven levels, loader, transitions | steps 1–4 done — loader, renderer, spikes, level 1 extended |
+| **Milestone: Level 1 complete** | **not yet reached** — progression + versioned save, and the retrofit checklist, remain |
+| 2+ (level tool, chamfers, enemies, weapons, octagons, world manipulation, polish) | not started, re-scoped by the design doc, blocked on the milestone |
 
 Level 1 runs 0–7200px: pits and passive spheres, then a spike half, then an
 unwinnable chainsaw boss resolved by a rescue NPC. Three checkpoints.
+
+See [Milestone: Level 1 complete](#milestone-level-1-complete) — nothing
+below it starts until that's checked off.
 
 ---
 
@@ -44,6 +48,7 @@ unwinnable chainsaw boss resolved by a rescue NPC. Three checkpoints.
 | What a restored octagon does | **Becomes a square again and flees** — an ally, not a recruit | Restoration is a *rescue* verb. Keeps freed squares out of the combat math |
 | Does the triangle shooter still kill? | **Yes — it still pops spheres** | It's the main gun with a second verb, not a niche tool |
 | Trick platforms | Parked in `levels/trickPlatforms.js`, out of level 1, returning later | Level 1 is the beginner level; trolling escalates in later levels |
+| Art direction | **Stay fully procedural** — canvas-drawn shapes, synthesized audio, no image/sprite/audio-file assets | Matches the current skill set, needs no art pipeline, and it's already carried the whole game so far. Revisit only if scope grows well past the current design doc |
 
 ### The unifying idea
 
@@ -85,30 +90,69 @@ and the scene manager already handles the swap.
 
 ---
 
+## Milestone: Level 1 complete
+
+Before any work spreads across levels 2–7, level 1 goes all the way to done —
+playable start to finish with nothing marked TODO. This is a deliberate
+checkpoint, not just "finish Phase 1": it's the difference between building
+seven levels' worth of half-finished systems and having one complete game
+loop to actually hand someone a controller for.
+
+Done means every box in [Level 1 retrofit](#level-1-retrofit) is checked,
+progression and save both work end to end, and the coin→life economy is
+tuned. Nothing about *later* levels — enemy tiers, looted weapons, octagons —
+needs to exist yet. Level 1 uses none of that.
+
+---
+
 ## Build order
 
-Each step is sequenced by what it unblocks, not by how fun it is.
+Each step is sequenced by what it unblocks, not by how fun it is. Steps 1–2
+are the milestone above; step 3 onward is what comes after — starting with
+the level tool, built early on Mike's call rather than waiting until hand-
+authoring starts hurting.
 
 **1. Finish Phase 1 — progression + save**
 `startNewRun()` vs `loadLevel()`; game over restarts the *current* level, never
 level 1. Coin counter on the HUD, coins→extra lives thresholds. 7-level registry.
-Save via localStorage, wrapped in try/catch (it throws in private browsing).
 
-**2. Chamfer rendering + collision — authored only**
+Save via localStorage, wrapped in try/catch (it throws in private browsing) —
+**and versioned from the start.** Every save carries a `saveVersion` field; on
+load, a mismatch means "reset," never "crash" or "load anyway and hope."
+Level data *will* change under existing saves — a moved platform, a
+rebalanced enemy, a level added — and there's no save yet to migrate, so this
+is free today and a real bug hunt if it's bolted on after saves exist in the
+wild.
+
+**2. Level 1 retrofit**
+See the checklist below. This is what turns "concept test" into "finished
+level."
+
+**3. Level authoring tool**
+A small in-browser layout tool: click to place platforms/hazards/enemies/coins,
+drag to resize, export in the existing level-data format. It doesn't need to
+be pretty — it needs to kill the hand-type-coordinates-then-eyeball-the-probe-
+output loop that level 1's spike section took. Worth drawing the ~162px jump
+arc directly on the canvas as a placement guide, so an obviously-bad gap or an
+overhead platform is visible *before* a probe run catches it. Pays off starting
+with level 2, and every level after.
+
+**4. Chamfer rendering + collision — authored only**
 Cut corners as level data, drawn and collided, with nothing carving them yet.
 Level 2 can open with pre-cut blocks showing the spheres have been at work.
-De-risks the foundation without needing enemy AI to exist.
+De-risks the foundation without needing enemy AI to exist. Comes after the
+level tool so the tool only has to support one terrain format, not two.
 *Expect jump tuning to shift slightly near cut edges — re-run the gap probe.*
 
-**3. Enemies**
+**5. Enemies**
 Base class and the passive → pursuing → aggressive tiers. Enemies hold weapons.
 
-**4. Weapons**
+**6. Weapons**
 Entity-agnostic (see constraints). Player starts unarmed, weapons drop from
 defeated enemies. Bazooka becomes the triangle shooter with limited ammo.
 
-**5. Octagons**
-Needs 3 and 4 — they're enemies, and restoring them needs the triangle weapon.
+**7. Octagons**
+Needs 5 and 6 — they're enemies, and restoring them needs the triangle weapon.
 Introduced by a corruption cutscene. A restored one turns back into a square
 and runs off-screen; that's the rescue NPC's existing `exit` state, so the
 behavior is mostly already written.
@@ -121,18 +165,21 @@ numbers get tuned: if triangles are plentiful, the choice evaporates.
 
 Stomping stays the unarmed fallback, so running dry is never a dead end.
 
-**6. Live world manipulation**
+**8. Live world manipulation**
 Sphere actors that carve terrain and move platforms. Revives the parked trick
 code behind a visible sphere cause. Merges "trolling" and "reshaping" — they're
 one system.
 
-**7. Bosses, cutscenes, controller, polish**
+**9. Bosses, cutscenes, controller, polish**
 Roughly the original roadmap. The opening cutscene may be worth pulling earlier
-since it's the player's first impression and motivates everything.
+since it's the player's first impression and motivates everything. **Touch
+controls belong here too** — parked for now (2026-09-18), see note below.
+"Polish" here means procedural refinement (particles, screen shake, animation
+curves, juice) — not a sprite pipeline; see the art-direction decision above.
 
-Chamfers sit at #2 because the octagons, the carving, and the whole damage
-language rest on them — and retrofitting a flat-top format after six more levels
-are authored would be miserable.
+Chamfers sit at #4 — right after the level tool, before any of the systems
+that depend on the damage language (octagons, carving) — because retrofitting
+a flat-top format after six more levels are authored would be miserable.
 
 ---
 
@@ -184,12 +231,28 @@ To add:
 
 **Blocking:** none right now.
 
-**Worth deciding when step 5 gets close:**
+**Worth deciding when step 7 gets close:**
 - Can a *different* weapon kill an octagon outright? If so, killing one means
   killing a victim who could have been saved — a possible moral beat, or an
   unfair trap, depending on how clearly the game signals it.
 
-**Not blocking yet** (from the design doc — they land in steps 4–7):
+**Not blocking yet** (from the design doc — they land in steps 6–9):
 NPC roles and dialogue, boss frequency, weapon inventory vs. one-at-a-time,
 whether octagon restoration is required or optional, cutscene style,
 multiplayer, sound direction.
+
+---
+
+## Parked: touch controls
+
+A standalone mobile-demo prototype (separate Claude Artifact, not in this
+repo) tested on-screen d-pad + jump button, wired via `touchstart`/`touchend`
+into a `touch` state object OR'd with the keyboard — that wiring pattern is
+worth reusing. Its physics were a simplified throwaway (flat velocity, no
+coyote time/jump buffer/variable jump height), not our real model — don't
+port those.
+
+Belongs in step 9 alongside gamepad support, in `engine/input.js` +
+`index.html`. Open question for whenever it's picked up: show the buttons
+always, or only on detected touch devices (leaning touch-only, to keep the
+keyboard experience uncluttered) — not yet decided.
