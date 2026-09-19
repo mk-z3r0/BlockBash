@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<!-- Stand-alone cutscene viewer. Loops the opening cutscene on repeat so it
+     can be reviewed without ever touching the title screen or starting a
+     real game — and without touching your save, so it won't mark the real
+     game's intro as "seen." Needs the local server running (ES modules need
+     http://, not file://) — open via Live Server same as index.html.
+     Press any key to skip straight to a replay. M toggles mute. -->
+<html><body style="margin:0;background:#000;">
+<canvas id="game" width="800" height="450"></canvas>
+<script type="module">
+  import { initInput } from '../src/engine/input.js';
+  import { initAudio, resumeAudioIfSuspended, toggleMute } from '../src/audio/audio.js';
+  import { registerScene, switchTo, update, draw, handleKeyDown } from '../src/scenes/sceneManager.js';
+  import { introScene } from '../src/scenes/introScene.js';
+
+  // The real intro finishes by handing off to 'title'. Here, "title" is just
+  // a stub that immediately jumps back into the cutscene — so finishing (or
+  // skipping) it loops instead of leaving you on a blank screen.
+  const loopBack = { enter() { switchTo('intro'); } };
+
+  registerScene('intro', introScene);
+  registerScene('title', loopBack);
+
+  initInput({
+    onKeyDown(e, alreadyDown) {
+      initAudio();
+      resumeAudioIfSuspended();
+      if (e.key === 'm' || e.key === 'M') toggleMute();
+      handleKeyDown(e, alreadyDown);
+    }
+  });
+
+  switchTo('intro');
+
+  function gameLoop() {
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+  }
+  gameLoop();
+</script>
+</body></html>
