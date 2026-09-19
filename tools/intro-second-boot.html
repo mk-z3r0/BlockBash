@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#000;"><canvas id="game" width="800" height="450"></canvas><pre id="out"></pre>
+<script>
+  localStorage.setItem('blockbash-save', JSON.stringify({
+    saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true
+  }));
+</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  import { getCurrentName } from '../src/scenes/sceneManager.js';
+  const out = [];
+  setTimeout(() => {
+    out.push('boot with hasSeenIntro already true: scene=' + getCurrentName() + '  (must be title, intro skipped entirely)');
+    document.getElementById('out').textContent = out.join('\n');
+  }, 300);
+</script></body></html>

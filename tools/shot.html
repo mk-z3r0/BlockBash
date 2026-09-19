@@ -3,6 +3,7 @@
      tools/shot.html?x=4980        - park the player at x and render
      tools/shot.html?cutscene=240  - run the boss cutscene to frame N and render -->
 <html><body style="margin:0;background:#0a0d1c;"><canvas id="game" width="800" height="450"></canvas>
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true }));</script>
 <script type="module" src="../src/main.js"></script>
 <script type="module">
   import { player } from '../src/entities/player.js';

@@ -26,7 +26,7 @@ tools/        gap-probe, cutscene-probe, shot  (dev tools, need the server runni
 |---|---|
 | 0 — module split + scene manager | done |
 | 1 — data-driven levels, loader, transitions | steps 1–4 done — loader, renderer, spikes, level 1 extended |
-| **Milestone: Level 1 complete** | **not yet reached** — progression + versioned save are done; the retrofit checklist remains |
+| **Milestone: Level 1 complete** | **not yet reached** — progression + versioned save are done; 3 of 5 retrofit items done (intro cutscene, coin thresholds, skybox resolved); weapon gating and carved platform damage remain |
 | 2+ (level tool, chamfers, enemies, weapons, octagons, world manipulation, polish) | not started, re-scoped by the design doc, blocked on the milestone |
 
 Level 1 runs 0–7200px: pits and passive spheres, then a spike half, then an
@@ -49,6 +49,7 @@ below it starts until that's checked off.
 | Does the triangle shooter still kill? | **Yes — it still pops spheres** | It's the main gun with a second verb, not a niche tool |
 | Trick platforms | Parked in `levels/trickPlatforms.js`, out of level 1, returning later | Level 1 is the beginner level; trolling escalates in later levels |
 | Art direction | **Stay fully procedural** — canvas-drawn shapes, synthesized audio, no image/sprite/audio-file assets | Matches the current skill set, needs no art pipeline, and it's already carried the whole game so far. Revisit only if scope grows well past the current design doc |
+| Opening cutscene style | **Super Metroid's ship-landing pacing** — slow burn (~13s), wordless, wide shot → descent → impact → a hard cut to intimate scale, no crossfade. Plays once ever, skippable any time | Restraint over reminders: show it once, powerfully, and let the world carry the memory rather than repeating it. Also why the planet's damaged corner doesn't reappear in level 1's gameplay background — the cutscene already said it |
 
 ### The unifying idea
 
@@ -227,11 +228,18 @@ Already fits: passive patrolling spheres, the unwinnable chainsaw boss as
 late-game foreshadowing, the rescue NPC as the first supporting NPC.
 
 To add:
-- [ ] Block house at spawn, and the opening cutscene leading into it
+- [x] Block house at spawn, and the opening cutscene leading into it —
+  `scenes/introScene.js` (planet → spheres descend → corner blown off → hard
+  cut to the house → player walks out), `scenes/blockHouse.js` shared between
+  the cutscene and level 1's background at spawn so both draw the same house.
+  Plays once ever (`save.js`'s `hasSeenIntro`), skippable any time
 - [ ] Gate the bazooka — `B` does nothing until it's earned
-- [ ] Coin→life thresholds tuned against its ~45 coins
+- [x] Coin→life thresholds tuned against its ~45 coins
 - [ ] Carved damage on elevated platform undersides above the spike debris
-- [ ] The blown-off planet corner visible in the skyline, if it fits
+- [x] ~~The blown-off planet corner visible in the skyline~~ — resolved by
+  *not* doing this: it's shown once, in the opening cutscene, and deliberately
+  not repeated as a gameplay-background reminder (see the cutscene-style
+  decision below)
 
 ---
 

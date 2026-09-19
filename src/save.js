@@ -12,7 +12,8 @@ function defaultSave() {
   return {
     saveVersion: SAVE_VERSION,
     furthestLevelIndex: 0,
-    bestScore: 0
+    bestScore: 0,
+    hasSeenIntro: false
   };
 }
 
@@ -20,7 +21,8 @@ function isWellFormed(save) {
   return save
     && save.saveVersion === SAVE_VERSION
     && Number.isInteger(save.furthestLevelIndex)
-    && Number.isInteger(save.bestScore);
+    && Number.isInteger(save.bestScore)
+    && typeof save.hasSeenIntro === 'boolean';
 }
 
 export function loadSave() {
@@ -53,4 +55,15 @@ export function recordProgress(levelIndex, score) {
   if (score > save.bestScore) { save.bestScore = score; changed = true; }
   if (changed) writeSave(save);
   return save;
+}
+
+// The opening cutscene plays once automatically, ever. Called both when it
+// finishes on its own and when it's skipped — either way it shouldn't play
+// again on the next boot.
+export function markIntroSeen() {
+  const save = loadSave();
+  if (!save.hasSeenIntro) {
+    save.hasSeenIntro = true;
+    writeSave(save);
+  }
 }

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<!-- Fresh-boot + skip behavior. See intro-second-boot.html for the other
+     half (a save that already has hasSeenIntro:true) — that needs its own
+     page, since main.js's boot decision runs once, before this page's own
+     script could set up a second scenario retroactively. -->
+<html><body style="margin:0;background:#000;"><canvas id="game" width="800" height="450"></canvas><pre id="out"></pre>
+<script>window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  import { getCurrentName } from '../src/scenes/sceneManager.js';
+  import { loadSave } from '../src/save.js';
+  const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+  const out = [];
+
+  setTimeout(() => {
+    out.push('1. fresh-save boot: scene=' + getCurrentName() + '  hasSeenIntro=' + loadSave().hasSeenIntro);
+
+    // a real, distinct keypress should skip it immediately
+    key('keydown', ' '); key('keyup', ' ');
+    out.push('2. after one keypress: scene=' + getCurrentName() + '  hasSeenIntro=' + loadSave().hasSeenIntro);
+
+    // held-key repeat (alreadyDown=true) must NOT cascade into starting a
+    // run — only a fresh press should act
+    key('keydown', 'Enter'); // still "fresh" the first time, this one legitimately starts a run from title
+    out.push('3. after a further Enter press (from title): scene=' + getCurrentName());
+
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 300);
+</script></body></html>

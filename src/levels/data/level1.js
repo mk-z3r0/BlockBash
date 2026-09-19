@@ -24,6 +24,12 @@ export default {
   groundY: GROUND_Y,
   playerSpawn: { x: 100, y: 300 },
 
+  // Where the opening cutscene leaves off — the block house the player just
+  // walked out of. Purely decorative (no collision); optional per level, so
+  // only level 1 needs one. Sits at x:0-500's ground segment, left of the
+  // first floating platform at x:150, so it never overlaps real geometry.
+  house: { x: 55 },
+
   // Gaps: 500-580 (80), 1350-1390 (40), 1500-1560 (60), 2150-2190 (40),
   // 3500-3570 (70), 4700-4760 (60), 5500-5590 (90). A full-speed jump
   // carries ~162px, so all of these have real margin.

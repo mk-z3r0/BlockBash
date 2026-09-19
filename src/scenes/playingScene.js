@@ -13,6 +13,7 @@ import { resetCoins, updateCoins, drawCoins } from '../entities/coins.js';
 import { updateBazookaInput, updateMissiles, drawMissiles } from '../weapons/bazooka.js';
 import { loadLevel, getLevel } from '../levels/levelLoader.js';
 import { drawPlatforms, drawGoal, drawCheckpoints, drawHazards } from '../levels/levelRenderer.js';
+import { drawBlockHouse } from './blockHouse.js';
 import { levels } from '../levels/registry.js';
 import { showToast, updateToast, drawHUD, toast } from '../ui/hud.js';
 import { playHit, playCheckpoint, playChainsawStart, playChainsawLoop, playExplosion, playWin, playGameOver } from '../audio/sfx.js';
@@ -191,6 +192,8 @@ export function drawWorldAndHUD() {
   drawBackground(camera.x);
   ctx.save();
   ctx.translate(-camera.x, 0);
+  const house = getLevel().house;
+  if (house) drawBlockHouse(house.x, getLevel().groundY, 1.1);
   drawPlatforms();
   drawHazards();
   drawCheckpoints();

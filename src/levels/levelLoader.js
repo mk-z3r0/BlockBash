@@ -35,6 +35,7 @@ export function loadLevel(data) {
     checkpoints: (data.checkpoints || []).map(c => ({ ...c, activated: false })),
     goal: { ...data.goal },
     boss: data.boss ? { ...data.boss } : null,
+    house: data.house ? { ...data.house } : null,
 
     // raw spawn data — the entity modules build their own run state from these
     enemySpawns: data.enemies || [],

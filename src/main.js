@@ -2,11 +2,14 @@ import { initInput } from './engine/input.js';
 import { initAudio, resumeAudioIfSuspended, toggleMute } from './audio/audio.js';
 import { bufferJump } from './entities/player.js';
 import { registerScene, switchTo, update, draw, handleKeyDown } from './scenes/sceneManager.js';
+import { introScene } from './scenes/introScene.js';
 import { titleScene } from './scenes/titleScene.js';
 import { playingScene } from './scenes/playingScene.js';
 import { winScene } from './scenes/winScene.js';
 import { gameOverScene } from './scenes/gameOverScene.js';
+import { loadSave } from './save.js';
 
+registerScene('intro', introScene);
 registerScene('title', titleScene);
 registerScene('playing', playingScene);
 registerScene('win', winScene);
@@ -28,7 +31,7 @@ initInput({
   }
 });
 
-switchTo('title');
+switchTo(loadSave().hasSeenIntro ? 'title' : 'intro');
 
 function gameLoop() {
   update();
