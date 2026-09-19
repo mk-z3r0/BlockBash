@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#000;"><canvas id="game" width="800" height="450"></canvas><pre id="out"></pre>
+<script>window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  import { getCurrentName } from '../src/scenes/sceneManager.js';
+  import * as audio from '../src/audio/audio.js';
+  const out = [];
+  setTimeout(() => {
+    out.push('before any interaction: scene=' + getCurrentName() + '  audioCtx=' + (audio.audioCtx ? 'created' : 'null (silent)'));
+
+    // a click should unlock audio WITHOUT skipping the intro
+    document.dispatchEvent(new PointerEvent('pointerdown'));
+    out.push('after a click: scene=' + getCurrentName() + '  audioCtx=' + (audio.audioCtx ? 'created' : 'null') + '  <-- must still be intro, audio must now exist');
+
+    // a real keypress should still skip, same as before
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+    out.push('after a keypress: scene=' + getCurrentName() + '  <-- must now be title (skip still works)');
+
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 200);
+</script></body></html>

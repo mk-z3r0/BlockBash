@@ -17,7 +17,7 @@
 // what the first version did and it read as flat.
 import { ctx, VIEW_WIDTH, VIEW_HEIGHT, drawStickLegs, drawMuscleArm } from '../engine/renderer.js';
 import { spawnExplosion, spawnDust, updateParticles, drawParticles, resetParticles } from '../entities/particles.js';
-import { playExplosion, playSpaceAmbient, playApproach, playRumble, playSurprise } from '../audio/sfx.js';
+import { playExplosion, playSpaceAmbient, playApproach, playRumble, playSurprise, playDoorOpen } from '../audio/sfx.js';
 import { drawBlockHouse } from './blockHouse.js';
 import { switchTo } from './sceneManager.js';
 import { markIntroSeen } from '../save.js';
@@ -45,7 +45,13 @@ const HOUSE_GROUND_Y = VIEW_HEIGHT * 0.78;
 // nothing else needs 3D yet.
 // ============================================
 const CAM_DIST = 480;
-const CAM_TILT = -0.52; // ~30 degrees above the horizon, more top-down
+// ~30 degrees above the horizon, top-down. Positive, not negative: canvas Y
+// grows downward, so the face this makes front-facing (y=-1) is the one
+// that projects toward the TOP of the screen — the near/prominent surface
+// needs to be the one rendering up top, or it reads as looking up from
+// below instead of down from above. Confirmed by deriving where each pole's
+// face normal actually lands post-transform, not just by eye.
+const CAM_TILT = 0.52;
 const ROT_SPEED = 0.0004; // slow — a pan, not a spin (was 0.0021, an 81% cut)
 // Chosen so the exploding corner ends up well-framed (centered, and its
 // face pointing most directly at the camera) right at EXPLOSION_FRAME,
@@ -59,6 +65,13 @@ function normalize3(x, y, z) {
   return { x: x / l, y: y / l, z: z / l };
 }
 const LIGHT = normalize3(-0.45, -0.6, 0.65);
+
+// The corner that blows off. On the y=-1 pole deliberately: with CAM_TILT
+// positive, that's the pole facing the camera (see CAM_TILT's comment) — a
+// corner on the far pole would only ever be visible edge-on. Re-run
+// tools/corner-angle-probe.html against this if CAM_TILT, ROT_SPEED, or
+// EXPLOSION_FRAME change; the best framing angle depends on all three.
+const EXPLODED_CORNER = { x: 1, y: -1, z: 1 };
 
 function rotateY(p, a) {
   const c = Math.cos(a), s = Math.sin(a);
@@ -116,49 +129,50 @@ const BASE_FACES = [
   makeFace('z', 1), makeFace('z', -1)
 ];
 
-// The corner that blows off: (1,1,1) in unit space. Truncating it replaces
-// that vertex with 3 new points along its 3 edges on the faces that share
-// it (x+, y+, z+), turning those quads into pentagons, and adds one new
-// triangular "raw" face where the corner used to be.
+// The corner that blows off — see EXPLODED_CORNER above for which one and
+// why. Truncating it replaces that vertex with 3 new points along its 3
+// edges, on the faces that share it, turning those quads into pentagons,
+// and adds one new triangular "raw" face where the corner used to be.
+//
+// The replacement order matters: each new point has to be spliced in next
+// to whichever original neighbor it's actually adjacent to, or the new
+// 5-gon's edges cross themselves — a bowtie, which is exactly what shipped
+// as "artifacting" the first time this was built, from hand-picking the
+// order per axis and getting 2 of 3 wrong. Deriving the order directly from
+// each face's actual prev/next vertex around the loop, as this does, can't
+// make that mistake — the order isn't a guess, it's read off the geometry.
 const CHAMFER_FRAC = 0.4;
-function buildChamferedFaces() {
-  const corner = { x: 1, y: 1, z: 1 };
-  const alongZ = lerp3(corner, { x: 1, y: 1, z: -1 }, CHAMFER_FRAC);
-  const alongY = lerp3(corner, { x: 1, y: -1, z: 1 }, CHAMFER_FRAC);
-  const alongX = lerp3(corner, { x: -1, y: 1, z: 1 }, CHAMFER_FRAC);
+function buildChamferedFaces(corner) {
+  const edgeNeighbors = [
+    { x: -corner.x, y: corner.y, z: corner.z },
+    { x: corner.x, y: -corner.y, z: corner.z },
+    { x: corner.x, y: corner.y, z: -corner.z }
+  ];
+  const cutVerts = edgeNeighbors.map(n => lerp3(corner, n, CHAMFER_FRAC));
+  const sameVert = (a, b) => a.x === b.x && a.y === b.y && a.z === b.z;
+  const cutPointFor = neighbor => cutVerts[edgeNeighbors.findIndex(n => sameVert(n, neighbor))];
 
   const faces = BASE_FACES.map(f => ({ ...f, verts: f.verts.slice() }));
-  const isCorner = v => v.x === 1 && v.y === 1 && v.z === 1;
-
   for (const f of faces) {
-    const idx = f.verts.findIndex(isCorner);
+    const idx = f.verts.findIndex(v => sameVert(v, corner));
     if (idx === -1) continue;
-    // The two edge-points belonging to this face, in the order that keeps
-    // the polygon loop simple (non-self-intersecting): each one has to sit
-    // next to whichever original neighbor it's closest to, or the new
-    // 5-gon's edges cross themselves — a bowtie, which is exactly what was
-    // "artifacting" at the explosion. Traced by hand: for the x+ face,
-    // verts[1] differs from the corner in z (it's the "z-neighbor") and
-    // verts[3] differs in y (the "y-neighbor"), so the replacement must go
-    // [alongZ, alongY] — toward verts[1] first, then toward verts[3]. Same
-    // reasoning for z+. y+ already happened to have this right.
-    const replacement =
-      f.normal.x === 1 ? [alongZ, alongY] :
-      f.normal.y === 1 ? [alongZ, alongX] :
-      [alongY, alongX]; // normal.z === 1
-    f.verts.splice(idx, 1, ...replacement);
-    f.craters = f.craters.filter(c => Math.hypot(c.u - 0.85, c.v - 0.85) > 0.25); // clear craters near the cut
+    const n = f.verts.length;
+    const prev = f.verts[(idx - 1 + n) % n];
+    const next = f.verts[(idx + 1) % n];
+    f.verts.splice(idx, 1, cutPointFor(prev), cutPointFor(next));
+    // craters never render on a 5-gon (see the f.verts.length===4 guard in
+    // drawPlanet), so there's nothing to clear here
   }
 
   faces.push({
-    verts: [alongZ, alongY, alongX],
-    normal: normalize3(1, 1, 1),
+    verts: cutVerts,
+    normal: normalize3(corner.x, corner.y, corner.z),
     craters: [],
     damaged: true
   });
   return faces;
 }
-const CHAMFERED_FACES = buildChamferedFaces();
+const CHAMFERED_FACES = buildChamferedFaces(EXPLODED_CORNER);
 
 function bilerp(corners, u, v) {
   const top = lerp3(corners[0], corners[1], u);
@@ -219,7 +233,7 @@ function makeSpheres() {
     };
     let targetLocal, targetNormal;
     if (targeted) {
-      targetLocal = { x: 1, y: 1, z: 1 };
+      targetLocal = { ...EXPLODED_CORNER };
       targetNormal = normalize3(1, 1, 1);
     } else {
       const face = BASE_FACES[Math.floor(Math.random() * 6)];
@@ -381,7 +395,7 @@ export const introScene = {
     if (t === EXPLOSION_FRAME) {
       const angleY = PLANET_BASE_ANGLE + t * ROT_SPEED;
       const scale = 90 + Math.min(1, t / EXPLOSION_FRAME) * 20;
-      const cam = toCameraSpace({ x: 1, y: 1, z: 1 }, angleY, scale);
+      const cam = toCameraSpace(EXPLODED_CORNER, angleY, scale);
       const p = project(cam);
       spawnExplosion(p.x, p.y, '#ffdf7a');
       spawnExplosion(p.x, p.y, '#f2c14e');
@@ -405,6 +419,7 @@ export const introScene = {
     if (t === DOOR_OPEN_AT) {
       bubbleActive = false;
       walker = { offset: 0 };
+      playDoorOpen();
     }
     if (walker && t > DOOR_OPEN_AT) {
       const progress = Math.min(1, (t - DOOR_OPEN_AT) / WALK_DURATION);
@@ -484,7 +499,7 @@ export const introScene = {
       ctx.textAlign = 'right';
       ctx.fillStyle = 'rgba(122, 132, 168, 0.7)';
       ctx.font = '11px Trebuchet MS, Arial, sans-serif';
-      ctx.fillText('press any key to skip', VIEW_WIDTH - 14, VIEW_HEIGHT - 12);
+      ctx.fillText('click for sound · press any key to skip', VIEW_WIDTH - 14, VIEW_HEIGHT - 12);
     }
   },
 

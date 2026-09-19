@@ -4,7 +4,10 @@
      real game — and without touching your save, so it won't mark the real
      game's intro as "seen." Needs the local server running (ES modules need
      http://, not file://) — open via Live Server same as index.html.
-     Press any key to skip straight to a replay. M toggles mute. -->
+     Click once to unlock audio without skipping (browsers block audio
+     until a real gesture, and a keypress here means "skip" — see main.js's
+     comment on the same pointerdown listener). Press any key to skip
+     straight to a replay. M toggles mute. -->
 <html><body style="margin:0;background:#000;">
 <canvas id="game" width="800" height="450"></canvas>
 <script type="module">
@@ -20,6 +23,11 @@
 
   registerScene('intro', introScene);
   registerScene('title', loopBack);
+
+  document.addEventListener('pointerdown', () => {
+    initAudio();
+    resumeAudioIfSuspended();
+  });
 
   initInput({
     onKeyDown(e, alreadyDown) {

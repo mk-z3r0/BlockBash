@@ -91,6 +91,15 @@ export function playRumble() {
   tone(55, t, 1.1, 'sine', 0.24, sfxGain, 220);
   noiseBurst(t, 0.9, 0.16, sfxGain, 'lowpass', 300);
 }
+export function playDoorOpen() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  // a short creak — filtered noise with a rising pitch, plus a soft low
+  // thud as it settles open
+  noiseBurst(t, 0.35, 0.12, sfxGain, 'bandpass', 700);
+  tone(140, t, 0.25, 'triangle', 0.1, sfxGain, 500, 220);
+  tone(90, t + 0.28, 0.18, 'sine', 0.12, sfxGain, 300);
+}
 export function playExtraLife() {
   if (!audioCtx) return;
   const t = audioCtx.currentTime;

@@ -15,6 +15,16 @@ registerScene('playing', playingScene);
 registerScene('win', winScene);
 registerScene('gameover', gameOverScene);
 
+// A click/tap unlocks audio without going through handleKeyDown — a
+// keypress also unlocks audio, but keydown is what the intro scene (and
+// others) read as "skip." Without a separate path, the only browser-legal
+// way to turn sound on doubles as skipping straight past the thing you
+// wanted to hear.
+document.addEventListener('pointerdown', () => {
+  initAudio();
+  resumeAudioIfSuspended();
+});
+
 initInput({
   onKeyDown(e, alreadyDown) {
     // any key wakes up audio (browsers block autoplay until a gesture)
