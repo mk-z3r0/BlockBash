@@ -43,6 +43,73 @@ export function bufferJump() {
   player.jumpBuffer = P.JUMP_BUFFER_FRAMES;
 }
 
+// --- axis-separated platform collision (2026-09-20) ---
+// Move + resolve X, THEN move + resolve Y — never both axes off one
+// combined move. The previous approach moved x and y together in one step
+// and picked whichever of the four overlaps (left/right/top/bottom) came
+// out smallest, which works fine at low speed but misreads a fast landing
+// as a side hit once horizontal speed and gravity both grew: landing
+// dead-center on a platform's top edge with enough velocityX built up can
+// leave the top overlap larger than the side overlap for a frame, so the
+// old code would think you'd run into the platform's side instead of
+// landing on it. Resolving one axis at a time removes the ambiguity
+// entirely — each axis only ever has two candidate sides, picked by the
+// sign of that axis's velocity, never by comparing overlap sizes.
+//
+// Each axis move is substepped so a single frame's move can't tunnel past
+// (or otherwise skip testing against) a platform thinner than the move
+// itself — e.g. level1's checkpoint poles are 8px wide, and jump/fall
+// speed regularly exceeds that in a single frame. Substep size is half the
+// smallest solid platform dimension in the level, per the same margin used
+// elsewhere in this codebase for "small enough not to skip an edge."
+function resolvePlatformsX(platforms) {
+  for (const platform of platforms) {
+    if (platform.width <= 1) continue; // a fully retracted ledge is not solid
+    if (!isColliding(player, platform)) continue;
+    if (player.velocityX >= 0) player.x = platform.x - player.width;
+    else player.x = platform.x + platform.width;
+    player.velocityX = 0;
+  }
+}
+
+function resolvePlatformsY(platforms) {
+  for (const platform of platforms) {
+    if (platform.width <= 1) continue;
+    if (!isColliding(player, platform)) continue;
+    if (player.velocityY >= 0) {
+      player.y = platform.y - player.height;
+      player.velocityY = 0;
+      player.isOnGround = true;
+    } else {
+      player.y = platform.y + platform.height;
+      player.velocityY = 0;
+    }
+  }
+}
+
+function moveAndResolveAxis(axis, platforms) {
+  const isX = axis === 'x';
+  const velocity = isX ? player.velocityX : player.velocityY;
+  if (velocity === 0) return;
+
+  let minDim = Infinity;
+  for (const p of platforms) {
+    if (p.width <= 1) continue;
+    minDim = Math.min(minDim, p.width, p.height);
+  }
+  const maxStep = Number.isFinite(minDim) ? Math.max(1, minDim / 2) : Math.abs(velocity);
+  const steps = Math.max(1, Math.ceil(Math.abs(velocity) / maxStep));
+  const stepAmount = velocity / steps;
+
+  for (let i = 0; i < steps; i++) {
+    if (isX) player.x += stepAmount; else player.y += stepAmount;
+    if (isX) resolvePlatformsX(platforms); else resolvePlatformsY(platforms);
+    // a collision just zeroed the velocity for this axis — nothing left to
+    // substep, so stop rather than continuing to move at the old velocity
+    if ((isX ? player.velocityX : player.velocityY) === 0) break;
+  }
+}
+
 export function resetPlayer() {
   player.x = respawnPoint.x;
   player.y = respawnPoint.y;
@@ -132,44 +199,21 @@ export function updatePlayer(inputLocked) {
   player.velocityY += (player.velocityY < 0) ? P.GRAVITY_UP : P.GRAVITY_DOWN;
   const incomingFallSpeed = player.velocityY;
 
-  // --- move ---
-  player.x += player.velocityX;
-  player.y += player.velocityY;
+  // --- move + resolve, one axis at a time — see the note above
+  // moveAndResolveAxis for why this replaced a combined move with
+  // min-overlap resolution ---
+  moveAndResolveAxis('x', level.platforms);
 
-  // --- world bounds ---
+  // --- world bounds (x) --- checked right after the x-axis resolves, same
+  // as the world edges were always the x-axis's other kind of wall
   if (player.x < 0) { player.x = 0; player.velocityX = 0; }
   if (player.x + player.width > level.worldWidth) {
     player.x = level.worldWidth - player.width;
     player.velocityX = 0;
   }
 
-  // --- platform collisions ---
   player.isOnGround = false;
-  for (const platform of level.platforms) {
-    if (platform.width <= 1) continue; // a fully retracted ledge is not solid
-    if (isColliding(player, platform)) {
-      const overlapLeft   = (player.x + player.width) - platform.x;
-      const overlapRight  = (platform.x + platform.width) - player.x;
-      const overlapTop    = (player.y + player.height) - platform.y;
-      const overlapBottom = (platform.y + platform.height) - player.y;
-      const minOverlap = Math.min(overlapLeft, overlapRight, overlapTop, overlapBottom);
-
-      if (minOverlap === overlapTop && player.velocityY >= 0) {
-        player.y = platform.y - player.height;
-        player.velocityY = 0;
-        player.isOnGround = true;
-      } else if (minOverlap === overlapBottom && player.velocityY < 0) {
-        player.y = platform.y + platform.height;
-        player.velocityY = 0;
-      } else if (minOverlap === overlapLeft && player.velocityX >= 0) {
-        player.x = platform.x - player.width;
-        player.velocityX = 0;
-      } else if (minOverlap === overlapRight && player.velocityX <= 0) {
-        player.x = platform.x + platform.width;
-        player.velocityX = 0;
-      }
-    }
-  }
+  moveAndResolveAxis('y', level.platforms);
 
   // --- landing dust: a puff sized to how hard the landing was ---
   if (!player.wasOnGround && player.isOnGround) {
