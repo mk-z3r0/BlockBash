@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<!-- Live SMB3-physics tuning lab (2026-09-20, physics-lab branch, Step 6).
+
+     Imports the SAME entities/player.js and engine/physics.js the real game
+     uses — zero duplicated physics. This page does NOT import main.js: it
+     needs its own controllable fixed-step loop (pause/frame-step/slow-mo/
+     record+replay), and main.js's independent requestAnimationFrame loop
+     would otherwise race against that control, double-driving update() the
+     same way headless test harnesses were already known to race against it
+     (see tools/*.html's shared testing notes). So this file replicates
+     main.js's minimal BOOTSTRAP (which scenes exist, wiring keys to
+     bufferJump) — never its physics — and drives entities/player.js's
+     updatePlayer()/drawPlayer() directly against a purpose-built benchmark
+     course (Step 7) loaded through the real levels/levelLoader.js.
+
+     The "analytic" pass/fail column in the benchmark table (bottom) is the
+     one intentional exception to "zero duplicated physics": it forward-
+     integrates the same public P formulas WITHOUT collision, specifically
+     so it can be compared against the real collision-driven "actual" test
+     next to it and show where the two diverge — that comparison is the
+     point of having both, not an oversight. -->
+<html>
+<head>
+<meta charset="utf-8">
+<title>BlockBash Physics Lab</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0b0e1a; --panel: #131829; --panel2: #1a2036; --line: #2a3252;
+    --text: #dfe6ff; --dim: #8a92b8; --accent: #6fd3ff; --accent2: #ffd166;
+    --good: #6fffa8; --bad: #ff6f8f;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.4 'Segoe UI', Arial, sans-serif; }
+  #app { display: grid; grid-template-columns: 320px 1fr 340px; grid-template-rows: auto 1fr; height: 100vh; }
+  header { grid-column: 1 / 4; background: var(--panel2); padding: 6px 12px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  header h1 { font-size: 14px; margin: 0; color: var(--accent); font-weight: 700; letter-spacing: .02em; }
+  #panel { overflow-y: auto; border-right: 1px solid var(--line); padding: 8px; }
+  #center { display: flex; flex-direction: column; overflow: hidden; }
+  #right { overflow-y: auto; border-left: 1px solid var(--line); padding: 8px; display: flex; flex-direction: column; gap: 10px; }
+  canvas#game { display: block; background: #060814; width: 100%; }
+  #hud { padding: 6px 10px; background: var(--panel2); border-bottom: 1px solid var(--line); font-size: 12px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px 12px; }
+  #hud b { color: var(--accent2); }
+  #controls { padding: 6px 10px; background: var(--panel2); border-top: 1px solid var(--line); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  button { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 12px; }
+  button:hover { border-color: var(--accent); }
+  button.active { background: var(--accent); color: #06121a; border-color: var(--accent); }
+  select, input[type=text], input[type=number] { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 3px 5px; font-size: 12px; }
+  details { border: 1px solid var(--line); border-radius: 6px; margin-bottom: 8px; background: var(--panel); }
+  summary { cursor: pointer; padding: 6px 8px; font-weight: 600; color: var(--accent); user-select: none; }
+  .row { display: grid; grid-template-columns: 108px 1fr 58px 20px; align-items: center; gap: 4px; padding: 2px 8px; }
+  .row label { font-size: 11px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row input[type=range] { width: 100%; }
+  .row input[type=number] { width: 100%; }
+  .row button.reset1 { padding: 1px 4px; font-size: 10px; }
+  .section-actions { padding: 4px 8px 8px; display: flex; gap: 6px; }
+  #log { flex: 1; overflow-y: auto; font-size: 11px; }
+  .jump-entry { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; background: var(--panel); }
+  .headline { display: flex; gap: 10px; margin-bottom: 4px; }
+  .headline div { flex: 1; text-align: center; background: var(--panel2); border-radius: 4px; padding: 4px 2px; }
+  .headline .num { font-size: 15px; font-weight: 700; color: var(--accent); display: block; }
+  .headline .lbl { font-size: 9px; color: var(--dim); text-transform: uppercase; }
+  .jump-entry .detail { color: var(--dim); font-size: 10.5px; }
+  table.course { width: 100%; border-collapse: collapse; font-size: 11px; }
+  table.course th, table.course td { border-bottom: 1px solid var(--line); padding: 3px 4px; text-align: left; }
+  .pass { color: var(--good); font-weight: 700; }
+  .fail { color: var(--bad); font-weight: 700; }
+  .pending { color: var(--dim); }
+  h2 { font-size: 12px; color: var(--accent2); margin: 4px 0; text-transform: uppercase; letter-spacing: .04em; }
+  textarea { width: 100%; height: 90px; background: var(--panel); color: var(--text); border: 1px solid var(--line); font-family: monospace; font-size: 10px; }
+  small.hint { color: var(--dim); }
+</style>
+</head>
+<body>
+<script>localStorage.getItem('blockbash-save') || localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true }));</script>
+<div id="app">
+  <header>
+    <h1>⚙ BLOCKBASH PHYSICS LAB</h1>
+    <span class="hint" style="color:var(--dim)">SMB3-accurate core · drives the real entities/player.js</span>
+    <span style="flex:1"></span>
+    <label class="hint">Preset:
+      <select id="presetSelect"></select>
+    </label>
+    <button id="btnSaveNamed">Save as…</button>
+    <button id="btnExport">Export ▾</button>
+  </header>
+
+  <div id="panel"></div>
+
+  <div id="center">
+    <div id="hud"></div>
+    <canvas id="game" width="900" height="440"></canvas>
+    <div id="controls">
+      <button id="btnPause">⏸ Pause</button>
+      <button id="btnStep">⏭ Step</button>
+      <button id="btnSlow1">1x</button>
+      <button id="btnSlow2">0.5x</button>
+      <button id="btnSlow4">0.25x</button>
+      <span style="width:1px;background:var(--line);align-self:stretch"></span>
+      <button id="btnResetPos">↺ Respawn</button>
+      <select id="markerSelect"></select>
+      <button id="btnTeleport">Teleport</button>
+      <span style="width:1px;background:var(--line);align-self:stretch"></span>
+      <button id="btnRecord">● Record</button>
+      <button id="btnReplay">▶ Replay</button>
+      <span style="width:1px;background:var(--line);align-self:stretch"></span>
+      <button id="btnFreezeA">Freeze A</button>
+      <button id="btnRunB">Compare vs A (run B)</button>
+      <span style="width:1px;background:var(--line);align-self:stretch"></span>
+      <button id="btnHoldSweep">HOLD SWEEP (1-40f)</button>
+      <span class="hint">Move: ←/→, Shift=run, Space/↑=jump. Grid toggles with G.</span>
+    </div>
+  </div>
+
+  <div id="right">
+    <h2>Per-jump log (most recent first)</h2>
+    <div id="log"></div>
+    <h2>Benchmark course (Step 7)</h2>
+    <table class="course" id="courseTable"><thead>
+      <tr><th>Obstacle</th><th>Analytic</th><th>Actual</th></tr>
+    </thead><tbody></tbody></table>
+    <button id="btnRunCourse">Run all auto-tests</button>
+  </div>
+</div>
+
+<div id="exportBox" style="display:none; position:fixed; inset: 40px; background:var(--panel2); border:1px solid var(--accent); border-radius:8px; padding:14px; overflow:auto; z-index:10;">
+  <h2>Export</h2>
+  <p class="hint">JSON (paste into a preset) and a paste-ready physics.js <code>P</code> block.</p>
+  <textarea id="exportJson"></textarea>
+  <textarea id="exportBlock"></textarea>
+  <button id="btnCloseExport">Close</button>
+</div>
+
+<script type="module">
+import { keys, initInput } from '../src/engine/input.js';
+import { P, isColliding } from '../src/engine/physics.js';
+import { canvas, ctx, VIEW_WIDTH, VIEW_HEIGHT } from '../src/engine/renderer.js';
+import { player, resetPlayer, updatePlayer, drawPlayer, bufferJump, setRespawnPoint } from '../src/entities/player.js';
+import { loadLevel, getLevel } from '../src/levels/levelLoader.js';
+import { updateParticles, drawParticles, resetParticles } from '../src/entities/particles.js';
+
+// ============================================================================
+// Step 7 — benchmark course, in tile units, baked to pixels at load time.
+// A live tileSize slider still rescales the PHYSICS (via NATIVE/rescale
+// below), but does not regenerate this course's geometry — that's a
+// reasonable scope cut for a diagnostic tool, noted here rather than left
+// implicit.
+// ============================================================================
+const T = 22; // course geometry tile size (independent of the live tileSize slider)
+const GROUND_Y = 380;
+
+function buildCourse() {
+  const ground = [];
+  const platforms = [];
+  const labels = [];
+  const markers = []; // {name, type, x, ...} — used by the marker teleport dropdown AND the benchmark table
+
+  let cx = 0;
+  const addGround = (tiles) => { const w = tiles * T; ground.push({ x: cx, width: w }); cx += w; };
+  const gap = (tiles) => { cx += tiles * T; };
+  const label = (text) => labels.push({ x: cx, text });
+
+  // --- Speed runway: 30+ flat tiles for accel/top-speed measurement ---
+  label('SPEED RUNWAY (34 tiles)');
+  markers.push({ name: 'runway-start', type: 'runway', x: cx + T, groundY: GROUND_Y });
+  addGround(34);
+  markers.push({ name: 'runway-end', type: 'marker', x: cx - T * 2, groundY: GROUND_Y });
+
+  // --- Gap ladder: 1..8 tiles wide, each with a 7-tile runway/landing ---
+  label('GAP LADDER (1-8 tiles)');
+  for (let g = 1; g <= 8; g++) {
+    addGround(7);
+    const edgeX = cx;
+    gap(g);
+    markers.push({ name: `gap-${g}`, type: 'gap', tiles: g, edgeX, landX: cx, groundY: GROUND_Y });
+  }
+  addGround(8);
+
+  // --- Wall/step ladder: 1..6 tiles tall, flush with the ground (no pit —
+  // failure is bonking the side and stalling, not dying) ---
+  label('WALL LADDER (1-6 tiles tall)');
+  for (let h = 1; h <= 6; h++) {
+    addGround(6);
+    const wallX = cx;
+    const wallW = 3 * T;
+    platforms.push({ x: wallX, y: GROUND_Y - h * T, width: wallW, height: h * T });
+    markers.push({ name: `wall-${h}`, type: 'wall', tiles: h, x: wallX, width: wallW, groundY: GROUND_Y });
+    cx = wallX + wallW;
+  }
+  addGround(4);
+
+  // --- Ceiling corridors: 4-tile gap under 2/3/4 tiles of headroom ---
+  label('CEILING CORRIDORS (4-tile gap, 2/3/4 tile headroom)');
+  for (const headroom of [2, 3, 4]) {
+    addGround(6);
+    const edgeX = cx;
+    const ceilingStart = cx - 2 * T;
+    gap(4);
+    const landX = cx;
+    const ceilingEnd = cx + 2 * T;
+    platforms.push({ x: ceilingStart, y: GROUND_Y - headroom * T - T, width: ceilingEnd - ceilingStart, height: T });
+    markers.push({ name: `ceiling-${headroom}`, type: 'ceiling', headroom, tiles: 4, edgeX, landX, groundY: GROUND_Y });
+  }
+  addGround(6);
+
+  // --- Descent staircase: exercises fall handling + terminal velocity ---
+  label('DESCENT STAIRCASE (terminal velocity check)');
+  const descentStartX = cx;
+  let stepY = GROUND_Y;
+  for (let s = 0; s < 8; s++) {
+    // 1-tile drops between steps — exercises fall-handling (repeated brief
+    // falls), but each is far too short on its own to reach terminal
+    // velocity (that needs ~14 continuous frames of unobstructed fall).
+    platforms.push({ x: cx, y: stepY, width: 3 * T, height: 40 });
+    cx += 3 * T;
+    stepY += T;
+  }
+  // One real drop at the bottom (16 tiles) is what actually exercises
+  // terminal velocity — the stair-step drops above never fall far enough
+  // on their own to reach it.
+  const bigDropTiles = 16;
+  cx += 2 * T; // short runway to walk off the last step
+  const dropEdgeX = cx;
+  const landY = stepY + bigDropTiles * T;
+  platforms.push({ x: cx, y: landY, width: 12 * T, height: 40 });
+  markers.push({ name: 'descent-start', type: 'descent', x: descentStartX, groundY: GROUND_Y, dropEdgeX, landY });
+  cx += 12 * T;
+
+  const worldWidth = cx + 100;
+  return {
+    data: {
+      id: 'physics-lab-course', name: 'Physics Lab Benchmark Course',
+      worldWidth, groundY: GROUND_Y,
+      playerSpawn: { x: 20, y: GROUND_Y - T },
+      ground, platforms, hazards: [], checkpoints: [],
+      goal: { x: worldWidth - 60, y: 200, width: 10, height: GROUND_Y - 200 },
+      boss: null, house: null, enemies: [], coins: []
+    },
+    labels, markers, worldWidth
+  };
+}
+
+const course = buildCourse();
+loadLevel(course.data);
+setRespawnPoint(course.data.playerSpawn.x, course.data.playerSpawn.y);
+resetPlayer();
+resetParticles();
+
+// ============================================================================
+// Minimal input bootstrap (main.js's wiring, minus its physics loop — see
+// the file header for why the two can't share a loop here). Real keyboard
+// AND scripted tests both go through `keys` + bufferJump(), same as the
+// live game.
+// ============================================================================
+let recording = null;   // { startState, frames: [{left,right,run,jump}] } | null
+let replayFrames = null; // frames array while a replay is actively driving input
+let replayIndex = 0;
+
+initInput({
+  onKeyDown(e, alreadyDown) {
+    if ((e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w') && !alreadyDown) bufferJump();
+    if (e.key === 'g' || e.key === 'G') showGrid = !showGrid;
+  }
+});
+
+function setKey(key, held) {
+  const was = !!keys[key];
+  keys[key] = held;
+  if (held && !was && (key === ' ')) bufferJump();
+}
+
+// ============================================================================
+// Fixed-step loop with pause / frame-step / slow-mo — this page's own
+// accumulator (Step 1's pattern), not main.js's, precisely so these controls
+// exist. main.js itself is never imported here.
+// ============================================================================
+let paused = false;
+let stepOnce = false;
+let slowMo = 1; // 1, 0.5, 0.25
+let lastTime = null, accumulator = 0;
+const MAX_FRAME_MS = 250, MAX_STEPS_PER_FRAME = 5;
+let frameCount = 0;
+
+let showGrid = true;
+let cameraX = 0;
+
+// --- per-jump tracking (feeds the log + live HUD) ---
+let jumpInProgress = null;
+const jumpLog = [];
+let lastJumpTier = null;
+let ghosts = []; // last 3 finalized trails: {trail, hash, color}
+
+// --- speed-to-cap timing (frames from standstill), tracked opportunistically ---
+let capTimers = { walk: null, run: null, pSpeed: null };
+let accelStartFrame = null, accelStartFromZero = false;
+
+function paramHash() {
+  const s = JSON.stringify(P);
+  let h = 0;
+  for (let i = 0; i < s.length; i++) { h = (h * 31 + s.charCodeAt(i)) | 0; }
+  return (h >>> 0).toString(16).slice(0, 6);
+}
+
+function jumpTierFor(vx) {
+  let tier = 0;
+  for (const b of P.speedTierBounds) if (Math.abs(vx) >= b) tier++;
+  return Math.min(tier, 3);
+}
+
+function doStep() {
+  const wasOnGround = player.isOnGround;
+  const wasVX = player.velocityX;
+
+  if (replayFrames) {
+    const f = replayFrames[replayIndex] || { left: false, right: false, run: false, jump: false };
+    setKey('ArrowLeft', f.left); setKey('ArrowRight', f.right); setKey('Shift', f.run); setKey(' ', f.jump);
+    replayIndex++;
+    if (replayIndex >= replayFrames.length) replayFrames = null;
+  }
+
+  updatePlayer(false);
+  updateParticles();
+  frameCount++;
+
+  if (recording) {
+    recording.frames.push({
+      left: !!keys['ArrowLeft'], right: !!keys['ArrowRight'],
+      run: !!keys['Shift'], jump: !!keys[' ']
+    });
+  }
+
+  // --- speed-cap timing: frames from a standing start (both held keys were
+  // just released to 0 velocity, or this is the first frame) to each cap ---
+  if (Math.abs(wasVX) < 0.001 && Math.abs(player.velocityX) >= 0.001) {
+    accelStartFrame = frameCount; accelStartFromZero = true;
+  }
+  if (accelStartFromZero) {
+    const avx = Math.abs(player.velocityX);
+    if (capTimers.walk === null && avx >= P.walkMax) capTimers.walk = frameCount - accelStartFrame;
+    if (capTimers.run === null && avx >= P.runMax) capTimers.run = frameCount - accelStartFrame;
+    if (capTimers.pSpeed === null && avx >= P.pSpeedMax) capTimers.pSpeed = frameCount - accelStartFrame;
+  }
+
+  // --- jump tracking ---
+  if (wasOnGround && !player.isOnGround && player.velocityY < 0) {
+    lastJumpTier = jumpTierFor(wasVX);
+    jumpInProgress = {
+      takeoffFrame: frameCount, takeoffX: player.x, takeoffY: player.y,
+      takeoffVX: wasVX, tier: lastJumpTier,
+      minY: player.y, apexFrame: frameCount,
+      trail: [{ x: player.x, y: player.y }]
+    };
+  }
+  if (jumpInProgress) {
+    jumpInProgress.trail.push({ x: player.x, y: player.y });
+    if (player.y < jumpInProgress.minY) { jumpInProgress.minY = player.y; jumpInProgress.apexFrame = frameCount; }
+  }
+  if (!wasOnGround && player.isOnGround && jumpInProgress) {
+    finalizeJump(jumpInProgress, frameCount);
+    jumpInProgress = null;
+  }
+}
+
+function finalizeJump(j, landFrame) {
+  const airtimeFrames = landFrame - j.takeoffFrame;
+  const peakHeightPx = j.takeoffY - j.minY;
+  const distancePx = Math.abs(player.x - j.takeoffX);
+  const riseFrames = j.apexFrame - j.takeoffFrame;
+  const fallFrames = landFrame - j.apexFrame;
+  const entry = {
+    frame: landFrame,
+    airtimeFrames, airtimeSec: airtimeFrames / P.fixedTimestepHz,
+    peakHeightPx, peakHeightTiles: peakHeightPx / P.tileSize,
+    distancePx, distanceTiles: distancePx / P.tileSize,
+    ratio: peakHeightPx > 0 ? distancePx / peakHeightPx : Infinity,
+    riseFrames, fallFrames, apexToLandingFrames: fallFrames,
+    takeoffVX: j.takeoffVX, tier: j.tier,
+    trail: j.trail
+  };
+  jumpLog.unshift(entry);
+  if (jumpLog.length > 25) jumpLog.pop();
+  ghosts.unshift({ trail: j.trail.slice(), hash: paramHash(), color: ghostColor(ghosts.length) });
+  if (ghosts.length > 3) ghosts.pop();
+  renderLog();
+}
+
+function ghostColor(i) { return ['#ffd166cc', '#6fd3ffcc', '#ff6f8fcc'][i % 3]; }
+
+function loop(now) {
+  if (lastTime === null) lastTime = now;
+  const frameMs = Math.min(now - lastTime, MAX_FRAME_MS);
+  lastTime = now;
+
+  if (!paused || stepOnce) {
+    accumulator += frameMs * slowMo;
+    const stepMs = 1000 / P.fixedTimestepHz;
+    let steps = 0;
+    while (accumulator >= stepMs && steps < MAX_STEPS_PER_FRAME) {
+      doStep();
+      accumulator -= stepMs;
+      steps++;
+      if (stepOnce) { stepOnce = false; paused = true; accumulator = 0; break; }
+    }
+  }
+
+  render();
+  requestAnimationFrame(loop);
+}
+
+// ============================================================================
+// Rendering: platforms, grid + tile rulers, live trajectory, ghosts, player.
+// Reuses drawPlayer() from the real player.js; everything else is this
+// page's own lightweight canvas drawing (not part of "physics").
+// ============================================================================
+function render() {
+  const level = getLevel();
+  cameraX = Math.max(0, Math.min(player.x - VIEW_WIDTH / 2, level.worldWidth - VIEW_WIDTH));
+
+  ctx.fillStyle = '#060814';
+  ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+  ctx.save();
+  ctx.translate(-cameraX, 0);
+
+  if (showGrid) drawGrid(level);
+
+  // platforms
+  for (const plat of level.platforms) {
+    ctx.fillStyle = plat.ground ? '#232c4d' : '#2f3a63';
+    ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
+    ctx.strokeStyle = '#4a5688';
+    ctx.strokeRect(plat.x, plat.y, plat.width, plat.height);
+  }
+
+  // course labels
+  ctx.fillStyle = '#8a92b8';
+  ctx.font = '11px monospace';
+  for (const l of course.labels) ctx.fillText(l.text, l.x + 4, 40);
+
+  // ghosts (faded past jumps)
+  for (const g of ghosts) drawTrail(g.trail, g.color, 1.5, `#${g.hash}`);
+  // live in-progress jump trail
+  if (jumpInProgress) drawTrail(jumpInProgress.trail, '#ffffff', 2, null);
+  // A/B frozen trails
+  if (trailA) drawTrail(trailA, '#ffd166', 2, 'A');
+  if (trailB) drawTrail(trailB, '#6fd3ff', 2, 'B');
+  // hold-sweep family
+  for (const t of sweepTrails) drawTrail(t, 'rgba(180,220,255,0.35)', 1, null);
+
+  drawPlayer(frameCount);
+  drawParticles();
+
+  ctx.restore();
+  renderHud(level);
+}
+
+function drawTrail(trail, color, width, tag) {
+  if (!trail || trail.length < 2) return;
+  ctx.strokeStyle = color; ctx.lineWidth = width; ctx.beginPath();
+  ctx.moveTo(trail[0].x + 11, trail[0].y + 11);
+  for (const p of trail) ctx.lineTo(p.x + 11, p.y + 11);
+  ctx.stroke();
+  if (tag) { ctx.fillStyle = color; ctx.font = '10px monospace'; ctx.fillText(tag, trail[trail.length - 1].x + 14, trail[trail.length - 1].y); }
+}
+
+function drawGrid(level) {
+  const t = P.tileSize;
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+  const startTile = Math.floor(cameraX / t);
+  const endTile = Math.ceil((cameraX + VIEW_WIDTH) / t);
+  ctx.font = '9px monospace'; ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  for (let i = startTile; i <= endTile; i++) {
+    const x = i * t;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, VIEW_HEIGHT); ctx.stroke();
+    if (i % 5 === 0) ctx.fillText(String(i), x + 2, 10);
+  }
+  for (let y = 0; y < VIEW_HEIGHT; y += t) {
+    ctx.beginPath(); ctx.moveTo(cameraX, y); ctx.lineTo(cameraX + VIEW_WIDTH, y); ctx.stroke();
+  }
+}
+
+function renderHud(level) {
+  const vxTiles = (player.velocityX / P.tileSize) * P.fixedTimestepHz;
+  const vyTiles = (player.velocityY / P.tileSize) * P.fixedTimestepHz;
+  const jumpHeld = keys[' '] || keys['ArrowUp'] || keys['w'];
+  const rising = player.velocityY < -P.riseGravityThreshold && jumpHeld;
+  const gravState = player.isOnGround ? 'GROUNDED' : (rising ? 'RISE_WEAK' : (player.velocityY >= P.terminalVelocity ? 'TERMINAL' : 'NORMAL'));
+  const running = !!keys['Shift'];
+  const hasPMeter = player.pMeter >= P.pMeterSegments;
+  const tierName = !running ? 'walk' : (hasPMeter ? 'P-speed' : 'run');
+  const framesSinceTakeoff = jumpInProgress ? frameCount - jumpInProgress.takeoffFrame : 0;
+
+  document.getElementById('hud').innerHTML = `
+    <div>vx <b>${player.velocityX.toFixed(2)}</b>px/f (${vxTiles.toFixed(2)} t/s)</div>
+    <div>vy <b>${player.velocityY.toFixed(2)}</b>px/f (${vyTiles.toFixed(2)} t/s)</div>
+    <div>tier <b>${tierName}</b></div>
+    <div>P-meter <b>${player.pMeter}/${P.pMeterSegments}</b></div>
+    <div>gravity <b>${gravState}</b></div>
+    <div>grounded <b>${player.isOnGround ? 'yes' : 'no'}</b></div>
+    <div>frame <b>${frameCount}</b></div>
+    <div>since takeoff <b>${jumpInProgress ? framesSinceTakeoff : '-'}</b></div>
+    <div>last jump tier <b>${lastJumpTier === null ? '-' : lastJumpTier}</b></div>
+    <div>x <b>${player.x.toFixed(0)}</b>px (${(player.x / P.tileSize).toFixed(1)} t)</div>
+    <div>frames→walk/run/P <b>${capTimers.walk ?? '-'}/${capTimers.run ?? '-'}/${capTimers.pSpeed ?? '-'}</b></div>
+    <div>${paused ? '⏸ PAUSED' : (slowMo < 1 ? `slow-mo ${slowMo}x` : 'running')}</div>
+  `;
+}
+
+function renderLog() {
+  const el = document.getElementById('log');
+  el.innerHTML = jumpLog.map(j => `
+    <div class="jump-entry">
+      <div class="headline">
+        <div><span class="num">${j.airtimeFrames}f</span><span class="lbl">airtime (${j.airtimeSec.toFixed(2)}s)</span></div>
+        <div><span class="num">${j.peakHeightTiles.toFixed(2)}</span><span class="lbl">peak tiles</span></div>
+        <div><span class="num">1:${(j.ratio).toFixed(2)}</span><span class="lbl">height:distance</span></div>
+      </div>
+      <div class="detail">
+        distance ${j.distancePx.toFixed(0)}px (${j.distanceTiles.toFixed(2)}t) ·
+        rise/fall ${j.riseFrames}/${j.fallFrames}f · apex→land ${j.apexToLandingFrames}f ·
+        |vx| takeoff ${Math.abs(j.takeoffVX).toFixed(2)} · jump tier ${j.tier}
+      </div>
+    </div>
+  `).join('') || '<div class="hint">No jumps yet — jump on the course to populate this log.</div>';
+}
+
+requestAnimationFrame(loop);
+
+// ============================================================================
+// Param panel: sliders + number inputs, grouped/collapsible, per-param and
+// global reset. Also drives the SCALE-rescale-from-native behavior for the
+// tileSize slider.
+// ============================================================================
+const NATIVE = {
+  accel: 14 / 256, groundFriction: 14 / 256, skidDecel: 32 / 256,
+  walkMax: 1.5, runMax: 2.5, pSpeedMax: 3.5, slideMax: 3.9375,
+  baseJumpVelocity: -3.5,
+  'jumpTable.0': 0, 'jumpTable.1': -0.125, 'jumpTable.2': -0.25, 'jumpTable.3': -0.5,
+  'speedTierBounds.0': 1, 'speedTierBounds.1': 2, 'speedTierBounds.2': 3,
+  gravityRise: 1 / 16, gravityFall: 5 / 16, riseGravityThreshold: 2.0,
+  terminalVelocity: 4.3125
+};
+
+const PARAM_GROUPS = [
+  { title: 'World', params: [
+    { key: 'tileSize', label: 'tileSize (px)', min: 8, max: 48, step: 1 },
+    { key: 'fixedTimestepHz', label: 'fixedTimestepHz', min: 15, max: 240, step: 1 },
+  ]},
+  { title: 'Horizontal', params: [
+    { key: 'accel', label: 'accel', min: 0, max: 0.3, step: 0.001 },
+    { key: 'groundFriction', label: 'groundFriction', min: 0, max: 0.3, step: 0.001 },
+    { key: 'skidDecel', label: 'skidDecel', min: 0, max: 0.6, step: 0.001 },
+    { key: 'walkMax', label: 'walkMax', min: 0, max: 6, step: 0.01 },
+    { key: 'runMax', label: 'runMax', min: 0, max: 6, step: 0.01 },
+    { key: 'pSpeedMax', label: 'pSpeedMax', min: 0, max: 8, step: 0.01 },
+    { key: 'slideMax', label: 'slideMax', min: 0, max: 8, step: 0.01 },
+    { key: 'minWalkSpeed', label: 'minWalkSpeed', min: 0, max: 2, step: 0.01 },
+    { key: 'airControlMultiplier', label: 'airControlMultiplier', min: 0, max: 2, step: 0.01 },
+    { key: 'airFriction', label: 'airFriction', min: 0, max: 0.3, step: 0.001 },
+    { key: 'pMeterFillFrames', label: 'pMeterFillFrames', min: 1, max: 60, step: 1 },
+    { key: 'pMeterDrainFrames', label: 'pMeterDrainFrames', min: 1, max: 120, step: 1 },
+    { key: 'pMeterSegments', label: 'pMeterSegments', min: 1, max: 20, step: 1 },
+  ]},
+  { title: 'Vertical', params: [
+    { key: 'baseJumpVelocity', label: 'baseJumpVelocity', min: -10, max: 0, step: 0.01 },
+    { key: 'jumpTable.0', label: 'jumpTable[0]', min: -3, max: 0, step: 0.001 },
+    { key: 'jumpTable.1', label: 'jumpTable[1]', min: -3, max: 0, step: 0.001 },
+    { key: 'jumpTable.2', label: 'jumpTable[2]', min: -3, max: 0, step: 0.001 },
+    { key: 'jumpTable.3', label: 'jumpTable[3]', min: -3, max: 0, step: 0.001 },
+    { key: 'speedTierBounds.0', label: 'speedTierBounds[0]', min: 0, max: 8, step: 0.01 },
+    { key: 'speedTierBounds.1', label: 'speedTierBounds[1]', min: 0, max: 8, step: 0.01 },
+    { key: 'speedTierBounds.2', label: 'speedTierBounds[2]', min: 0, max: 8, step: 0.01 },
+    { key: 'gravityRise', label: 'gravityRise', min: 0, max: 1, step: 0.001 },
+    { key: 'gravityFall', label: 'gravityFall', min: 0, max: 1.5, step: 0.001 },
+    { key: 'riseGravityThreshold', label: 'riseGravityThreshold', min: 0, max: 8, step: 0.01 },
+    { key: 'terminalVelocity', label: 'terminalVelocity', min: 0, max: 15, step: 0.01 },
+  ]},
+  { title: 'Non-SMB3 (game-feel additions)', params: [
+    { key: 'coyoteFrames', label: 'coyoteFrames', min: 0, max: 20, step: 1 },
+    { key: 'jumpBufferFrames', label: 'jumpBufferFrames', min: 0, max: 20, step: 1 },
+    { key: 'lockAirMomentum', label: 'lockAirMomentum', type: 'bool' },
+  ]}
+];
+
+function getParam(key) {
+  const parts = key.split('.');
+  let obj = P;
+  for (let i = 0; i < parts.length - 1; i++) obj = obj[parts[i]];
+  return obj[parts[parts.length - 1]];
+}
+function setParam(key, value) {
+  const parts = key.split('.');
+  let obj = P;
+  for (let i = 0; i < parts.length - 1; i++) obj = obj[parts[i]];
+  obj[parts[parts.length - 1]] = value;
+}
+
+const DEFAULTS = snapshot();
+function snapshot() {
+  return JSON.parse(JSON.stringify(P, (k, v) => (typeof v === 'function' ? undefined : v)));
+}
+function readFromSnap(snap, key) {
+  const parts = key.split('.'); let obj = snap;
+  for (const part of parts) obj = obj[part];
+  return obj;
+}
+
+function rescaleFromNative() {
+  const scale = P.tileSize / 16;
+  P.SCALE = scale;
+  for (const [key, nativeVal] of Object.entries(NATIVE)) setParam(key, nativeVal * scale);
+  refreshPanelInputs();
+}
+
+const panelEl = document.getElementById('panel');
+const inputRefs = {}; // key -> {slider, number}
+
+function buildPanel() {
+  panelEl.innerHTML = '';
+  for (const group of PARAM_GROUPS) {
+    const details = document.createElement('details');
+    details.open = group.title === 'Vertical' || group.title === 'World';
+    const summary = document.createElement('summary');
+    summary.textContent = group.title;
+    details.appendChild(summary);
+
+    for (const p of group.params) {
+      const row = document.createElement('div');
+      row.className = 'row';
+      const label = document.createElement('label');
+      label.textContent = p.label; label.title = p.key;
+      row.appendChild(label);
+
+      if (p.type === 'bool') {
+        const cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.checked = !!getParam(p.key);
+        cb.style.gridColumn = '2 / 4';
+        cb.addEventListener('change', () => { setParam(p.key, cb.checked); });
+        row.appendChild(cb);
+        inputRefs[p.key] = { bool: cb };
+      } else {
+        const slider = document.createElement('input');
+        slider.type = 'range'; slider.min = p.min; slider.max = p.max; slider.step = p.step;
+        slider.value = getParam(p.key);
+        const number = document.createElement('input');
+        number.type = 'number'; number.step = p.step;
+        number.value = round(getParam(p.key));
+
+        slider.addEventListener('input', () => { setParam(p.key, parseFloat(slider.value)); number.value = round(parseFloat(slider.value)); onParamChange(p.key); });
+        number.addEventListener('change', () => { const v = parseFloat(number.value); if (!isNaN(v)) { setParam(p.key, v); slider.value = v; onParamChange(p.key); } });
+
+        row.appendChild(slider); row.appendChild(number);
+        inputRefs[p.key] = { slider, number };
+      }
+
+      const resetBtn = document.createElement('button');
+      resetBtn.className = 'reset1'; resetBtn.textContent = '↺'; resetBtn.title = 'Reset this param';
+      resetBtn.addEventListener('click', () => { setParam(p.key, readFromSnap(DEFAULTS, p.key)); refreshPanelInputs(); });
+      row.appendChild(resetBtn);
+
+      details.appendChild(row);
+    }
+
+    const actions = document.createElement('div');
+    actions.className = 'section-actions';
+    const resetAllBtn = document.createElement('button');
+    resetAllBtn.textContent = 'Reset section';
+    resetAllBtn.addEventListener('click', () => {
+      for (const p of group.params) setParam(p.key, readFromSnap(DEFAULTS, p.key));
+      refreshPanelInputs();
+    });
+    actions.appendChild(resetAllBtn);
+    details.appendChild(actions);
+
+    panelEl.appendChild(details);
+  }
+
+  const globalRow = document.createElement('div');
+  globalRow.style.padding = '8px';
+  const globalReset = document.createElement('button');
+  globalReset.textContent = 'Reset ALL to page-load defaults';
+  globalReset.addEventListener('click', () => { for (const group of PARAM_GROUPS) for (const p of group.params) setParam(p.key, readFromSnap(DEFAULTS, p.key)); refreshPanelInputs(); });
+  globalRow.appendChild(globalReset);
+  panelEl.appendChild(globalRow);
+}
+
+function onParamChange(key) {
+  if (key === 'tileSize') rescaleFromNative();
+}
+
+function refreshPanelInputs() {
+  for (const group of PARAM_GROUPS) {
+    for (const p of group.params) {
+      const ref = inputRefs[p.key];
+      if (!ref) continue;
+      if (ref.bool) ref.bool.checked = !!getParam(p.key);
+      else { ref.slider.value = getParam(p.key); ref.number.value = round(getParam(p.key)); }
+    }
+  }
+}
+function round(v) { return Math.round(v * 10000) / 10000; }
+
+buildPanel();
+
+// ============================================================================
+// Presets: "current" (today's live values, i.e. what physics.js ships with)
+// and "smb3" (same, but the three non-SMB3 additions zeroed/off) as
+// built-ins, plus named save/load via localStorage.
+// ============================================================================
+const PRESET_KEY = 'blockbash-physics-lab-presets';
+const PRESET_CURRENT = snapshot();
+const PRESET_SMB3 = (() => {
+  const s = snapshot();
+  s.coyoteFrames = 0; s.jumpBufferFrames = 0; s.lockAirMomentum = false;
+  return s;
+})();
+
+function loadNamedPresets() {
+  try { return JSON.parse(localStorage.getItem(PRESET_KEY) || '{}'); } catch { return {}; }
+}
+function saveNamedPresets(map) { localStorage.setItem(PRESET_KEY, JSON.stringify(map)); }
+
+function refreshPresetSelect() {
+  const sel = document.getElementById('presetSelect');
+  sel.innerHTML = '';
+  const builtins = { current: PRESET_CURRENT, smb3: PRESET_SMB3 };
+  for (const name of Object.keys(builtins)) {
+    const opt = document.createElement('option'); opt.value = 'builtin:' + name; opt.textContent = name; sel.appendChild(opt);
+  }
+  const named = loadNamedPresets();
+  for (const name of Object.keys(named)) {
+    const opt = document.createElement('option'); opt.value = 'named:' + name; opt.textContent = '★ ' + name; sel.appendChild(opt);
+  }
+}
+refreshPresetSelect();
+
+document.getElementById('presetSelect').addEventListener('change', (e) => {
+  const [kind, name] = e.target.value.split(':');
+  const snap = kind === 'builtin' ? (name === 'current' ? PRESET_CURRENT : PRESET_SMB3) : loadNamedPresets()[name];
+  if (!snap) return;
+  for (const group of PARAM_GROUPS) for (const p of group.params) setParam(p.key, readFromSnap(snap, p.key));
+  refreshPanelInputs();
+});
+
+document.getElementById('btnSaveNamed').addEventListener('click', () => {
+  const name = prompt('Preset name?');
+  if (!name) return;
+  const map = loadNamedPresets();
+  map[name] = snapshot();
+  saveNamedPresets(map);
+  refreshPresetSelect();
+});
+
+document.getElementById('btnExport').addEventListener('click', () => {
+  document.getElementById('exportJson').value = JSON.stringify(P, null, 2);
+  document.getElementById('exportBlock').value = formatAsPhysicsBlock();
+  document.getElementById('exportBox').style.display = 'block';
+});
+document.getElementById('btnCloseExport').addEventListener('click', () => { document.getElementById('exportBox').style.display = 'none'; });
+
+function formatAsPhysicsBlock() {
+  const lines = ['export const P = {'];
+  for (const [k, v] of Object.entries(P)) {
+    lines.push(`  ${k}: ${JSON.stringify(v)},`);
+  }
+  lines.push('};');
+  return lines.join('\n');
+}
+
+// ============================================================================
+// Controls: pause / step / slow-mo, teleport, record+replay, A/B, hold sweep
+// ============================================================================
+document.getElementById('btnPause').addEventListener('click', (e) => {
+  paused = !paused;
+  e.target.textContent = paused ? '▶ Resume' : '⏸ Pause';
+  e.target.classList.toggle('active', paused);
+});
+document.getElementById('btnStep').addEventListener('click', () => { paused = true; stepOnce = true; document.getElementById('btnPause').textContent = '▶ Resume'; document.getElementById('btnPause').classList.add('active'); });
+function setSlow(mult, btnId) {
+  slowMo = mult;
+  for (const id of ['btnSlow1', 'btnSlow2', 'btnSlow4']) document.getElementById(id).classList.toggle('active', id === btnId);
+}
+document.getElementById('btnSlow1').addEventListener('click', () => setSlow(1, 'btnSlow1'));
+document.getElementById('btnSlow2').addEventListener('click', () => setSlow(0.5, 'btnSlow2'));
+document.getElementById('btnSlow4').addEventListener('click', () => setSlow(0.25, 'btnSlow4'));
+
+document.getElementById('btnResetPos').addEventListener('click', () => { resetPlayer(); jumpInProgress = null; capTimers = { walk: null, run: null, pSpeed: null }; accelStartFromZero = false; });
+
+const markerSelect = document.getElementById('markerSelect');
+for (const m of course.markers) {
+  const opt = document.createElement('option'); opt.value = m.name; opt.textContent = m.name; markerSelect.appendChild(opt);
+}
+document.getElementById('btnTeleport').addEventListener('click', () => {
+  const m = course.markers.find(m => m.name === markerSelect.value);
+  if (!m) return;
+  player.x = m.x !== undefined ? m.x : m.edgeX; player.y = (m.groundY ?? GROUND_Y) - player.height - 1;
+  player.velocityX = 0; player.velocityY = 0; player.isOnGround = false;
+  jumpInProgress = null;
+});
+
+document.getElementById('btnRecord').addEventListener('click', (e) => {
+  if (!recording) {
+    recording = { startX: player.x, startY: player.y, frames: [] };
+    e.target.textContent = '■ Stop'; e.target.classList.add('active');
+  } else {
+    e.target.textContent = '● Record'; e.target.classList.remove('active');
+    window.__lastRecording = recording; // kept for replay
+    recording = null;
+  }
+});
+document.getElementById('btnReplay').addEventListener('click', () => {
+  const rec = window.__lastRecording;
+  if (!rec) { alert('Nothing recorded yet.'); return; }
+  player.x = rec.startX; player.y = rec.startY; player.velocityX = 0; player.velocityY = 0; player.isOnGround = false;
+  jumpInProgress = null;
+  replayFrames = rec.frames; replayIndex = 0;
+});
+
+// --- A/B ---
+let trailA = null, trailB = null;
+// Walks/runs from startX and jumps once the player's leading edge reaches
+// jumpAtX — NOT on the first frame, which would skip the whole runway and
+// always jump from a near-standstill regardless of runSpeed/holdFrames.
+// Same pattern as tools/gap-probe.html's attempt(). Resets the P-meter too
+// (this runs many times per page load — nothing should leak between calls).
+function scriptedTestJump(startX, startY, runSpeed, holdFrames, jumpAtX, maxFrames = 250) {
+  player.x = startX; player.y = startY; player.velocityX = 0; player.velocityY = 0;
+  player.isOnGround = true; player.wasOnGround = true; player.coyoteTimer = 0; player.jumpBuffer = 0;
+  player.pMeter = 0; player.pMeterTimer = 0; player.respawnFreeze = 0; // see gamepad-probe.html's Step 4 fix for the same bug
+  setKey('Shift', runSpeed); setKey('ArrowRight', true);
+  const trail = [];
+  let jumped = false, held = 0;
+  for (let i = 0; i < maxFrames; i++) {
+    if (!jumped && player.isOnGround && player.x + player.width >= jumpAtX) {
+      setKey(' ', true); jumped = true; held = holdFrames;
+    }
+    if (held > 0 && --held === 0) setKey(' ', false);
+    updatePlayer(false);
+    trail.push({ x: player.x, y: player.y });
+    if (jumped && player.isOnGround) break;
+  }
+  setKey(' ', false); setKey('ArrowRight', false); setKey('Shift', false);
+  return trail;
+}
+document.getElementById('btnFreezeA').addEventListener('click', () => {
+  const start = course.markers.find(m => m.name === 'runway-start');
+  trailA = scriptedTestJump(start.x, GROUND_Y - player.height, true, 20, start.x + 5 * T);
+});
+document.getElementById('btnRunB').addEventListener('click', () => {
+  const start = course.markers.find(m => m.name === 'runway-start');
+  trailB = scriptedTestJump(start.x, GROUND_Y - player.height, true, 20, start.x + 5 * T);
+});
+
+// --- Hold sweep ---
+let sweepTrails = [];
+document.getElementById('btnHoldSweep').addEventListener('click', () => {
+  sweepTrails = [];
+  const start = course.markers.find(m => m.name === 'runway-start');
+  for (let held = 1; held <= 40; held++) {
+    sweepTrails.push(scriptedTestJump(start.x, GROUND_Y - player.height, false, held, start.x + 5 * T, 250));
+  }
+  resetPlayer();
+});
+
+// ============================================================================
+// Step 7 continued: benchmark table — analytic (forward-integrated, no
+// collision) vs actual (drives the real player + level) pass/fail.
+// ============================================================================
+function analyticJump(takeoffVX, holdFrames, maxFrames = 400) {
+  let vx = takeoffVX, vy;
+  let tier = jumpTierFor(takeoffVX);
+  vy = P.baseJumpVelocity + P.jumpTable[tier];
+  let x = 0, y = 0, apexY = 0, apexFrame = 0;
+  const trail = [{ x, y }];
+  for (let f = 1; f <= maxFrames; f++) {
+    const rising = vy < -P.riseGravityThreshold && f <= holdFrames;
+    vy += rising ? P.gravityRise : P.gravityFall;
+    vy = Math.min(vy, P.terminalVelocity);
+    x += vx; y += vy;
+    if (y < apexY) { apexY = y; apexFrame = f; }
+    trail.push({ x, y });
+    if (f > 1 && y >= 0) return { distance: x, peakHeight: -apexY, airtime: f, trail };
+  }
+  return { distance: x, peakHeight: -apexY, airtime: maxFrames, trail, incomplete: true };
+}
+
+function actualTestGap(marker) {
+  // Sweep a few hold durations rather than one fixed value — same reason
+  // as actualTestCeiling below: a single hold that clears a narrow gap
+  // isn't necessarily the one that clears the widest one too.
+  const startX = marker.edgeX - 7 * T + 4;
+  for (const hold of [14, 18, 22, 28, 34, 40]) {
+    scriptedTestJump(startX, GROUND_Y - player.height, true, hold, marker.edgeX, 250);
+    if (player.x >= marker.landX && player.y < GROUND_Y + 100) return true;
+  }
+  return false;
+}
+function actualTestWall(marker) {
+  // Jump a full tile before the wall's face, not AT it — triggering right
+  // at the collision boundary means the wall has already blocked/zeroed
+  // velocityX the frame before, so the jump samples ~0 speed (tier 0, no
+  // horizontal carry) and never clears even a short wall.
+  // PASS = successfully mounted the step (standing on its top), same as a
+  // real "wall/step ladder" — this is a step to climb, not a gap to long-
+  // jump clean over in one bound (landing partway ON TOP is success).
+  const startX = marker.x - 6 * T + 4;
+  scriptedTestJump(startX, GROUND_Y - player.height, false, 20, marker.x - T, 250);
+  const wallTopY = GROUND_Y - marker.tiles * T - player.height;
+  return player.isOnGround && player.y <= wallTopY + 2 && player.x + player.width > marker.x;
+}
+function actualTestCeiling(marker) {
+  // Sweeps the SAME 1-40 hold range the analytic model searches (Step 6's
+  // HOLD SWEEP range) — a narrower fixed set under-samples this one, since
+  // a too-long hold can bonk the ceiling while still over the gap and fall
+  // straight into the pit instead of landing short or clearing, which a
+  // handful of fixed candidates can easily miss entirely.
+  const startX = marker.edgeX - 6 * T + 4;
+  for (let hold = 1; hold <= 40; hold++) {
+    scriptedTestJump(startX, GROUND_Y - player.height, true, hold, marker.edgeX, 250);
+    if (player.x >= marker.landX && player.y < GROUND_Y + 100) return true;
+  }
+  return false;
+}
+function actualTestDescent(marker) {
+  player.x = marker.x + 2; player.y = marker.groundY - player.height;
+  player.velocityX = 0; player.velocityY = 0; player.isOnGround = true;
+  player.coyoteTimer = 0; player.jumpBuffer = 0; player.respawnFreeze = 0;
+  setKey('ArrowRight', true);
+  let maxVY = 0;
+  // Walks the whole staircase, then the one real (16-tile) drop at the end
+  // — that drop is what can actually reach terminal velocity; the 1-tile
+  // steps above it individually can't (too short to matter).
+  for (let i = 0; i < 400; i++) {
+    updatePlayer(false);
+    maxVY = Math.max(maxVY, player.velocityY);
+    if (player.isOnGround && player.y >= marker.landY - player.height - 2) break;
+  }
+  setKey('ArrowRight', false);
+  return maxVY >= P.terminalVelocity - 0.05;
+}
+
+function buildCourseTable() {
+  const tbody = document.querySelector('#courseTable tbody');
+  tbody.innerHTML = '';
+  for (const m of course.markers) {
+    if (!['gap', 'wall', 'ceiling', 'descent'].includes(m.type)) continue;
+    const tr = document.createElement('tr');
+    tr.id = 'row-' + m.name;
+    const label = m.type === 'gap' ? `Gap ${m.tiles}t` : m.type === 'wall' ? `Wall ${m.tiles}t` : m.type === 'ceiling' ? `Ceiling ${m.headroom}t/${m.tiles}t gap` : 'Descent';
+    tr.innerHTML = `<td>${label}</td><td class="analytic pending">–</td><td class="actual pending">–</td>`;
+    tbody.appendChild(tr);
+  }
+}
+buildCourseTable();
+
+function runAnalyticForMarker(m) {
+  if (m.type === 'gap') {
+    const r = analyticJump(P.runMax, 40);
+    return r.distance >= m.tiles * T;
+  }
+  if (m.type === 'wall') {
+    const r = analyticJump(P.walkMax, 40);
+    return r.peakHeight >= m.tiles * T;
+  }
+  if (m.type === 'ceiling') {
+    for (let hold = 1; hold <= 40; hold++) {
+      const r = analyticJump(P.runMax, hold);
+      if (r.distance >= m.tiles * T && r.peakHeight <= m.headroom * T - player.height * 0.5) return true;
+    }
+    return false;
+  }
+  if (m.type === 'descent') return P.gravityFall > 0; // terminal velocity is always reachable given enough fall distance
+  return null;
+}
+
+document.getElementById('btnRunCourse').addEventListener('click', () => {
+  const savedX = player.x, savedY = player.y, savedVX = player.velocityX, savedVY = player.velocityY, savedGround = player.isOnGround;
+  for (const m of course.markers) {
+    if (!['gap', 'wall', 'ceiling', 'descent'].includes(m.type)) continue;
+    const row = document.getElementById('row-' + m.name);
+    const analytic = runAnalyticForMarker(m);
+    row.children[1].textContent = analytic ? 'PASS' : 'FAIL';
+    row.children[1].className = analytic ? 'pass' : 'fail';
+
+    let actual;
+    if (m.type === 'gap') actual = actualTestGap(m);
+    else if (m.type === 'wall') actual = actualTestWall(m);
+    else if (m.type === 'ceiling') actual = actualTestCeiling(m);
+    else actual = actualTestDescent(m);
+    row.children[2].textContent = actual ? 'PASS' : 'FAIL';
+    row.children[2].className = actual ? 'pass' : 'fail';
+  }
+  player.x = savedX; player.y = savedY; player.velocityX = savedVX; player.velocityY = savedVY; player.isOnGround = savedGround;
+  jumpInProgress = null;
+});
+
+renderLog();
+</script>
+</body>
+</html>
