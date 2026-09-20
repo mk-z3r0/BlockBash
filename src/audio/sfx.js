@@ -43,6 +43,23 @@ export function playDeflect() {
   tone(1400, t, 0.1, 'square', 0.16, sfxGain, 6000, 700);
   noiseBurst(t, 0.12, 0.2, sfxGain, 'highpass', 5000);
 }
+// Unused while the chainsaw is parked (weapons/chainsaw.js) — level 1's
+// boss uses the pickaxe cues below instead. Kept for when it reappears.
+export function playChainsawStart() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  // a nasty two-pull rev
+  tone(90, t, 0.28, 'sawtooth', 0.26, sfxGain, 1400, 260);
+  noiseBurst(t, 0.3, 0.2, sfxGain, 'bandpass', 1800);
+  tone(120, t + 0.32, 0.45, 'sawtooth', 0.26, sfxGain, 2200, 420);
+  noiseBurst(t + 0.32, 0.5, 0.22, sfxGain, 'bandpass', 2400);
+}
+export function playChainsawLoop() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  tone(300, t, 0.48, 'sawtooth', 0.12, sfxGain, 2600, 340);
+  noiseBurst(t, 0.45, 0.07, sfxGain, 'bandpass', 3000);
+}
 export function playSurprise() {
   if (!audioCtx) return;
   const t = audioCtx.currentTime;

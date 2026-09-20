@@ -3,6 +3,7 @@ import { drawStickLegs, drawMuscleArm, drawPickaxeIcon } from '../engine/rendere
 import { isColliding, STOMP_BOUNCE } from '../engine/physics.js';
 import { spawnExplosion } from './particles.js';
 import { playStomp, playSurprise } from '../audio/sfx.js';
+import { pickaxeAngleAt, pickaxeFistAt } from '../weapons/pickaxe.js';
 import { state } from '../state.js';
 
 // Builds live enemies from a level's raw spawn data.
@@ -136,18 +137,19 @@ export function drawEnemies(frameCount, cutsceneDone) {
 
     // one muscular arm on the side it's travelling toward, rooted at the
     // sphere's center — exactly the same art as the player's. Once the
-    // pickaxe is out, the fist target oscillates with the same swing value
-    // that drives the axe's rotation, so the arm itself visibly swings
-    // along with the weapon rather than holding a fixed pose while only the
-    // axe rotates in its hand (matches the player's carry in weapons/pickaxe.js).
+    // pickaxe is out, the fist target rides the same idle(shoulder) <->
+    // struck(handle level with the ground) sweep as the player's swing
+    // (weapons/pickaxe.js) — just driven by an oscillating phase instead of
+    // a one-shot timer, since the boss's is a continuous threat, not a
+    // single button-press swing. Sharing the same two poses is what keeps
+    // the boss's swing reading as the same motion as the player's.
     if (!squashed) {
       const side = enemy.speed >= 0 ? 1 : -1;
       const r = enemy.w / 2;
       const hasPickaxe = enemy.boss && enemy.awake && !cutsceneDone;
-      const swing = hasPickaxe ? Math.sin(enemy.swingPhase * 0.24) : 0;
-      const fistX = hasPickaxe ? side * (r + 12 + swing * 8) : side * (r + 17);
-      const fistY = hasPickaxe ? -r * (0.55 + swing * 0.35) : -r * 0.35;
-      const hand = drawMuscleArm(0, -r * 0.1, fistX, fistY);
+      const swingProgress = hasPickaxe ? (Math.sin(enemy.swingPhase * 0.24) + 1) / 2 : 0;
+      const fist = hasPickaxe ? pickaxeFistAt(r, r, side, swingProgress) : { x: side * (r + 17), y: -r * 0.35 };
+      const hand = drawMuscleArm(0, -r * 0.1, fist.x, fist.y);
 
       // the boss whips out its pickaxe once it's awake, swinging it as a
       // continuous threat — this is what it drops for the player once the
@@ -159,7 +161,7 @@ export function drawEnemies(frameCount, cutsceneDone) {
         // weapons/pickaxe.js) — keeps the pickaxe pointing away from the
         // body on both sides instead of swinging through it
         ctx.scale(side, 1);
-        ctx.rotate(swing * 0.8);
+        ctx.rotate(pickaxeAngleAt(swingProgress));
         drawPickaxeIcon();
         ctx.restore();
       }

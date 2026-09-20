@@ -15,7 +15,7 @@ src/
   engine/     game loop, physics constants, input, camera, renderer
   entities/   player, enemy, npc, coins, particles
   weapons/    pickaxe (melee, earned — see the Level 1 retrofit),
-              bazooka (parked, not wired into any scene — for a later level)
+              bazooka, chainsaw (both parked, not wired into any scene — for later levels)
   levels/     levelLoader, levelRenderer, trickPlatforms (parked), data/level1.js, data/testLevel.js (sandbox dupe, see below)
   scenes/     sceneManager + title, playing, win, gameOver
   ui/         hud, overlays

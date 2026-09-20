@@ -68,10 +68,34 @@ export function updateWeaponInput(player, cutsceneActive) {
 const IDLE_FIST = (hw, hh, facing) => ({ x: facing * hw * 0.4, y: -hh * 0.85 });
 const IDLE_ANGLE = -1.85;
 
-// Struck pose at the end of a swing: reaching forward and down, well past
-// horizontal — this is what SWING_REACH's hitbox is modeled on.
+// End of the swing: the handle drawn flat, parallel to the ground. The
+// handle in drawPickaxeIcon() runs from (0,0) to (18,-13) before rotation,
+// so it's level (screen-space y delta of 0) when rotated by
+// atan2(13, 18) — solving 18*sin(a) - 13*cos(a) = 0 for the root that keeps
+// sweeping the same direction the swing already travels (the other root
+// would reverse direction partway through). The fist still reaches to the
+// same forward-and-down spot as before — only the final angle changed, from
+// "still tilted" to "fully level."
 const STRUCK_FIST = (hw, hh, facing) => ({ x: facing * (hw + 22), y: -hh * 0.12 });
-const STRUCK_ANGLE = -0.15;
+const STRUCK_ANGLE = Math.atan2(13, 18);
+
+// progress: 0 = idle (over the shoulder), 1 = struck (handle level with the
+// ground). Shared by both the player's discrete swing (progress driven by
+// weaponTimer counting down, below) and the boss's continuous threat swing
+// (entities/enemy.js, progress driven by an oscillating phase instead) so
+// both read as the same motion.
+export function pickaxeAngleAt(progress) {
+  return IDLE_ANGLE + (STRUCK_ANGLE - IDLE_ANGLE) * progress;
+}
+
+export function pickaxeFistAt(hw, hh, facing, progress) {
+  const idle = IDLE_FIST(hw, hh, facing);
+  const struck = STRUCK_FIST(hw, hh, facing);
+  return {
+    x: idle.x + (struck.x - idle.x) * progress,
+    y: idle.y + (struck.y - idle.y) * progress
+  };
+}
 
 // Where the fist should aim while carrying the pickaxe. Callers feed this
 // straight into drawMuscleArm() instead of the fixed unarmed reach target,
@@ -81,14 +105,9 @@ const STRUCK_ANGLE = -0.15;
 // idle (shoulder) pose to the struck pose, so it starts exactly where the
 // arm was already resting instead of popping to a separate wind-up pose first.
 export function pickaxeFistTarget(hw, hh, facing, weaponTimer) {
-  const idle = IDLE_FIST(hw, hh, facing);
-  if (weaponTimer <= 0) return idle;
-  const struck = STRUCK_FIST(hw, hh, facing);
+  if (weaponTimer <= 0) return pickaxeFistAt(hw, hh, facing, 0);
   const progress = 1 - weaponTimer / SWING_DURATION; // 0 at swing start -> 1 at the end
-  return {
-    x: idle.x + (struck.x - idle.x) * progress,
-    y: idle.y + (struck.y - idle.y) * progress
-  };
+  return pickaxeFistAt(hw, hh, facing, progress);
 }
 
 // Drawn in the hand every frame the weapon is carried — persistent once
@@ -103,13 +122,11 @@ export function pickaxeFistTarget(hw, hh, facing, weaponTimer) {
 // way they face, so the same angle looks right both ways instead of
 // swinging into their own body on one side.
 export function drawHeldPickaxe(hand, facing, weaponTimer) {
-  const angle = weaponTimer > 0
-    ? IDLE_ANGLE + (STRUCK_ANGLE - IDLE_ANGLE) * (1 - weaponTimer / SWING_DURATION)
-    : IDLE_ANGLE;
+  const progress = weaponTimer > 0 ? 1 - weaponTimer / SWING_DURATION : 0;
   ctx.save();
   ctx.translate(hand.x, hand.y);
   ctx.scale(facing, 1);
-  ctx.rotate(angle);
+  ctx.rotate(pickaxeAngleAt(progress));
   drawPickaxeIcon();
   ctx.restore();
 }
