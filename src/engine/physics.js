@@ -35,26 +35,33 @@ export const P = {
 
   // --- Horizontal ---
   // ONE acceleration value for walk/run/dash — only the speed CAP differs
-  // by tier, not the ramp-up rate. Native 14/256 px/frame^2, confirmed via
-  // velipso/smb3-physics (ported directly from the real disassembly) —
-  // the task spec's guess of 0.0625 (16/256) was close but not the ROM
-  // value; 14/256 is what's actually there.
-  accel: 14 / 256 * SCALE, // 0.0751953125
+  // by tier, not the ramp-up rate. ROM-accurate native value is 14/256 px/
+  // frame^2 (0.0752 scaled), confirmed via velipso/smb3-physics (ported
+  // directly from the real disassembly) — the task spec's guess of 0.0625
+  // (16/256) was close but not the ROM value. Hand-tuned to 0.15 (2026-09-20
+  // playtesting via tools/physics-lab.html: the ROM-accurate ramp felt too
+  // slow to get moving) — roughly 2x the ROM rate, still well under the old
+  // ad-hoc model's 0.35.
+  accel: 0.15,
   // Ground-only: friction to a stop with no input held, AND easing back
   // down to the cap on landing above it. In the real game this shares the
-  // same 14/256 constant as accel (true for "big" Mario) — not a
-  // coincidence worth un-sharing. Never applied in the air; see airFriction.
-  groundFriction: 14 / 256 * SCALE,
+  // ROM-accurate accel constant (true for "big" Mario) — kept at the ROM
+  // value (not bumped alongside accel above) since a snappier stop wasn't
+  // part of the "feels slow to get moving" feedback that motivated the bump.
+  groundFriction: 14 / 256 * SCALE, // 0.0751953125
   // Separate, steeper deceleration when the held direction opposes current
-  // velocity (skidding to a stop or reversal) — native 32/256, confirmed
-  // via the same source.
-  skidDecel: 32 / 256 * SCALE,
-  // Speed caps, native -> scaled, confirmed via datacrystal's SMB3 RAM
-  // notes (walk/run/run+P) and the disassembly's OBJECT_MAXFALL-adjacent
+  // velocity (skidding to a stop or reversal). ROM-accurate native value is
+  // 32/256 (0.1719 scaled); hand-tuned to 0.19 alongside the accel bump
+  // (2026-09-20 playtesting).
+  skidDecel: 0.19,
+  // Speed caps. ROM-accurate values (native -> scaled) confirmed via
+  // datacrystal's SMB3 RAM notes (walk/run/run+P) and the disassembly's
   // Player_XVel comment ("max value is $38" = 56 subpixels = 3.5 native,
-  // matching run+P below):
-  walkMax: 1.5 * SCALE,      // 2.0625
-  runMax: 2.5 * SCALE,       // 3.4375 — run held, P-meter not full
+  // matching run+P below): walkMax 1.5->2.0625, runMax 2.5->3.4375. Both
+  // hand-tuned up (2026-09-20 playtesting) alongside the accel bump above —
+  // pSpeedMax (the P-meter-gated top tier) is untouched, still ROM-accurate.
+  walkMax: 2.29,
+  runMax: 3.68,
   pSpeedMax: 3.5 * SCALE,    // 4.8125 — run held, P-meter full
   // Slide cap only matters on sloped terrain (Player_Slide in the real
   // game), which this flat-ground game doesn't have yet — exposed for lab
