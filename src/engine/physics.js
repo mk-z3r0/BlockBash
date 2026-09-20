@@ -5,56 +5,150 @@
 // change these at runtime to A/B tune, which plain `const` bindings can't
 // do. Every importer reads through P.<NAME> so a lab edit is visible
 // everywhere immediately, with no re-import or reload.
-export const P = {
-  // Gravity is cut by the same percentage as the speed constants below every
-  // time they drop, deliberately — not a separate feel tweak. Horizontal jump
-  // carry = speed * airtime, and airtime scales with 1/gravity for a fixed
-  // JUMP_FORCE, so scaling speed and gravity down by the same factor cancels
-  // out: carry distance stays put (walk ~93.5px, run ~168px, unchanged since
-  // the very first cut — verified every time by rerunning the gap-probe
-  // autoplay clean). Cut twice now, each by 20% (2026-09-19, playtesting with
-  // a 2nd grader: 0.42/0.68 -> 0.336/0.544 -> 0.2688/0.4352), for a cumulative
-  // 36% below the original. Airtime and peak height keep rising each time
-  // this happens (now ~73 frames / ~225px, up from the original ~47/~144) —
-  // that's an increasingly floaty arc, worth watching if it's cut again.
-  GRAVITY_UP: 0.2688,   // gravity while rising — lighter, floatier arc up
-  GRAVITY_DOWN: 0.4352, // gravity while falling — a bit snappier than rising, not jarring
-  ACCEL: 0.35,          // how fast the player speeds up — gentler ramp, less "instant" feel
-  FRICTION: 0.9,        // how fast the player slows down when no key is held, on the ground
-  // Airborne deceleration when no direction is held. Deliberately 0, not a
-  // smaller version of FRICTION: releasing the stick mid-jump used to apply
-  // the same 0.9/frame ground friction in the air, killing horizontal speed
-  // in ~4 frames (3.6/0.9) regardless of what's still ahead — over a pit,
-  // that meant stopping and dropping straight down unless you kept holding
-  // forward the whole way, which reads as broken, not deliberate. Real
-  // platformer jump momentum is preserved once you leave the ground; only
-  // landing (FRICTION, above) or actively steering (ACCEL/TURN_ACCEL, still
-  // live in the air) changes it from there.
-  AIR_FRICTION: 0,
-  TURN_ACCEL: 0.5,      // extra deceleration applied when reversing direction
+//
+// --- Historical record: the pre-physics-lab tuning journey (2026-09-19) ---
+// Before this rewrite, movement used a much simpler ad-hoc model (flat
+// ACCEL/FRICTION, one GRAVITY_UP/GRAVITY_DOWN split, WALK/RUN_MAX_SPEED).
+// It went through three rounds of playtesting cuts with a 2nd grader, each
+// cutting speed AND gravity by the same 20% together so jump-carry distance
+// (walk ~93.5px, run ~168px) stayed put while airtime/height grew floatier
+// each time (final values: gravity 0.2688/0.4352, accel 0.35, walk/run
+// speed 1.28/2.304 — cut cumulatively 36% below the 0.42/0.68 and 2.0/3.6
+// originals). That model is fully replaced below by an SMB3-accurate one
+// (see the physics-lab task doc for why) — kept here only so the reasoning
+// behind those old numbers isn't lost; none of them are live anymore.
 
-  // Walk is the default pace; holding the run button raises the speed cap.
-  // Both caps (and every enemy's patrol speed, and the boss's chargeSpeed)
-  // have now been cut 20% twice from their original values (2.0/3.6 ->
-  // 1.6/2.88 -> 1.28/2.304, 2026-09-19) for an overall slower feel — the
-  // acceleration curve (ACCEL/TURN_ACCEL, above) is untouched both times, so
-  // this is a pure top-speed change, not a different ramp-up. Jump-carry
-  // distance is preserved despite the lower speed by also cutting gravity the
-  // same percentage each time (see the note above GRAVITY_UP) — the level's
-  // gaps and hazard widths didn't need re-tuning, verified by rerunning the
-  // gap-probe autoplay clean at the new speed both times.
-  WALK_MAX_SPEED: 1.28,
-  RUN_MAX_SPEED: 2.304,
-  JUMP_FORCE: -11,
-  JUMP_CUT_MULTIPLIER: 0.6, // releasing jump early cuts upward velocity, enabling short hops
-  // Grace window to still jump just after walking off a ledge. Cut from 9
-  // (2026-09-19) — measured with tools/coyote-drift-probe.html that the last
-  // frame a jump still fired, the player was a full body-width (22px) past
-  // the edge and nearly a full body-height (20px) below the platform surface
-  // at run speed: visibly hanging in open air over the pit, not a subtle
-  // forgiveness window. 5 frames brings that down to ~13px past / ~8px below.
-  COYOTE_FRAMES: 5,
-  JUMP_BUFFER_FRAMES: 6, // grace window: a jump press just before landing still fires
+// SMB3's internal units are 1/16px subpixels at a 16px native tile; this
+// project runs at 22px tiles, so every SMB3-native value below is
+// multiplied by SCALE to convert. Values were checked against the real
+// disassembly (captainsouthbird/smb3, and a from-that-source JS port at
+// velipso/smb3-physics) rather than trusting guesses — several guesses in
+// the original physics-lab task spec turned out to disagree with the ROM;
+// those are called out below at the value that changed.
+export const SCALE = 1.375; // this project's tileSize (22) / SMB3's native tileSize (16)
+
+export const P = {
+  // --- World ---
+  SCALE,
+  tileSize: 22,
+  fixedTimestepHz: 60, // read live each frame by main.js's accumulator — see engine/main loop
+
+  // --- Horizontal ---
+  // ONE acceleration value for walk/run/dash — only the speed CAP differs
+  // by tier, not the ramp-up rate. Native 14/256 px/frame^2, confirmed via
+  // velipso/smb3-physics (ported directly from the real disassembly) —
+  // the task spec's guess of 0.0625 (16/256) was close but not the ROM
+  // value; 14/256 is what's actually there.
+  accel: 14 / 256 * SCALE, // 0.0751953125
+  // Ground-only: friction to a stop with no input held, AND easing back
+  // down to the cap on landing above it. In the real game this shares the
+  // same 14/256 constant as accel (true for "big" Mario) — not a
+  // coincidence worth un-sharing. Never applied in the air; see airFriction.
+  groundFriction: 14 / 256 * SCALE,
+  // Separate, steeper deceleration when the held direction opposes current
+  // velocity (skidding to a stop or reversal) — native 32/256, confirmed
+  // via the same source.
+  skidDecel: 32 / 256 * SCALE,
+  // Speed caps, native -> scaled, confirmed via datacrystal's SMB3 RAM
+  // notes (walk/run/run+P) and the disassembly's OBJECT_MAXFALL-adjacent
+  // Player_XVel comment ("max value is $38" = 56 subpixels = 3.5 native,
+  // matching run+P below):
+  walkMax: 1.5 * SCALE,      // 2.0625
+  runMax: 2.5 * SCALE,       // 3.4375 — run held, P-meter not full
+  pSpeedMax: 3.5 * SCALE,    // 4.8125 — run held, P-meter full
+  // Slide cap only matters on sloped terrain (Player_Slide in the real
+  // game), which this flat-ground game doesn't have yet — exposed for lab
+  // completeness/future slope support, not currently reachable in play.
+  slideMax: 3.9375 * SCALE,  // 5.4140625 — native 63/16, per datacrystal
+  // Below this, treat horizontal speed as "not moving" for animation/dust
+  // purposes — not an SMB3 concept, this project's own tuned threshold
+  // (was a hardcoded 0.6 scattered across player.js; centralized here).
+  minWalkSpeed: 0.6,
+  // AIR: accel/skidDecel apply at full strength in the air in the real
+  // game (multiplier 1.0) — NOT halved, despite the original physics-lab
+  // task spec's belief that SMB3 halves air control. velipso/smb3-physics
+  // (from the real disassembly) shows no `!playerInAir` guard at all on
+  // its accel/skid branches; only ground-only friction and the
+  // above-cap-easing are gated to the ground. Exposed as a live multiplier
+  // anyway so this can be A/B'd against the task author's original belief.
+  airControlMultiplier: 1.0,
+  // Passive deceleration with no input held, in the air. Real SMB3 has no
+  // such thing — ground friction simply doesn't apply airborne at all
+  // (momentum preserved until landing or active steering), matching what
+  // this project already independently arrived at pre-physics-lab (see the
+  // historical AIR_FRICTION note this replaces). Default 0 = that real
+  // behavior; exposed for A/B comparison, not because the ROM has a
+  // nonzero value for it.
+  airFriction: 0,
+  // Non-SMB3: locks horizontal velocity entirely at its takeoff value for
+  // the whole jump (no air steering at all except via reversal), matching
+  // the task author's ORIGINAL (pre-disassembly-check) idea of air
+  // control, before airControlMultiplier/airFriction (above) replaced it
+  // as the real-game behavior. Off by default; toggle on to A/B against it.
+  lockAirMomentum: false,
+
+  // P-meter: fills while |vx| >= runMax, drains otherwise. Native timings
+  // from datacrystal's SMB3 notes ($515 countdown: reset to 7 while
+  // running, to 23 while not) — these are frame counts, not distances, so
+  // SCALE doesn't apply. pMeterSegments is the real game's step count (the
+  // status-bar meter has 7 arrows); full from empty while running
+  // continuously takes pMeterSegments * pMeterFillFrames frames.
+  pMeterFillFrames: 7,
+  pMeterDrainFrames: 23,
+  pMeterSegments: 7,
+
+  // --- Vertical ---
+  // Three gravity states, re-evaluated every frame (see the switch logic
+  // in entities/player.js) — confirmed via velipso/smb3-physics:
+  //   if (vy < -riseGravityThreshold && jump held) gravity = gravityRise
+  //   else gravity = gravityFall
+  // Native 1/16 and 5/16 (exactly a 5:1 ratio — gravity is nearly off
+  // during the fast part of the rise) and threshold 2.0, all confirmed
+  // exact matches to the task spec's own guesses (no correction needed
+  // for these three, unlike accel/baseJumpVelocity below).
+  gravityRise: 1 / 16 * SCALE,   // 0.0859375
+  gravityFall: 5 / 16 * SCALE,   // 0.4296875
+  riseGravityThreshold: 2.0 * SCALE, // 2.75
+  // Terminal velocity: the disassembly's OBJECT_MAXFALL constant is $40
+  // (4.0 native), applied as a clamp BEFORE that frame's gravity is added
+  // — so the actual max Y move in any given frame is 4.0 + gravityFall =
+  // 4.3125 native, not 4.0 itself (confirmed: OBJECT_MAXFALL = $40 is a
+  // real label in captainsouthbird/smb3, not a guess). This project clamps
+  // AFTER adding gravity each frame instead (see updatePlayer) — clamping
+  // 4.3125 after-add reproduces the identical observed per-frame fall
+  // speed as clamping 4.0 before-add, just without replicating the ROM's
+  // specific clamp-then-add instruction order.
+  terminalVelocity: 4.3125 * SCALE, // 5.9296875
+  // Jump velocity is sampled ONCE at takeoff from horizontal speed and
+  // latched for the whole jump (never recomputed mid-air). Base velocity
+  // native -3.5, confirmed via velipso/smb3-physics's JUMP_FORCE table
+  // ([-3.5, -3.625, -3.75, -4]) — the task spec's own estimate of -3.0 was
+  // a real disagreement with the ROM (flagged per the task's "STOP and
+  // tell me" instruction for this exact value): the actual base is 17%
+  // higher-magnitude than guessed.
+  baseJumpVelocity: -3.5 * SCALE, // -4.8125
+  // Per-tier delta subtracted from baseJumpVelocity, stored as negative so
+  // `vy = baseJumpVelocity + jumpTable[tier]` reads as one addition (both
+  // are already in this codebase's negative-is-up convention). Native
+  // magnitudes [0, 0.125, 0.25, 0.5] match the task spec exactly, and
+  // exactly reproduce velipso/smb3-physics's JUMP_FORCE table once
+  // subtracted from -3.5 (-3.5, -3.625, -3.75, -4) — cross-confirmed, no
+  // correction needed here despite the baseJumpVelocity correction above.
+  jumpTable: [0, -0.125 * SCALE, -0.25 * SCALE, -0.5 * SCALE], // [0, -0.171875, -0.34375, -0.6875]
+  // Tier boundaries, kept in NATIVE-derived (but pre-scaled) units per the
+  // task spec's explicit instruction — comparing scaled |vx| against these
+  // directly is equivalent to flooring native |vx| into tiers [0,1,2,3]
+  // without a runtime division. tier = number of bounds <= |vx|, capped 3.
+  speedTierBounds: [1 * SCALE, 2 * SCALE, 3 * SCALE], // [1.375, 2.75, 4.125]
+
+  // --- Non-SMB3 additions, kept at today's live-game values (unchanged by
+  // the physics-lab rewrite) — the vanilla 1988 game has neither; these
+  // are this project's own forgiveness windows from earlier playtesting.
+  // The physics-lab's "smb3" preset (tools/physics-lab.html) zeroes these
+  // to compare against pure ROM behavior; the live game keeps them on. ---
+  coyoteFrames: 5,
+  jumpBufferFrames: 6,
+
   STOMP_BOUNCE: -8,
 
   // Respawn safety window (2026-09-19, playtesting feedback: respawning at a

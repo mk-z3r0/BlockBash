@@ -8,6 +8,7 @@ import { titleScene } from './scenes/titleScene.js';
 import { playingScene } from './scenes/playingScene.js';
 import { winScene } from './scenes/winScene.js';
 import { gameOverScene } from './scenes/gameOverScene.js';
+import { P } from './engine/physics.js';
 
 registerScene('intro', introScene);
 registerScene('title', titleScene);
@@ -50,8 +51,9 @@ switchTo('title');
 // monitor-specific. update() itself is untouched and still does exactly one
 // frame's worth of work per call; this loop just decides how many times to
 // call it based on real elapsed time, so the simulation always advances at
-// 60 fixed steps/sec regardless of display Hz.
-const STEP_MS = 1000 / 60;
+// P.fixedTimestepHz fixed steps/sec regardless of display Hz. Read from P
+// (not a local const) every frame so tools/physics-lab.html can retune it
+// live, same as every other physics value.
 // Clamp a single rAF frame's elapsed time before feeding the accumulator —
 // without this, a tab-blur/backgrounded-tab gap (multi-second delta on
 // return) would queue hundreds of catch-up steps and the player would
@@ -78,10 +80,11 @@ function gameLoop(now) {
 
   pollGamepad();
 
+  const stepMs = 1000 / P.fixedTimestepHz;
   let steps = 0;
-  while (accumulator >= STEP_MS && steps < MAX_STEPS_PER_FRAME) {
+  while (accumulator >= stepMs && steps < MAX_STEPS_PER_FRAME) {
     update();
-    accumulator -= STEP_MS;
+    accumulator -= stepMs;
     steps++;
   }
 
