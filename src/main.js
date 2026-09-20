@@ -43,11 +43,50 @@ initInput({
 
 switchTo('title');
 
-function gameLoop() {
+// Fixed-timestep accumulator (2026-09-20): the loop used to call update()
+// once per requestAnimationFrame, which ties simulation speed to display
+// refresh rate — on a 144Hz monitor every per-frame constant in physics.js
+// (speed, gravity, accel...) effectively runs 2.4x fast, making tuning
+// monitor-specific. update() itself is untouched and still does exactly one
+// frame's worth of work per call; this loop just decides how many times to
+// call it based on real elapsed time, so the simulation always advances at
+// 60 fixed steps/sec regardless of display Hz.
+const STEP_MS = 1000 / 60;
+// Clamp a single rAF frame's elapsed time before feeding the accumulator —
+// without this, a tab-blur/backgrounded-tab gap (multi-second delta on
+// return) would queue hundreds of catch-up steps and the player would
+// visibly teleport as they all resolve.
+const MAX_FRAME_MS = 250;
+// Spiral-of-death guard: if a single rAF callback still can't drain the
+// accumulator within this many steps (slow device, dev tools open, etc.),
+// stop and let the remainder carry over to following frames instead of the
+// while-loop growing unbounded and freezing the tab further.
+const MAX_STEPS_PER_FRAME = 5;
+
+let lastTime = null;
+let accumulator = 0;
+
+// No render interpolation: draw() always shows the exact state left by the
+// most recent update() step, never a blended in-between. That's a step
+// behind true real-time smoothness, but it keeps the visuals matching the
+// same discrete step math the physics tuning is judged against.
+function gameLoop(now) {
+  if (lastTime === null) lastTime = now;
+  const frameMs = Math.min(now - lastTime, MAX_FRAME_MS);
+  lastTime = now;
+  accumulator += frameMs;
+
   pollGamepad();
-  update();
+
+  let steps = 0;
+  while (accumulator >= STEP_MS && steps < MAX_STEPS_PER_FRAME) {
+    update();
+    accumulator -= STEP_MS;
+    steps++;
+  }
+
   draw();
   requestAnimationFrame(gameLoop);
 }
 
-gameLoop();
+requestAnimationFrame(gameLoop);
