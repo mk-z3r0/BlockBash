@@ -1,12 +1,6 @@
 import { keys } from '../engine/input.js';
 import { ctx, VIEW_HEIGHT, drawStickLegs, drawMuscleArm } from '../engine/renderer.js';
-import {
-  GRAVITY_UP, GRAVITY_DOWN, ACCEL, FRICTION, AIR_FRICTION, TURN_ACCEL,
-  WALK_MAX_SPEED, RUN_MAX_SPEED,
-  JUMP_FORCE, JUMP_CUT_MULTIPLIER, COYOTE_FRAMES, JUMP_BUFFER_FRAMES,
-  RESPAWN_FREEZE_FRAMES, RESPAWN_INVINCIBLE_FRAMES,
-  isColliding
-} from '../engine/physics.js';
+import { P, isColliding } from '../engine/physics.js';
 import { getLevel } from '../levels/levelLoader.js';
 import { spawnDust } from './particles.js';
 import { playJump } from '../audio/sfx.js';
@@ -46,7 +40,7 @@ export function resetDustTimer() {
 }
 
 export function bufferJump() {
-  player.jumpBuffer = JUMP_BUFFER_FRAMES;
+  player.jumpBuffer = P.JUMP_BUFFER_FRAMES;
 }
 
 export function resetPlayer() {
@@ -55,8 +49,8 @@ export function resetPlayer() {
   player.velocityX = 0;
   player.velocityY = 0;
   player.isOnGround = false;
-  player.invincible = RESPAWN_INVINCIBLE_FRAMES;
-  player.respawnFreeze = RESPAWN_FREEZE_FRAMES;
+  player.invincible = P.RESPAWN_INVINCIBLE_FRAMES;
+  player.respawnFreeze = P.RESPAWN_FREEZE_FRAMES;
   player.coyoteTimer = 0;
   player.jumpBuffer = 0;
   player.jumpCut = true;
@@ -71,9 +65,9 @@ export function updatePlayer(inputLocked) {
   const level = getLevel();
   // Frozen right after a respawn: ignores left/right (but not jump) so a
   // disoriented player can't immediately walk into an enemy or off a ledge
-  // into a pit — see the RESPAWN_FREEZE_FRAMES note in physics.js for why
+  // into a pit — see the P.RESPAWN_FREEZE_FRAMES note in physics.js for why
   // invincibility alone (below) never covered the pit case. Checked BEFORE
-  // decrementing so the freeze holds for exactly RESPAWN_FREEZE_FRAMES full
+  // decrementing so the freeze holds for exactly P.RESPAWN_FREEZE_FRAMES full
   // frames, not one fewer (a real off-by-one caught by
   // tools/respawn-safety-probe.html: checking after the decrement let one
   // frame of input through right on the boundary).
@@ -82,18 +76,18 @@ export function updatePlayer(inputLocked) {
   const left = !inputLocked && !frozen && (keys['ArrowLeft'] || keys['a']);
   const right = !inputLocked && !frozen && (keys['ArrowRight'] || keys['d']);
   const running = !inputLocked && keys['Shift'];
-  const maxSpeed = running ? RUN_MAX_SPEED : WALK_MAX_SPEED;
+  const maxSpeed = running ? P.RUN_MAX_SPEED : P.WALK_MAX_SPEED;
 
   if (left && !right) {
-    if (player.velocityX > 0) player.velocityX -= TURN_ACCEL; // reversing: extra kick to kill old momentum
-    player.velocityX -= ACCEL;
+    if (player.velocityX > 0) player.velocityX -= P.TURN_ACCEL; // reversing: extra kick to kill old momentum
+    player.velocityX -= P.ACCEL;
     player.facing = -1;
     // clamped only while actively accelerating — see the note below on why
     // this doesn't happen unconditionally every frame
     player.velocityX = Math.max(-maxSpeed, Math.min(maxSpeed, player.velocityX));
   } else if (right && !left) {
-    if (player.velocityX < 0) player.velocityX += TURN_ACCEL;
-    player.velocityX += ACCEL;
+    if (player.velocityX < 0) player.velocityX += P.TURN_ACCEL;
+    player.velocityX += P.ACCEL;
     player.facing = 1;
     player.velocityX = Math.max(-maxSpeed, Math.min(maxSpeed, player.velocityX));
   } else {
@@ -101,24 +95,24 @@ export function updatePlayer(inputLocked) {
     // apply unconditionally every frame, which meant releasing Shift
     // mid-air (maxSpeed dropping from RUN to WALK) instantly chopped
     // existing run-speed momentum down to the walk cap on the very next
-    // frame, even with AIR_FRICTION at 0 — a second, more subtle way the
+    // frame, even with P.AIR_FRICTION at 0 — a second, more subtle way the
     // same "why did I stop over the pit" bug could happen. Momentum should
     // only change via friction (grounded) or active steering (the branches
     // above), never a passive clamp reacting to a cap that just changed.
-    const friction = player.isOnGround ? FRICTION : AIR_FRICTION;
+    const friction = player.isOnGround ? P.FRICTION : P.AIR_FRICTION;
     if (player.velocityX > 0) player.velocityX = Math.max(0, player.velocityX - friction);
     else if (player.velocityX < 0) player.velocityX = Math.min(0, player.velocityX + friction);
   }
 
   // --- coyote time: still allowed to jump briefly after leaving a ledge ---
-  if (player.isOnGround) player.coyoteTimer = COYOTE_FRAMES;
+  if (player.isOnGround) player.coyoteTimer = P.COYOTE_FRAMES;
   else if (player.coyoteTimer > 0) player.coyoteTimer--;
 
   // --- jump buffer: a press just before landing still fires the jump ---
   if (player.jumpBuffer > 0) player.jumpBuffer--;
 
   if (!inputLocked && player.jumpBuffer > 0 && player.coyoteTimer > 0) {
-    player.velocityY = JUMP_FORCE;
+    player.velocityY = P.JUMP_FORCE;
     player.isOnGround = false;
     player.coyoteTimer = 0;
     player.jumpBuffer = 0;
@@ -130,12 +124,12 @@ export function updatePlayer(inputLocked) {
   // --- variable jump height: releasing the key early cuts the jump short ---
   const jumpHeld = keys[' '] || keys['ArrowUp'] || keys['w'];
   if (!jumpHeld && !player.jumpCut && player.velocityY < 0) {
-    player.velocityY *= JUMP_CUT_MULTIPLIER;
+    player.velocityY *= P.JUMP_CUT_MULTIPLIER;
     player.jumpCut = true;
   }
 
   // --- gravity: heavier on the way down for a snappier, more predictable arc ---
-  player.velocityY += (player.velocityY < 0) ? GRAVITY_UP : GRAVITY_DOWN;
+  player.velocityY += (player.velocityY < 0) ? P.GRAVITY_UP : P.GRAVITY_DOWN;
   const incomingFallSpeed = player.velocityY;
 
   // --- move ---

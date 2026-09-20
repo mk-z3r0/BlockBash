@@ -1,6 +1,6 @@
 import { ctx } from '../engine/renderer.js';
 import { drawStickLegs, drawMuscleArm } from '../engine/renderer.js';
-import { STOMP_BOUNCE } from '../engine/physics.js';
+import { P } from '../engine/physics.js';
 import { getLevel } from '../levels/levelLoader.js';
 import { spawnExplosion, spawnDust } from './particles.js';
 import { playStomp } from '../audio/sfx.js';
@@ -68,7 +68,7 @@ export function updateRescueNPC(npc, viewWidth, cameraX) {
         spawnExplosion(boss.x + boss.w / 2, boss.y + boss.w / 2, '#8effc0');
         spawnDust(boss.x + boss.w / 2, boss.y + boss.w, 12, { spread: 4, size: 10, life: 28 });
         spawnWeaponPickup(boss.x + boss.w / 2, groundY);
-        npc.velocityY = STOMP_BOUNCE;
+        npc.velocityY = P.STOMP_BOUNCE;
         npc.state = 'landing';
         npc.stomped = true;
         npc.timer = 0;
