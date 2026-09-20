@@ -1,5 +1,5 @@
 import { ctx } from '../engine/renderer.js';
-import { drawStickLegs, drawMuscleArm } from '../engine/renderer.js';
+import { drawStickLegs, drawMuscleArm, drawPickaxeIcon } from '../engine/renderer.js';
 import { isColliding, STOMP_BOUNCE } from '../engine/physics.js';
 import { spawnExplosion } from './particles.js';
 import { playStomp, playSurprise } from '../audio/sfx.js';
@@ -16,8 +16,8 @@ export function spawnEnemies(spawns) {
     hopVY: 0,
     hopTimer: 90 + Math.floor(Math.random() * 150), // ticks down to the next surprise hop
     shout: 0,
-    awake: false,   // boss only: has the chainsaw come out yet
-    sawRev: 0       // boss only: chainsaw spin/buzz timer
+    awake: false,     // boss only: has the pickaxe come out yet
+    swingPhase: 0     // boss only: drives the threatening pickaxe swing
   }));
 }
 
@@ -135,39 +135,32 @@ export function drawEnemies(frameCount, cutsceneDone) {
     ctx.fill();
 
     // one muscular arm on the side it's travelling toward, rooted at the
-    // sphere's center — exactly the same art as the player's
+    // sphere's center — exactly the same art as the player's. Once the
+    // pickaxe is out, the fist target oscillates with the same swing value
+    // that drives the axe's rotation, so the arm itself visibly swings
+    // along with the weapon rather than holding a fixed pose while only the
+    // axe rotates in its hand (matches the player's carry in weapons/pickaxe.js).
     if (!squashed) {
       const side = enemy.speed >= 0 ? 1 : -1;
       const r = enemy.w / 2;
-      const hand = drawMuscleArm(0, -r * 0.1, side * (r + 17), -r * 0.35);
+      const hasPickaxe = enemy.boss && enemy.awake && !cutsceneDone;
+      const swing = hasPickaxe ? Math.sin(enemy.swingPhase * 0.24) : 0;
+      const fistX = hasPickaxe ? side * (r + 12 + swing * 8) : side * (r + 17);
+      const fistY = hasPickaxe ? -r * (0.55 + swing * 0.35) : -r * 0.35;
+      const hand = drawMuscleArm(0, -r * 0.1, fistX, fistY);
 
-      // the boss whips out a chainsaw once it's awake
-      if (enemy.boss && enemy.awake && !cutsceneDone) {
+      // the boss whips out its pickaxe once it's awake, swinging it as a
+      // continuous threat — this is what it drops for the player once the
+      // rescue NPC stomps it (see entities/weaponPickup.js)
+      if (hasPickaxe) {
         ctx.save();
         ctx.translate(hand.x, hand.y);
+        // scale(side, 1) before rotating, same as the player's swing (see
+        // weapons/pickaxe.js) — keeps the pickaxe pointing away from the
+        // body on both sides instead of swinging through it
         ctx.scale(side, 1);
-
-        // handle
-        ctx.fillStyle = '#2d3340';
-        ctx.fillRect(-4, -4, 10, 8);
-        // bar
-        ctx.fillStyle = '#9aa6bb';
-        ctx.fillRect(5, -3, 22, 6);
-        ctx.strokeStyle = '#5b6678';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(5, -3, 22, 6);
-        // spinning teeth
-        ctx.fillStyle = '#e8eef8';
-        const phase = (frameCount * 2.2) % 5;
-        for (let tx = 5 + phase; tx < 27; tx += 5) {
-          ctx.fillRect(tx, -5.5, 2.5, 2.5);
-          ctx.fillRect(tx, 3, 2.5, 2.5);
-        }
-        // motion blur haze
-        ctx.globalAlpha = 0.35;
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(5, -5.5, 22, 1.5);
-        ctx.fillRect(5, 4, 22, 1.5);
+        ctx.rotate(swing * 0.8);
+        drawPickaxeIcon();
         ctx.restore();
       }
     }

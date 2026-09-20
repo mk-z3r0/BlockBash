@@ -2,7 +2,17 @@
 export const GRAVITY_UP = 0.42;     // gravity while rising — lighter, floatier arc up
 export const GRAVITY_DOWN = 0.68;   // gravity while falling — a bit snappier than rising, not jarring
 export const ACCEL = 0.35;          // how fast the player speeds up — gentler ramp, less "instant" feel
-export const FRICTION = 0.9;        // how fast the player slows down when no key is held
+export const FRICTION = 0.9;        // how fast the player slows down when no key is held, on the ground
+// Airborne deceleration when no direction is held. Deliberately 0, not a
+// smaller version of FRICTION: releasing the stick mid-jump used to apply
+// the same 0.9/frame ground friction in the air, killing horizontal speed
+// in ~4 frames (3.6/0.9) regardless of what's still ahead — over a pit,
+// that meant stopping and dropping straight down unless you kept holding
+// forward the whole way, which reads as broken, not deliberate. Real
+// platformer jump momentum is preserved once you leave the ground; only
+// landing (FRICTION, above) or actively steering (ACCEL/TURN_ACCEL, still
+// live in the air) changes it from there.
+export const AIR_FRICTION = 0;
 export const TURN_ACCEL = 0.5;      // extra deceleration applied when reversing direction
 
 // Walk is the default pace; holding the run button raises the speed cap.

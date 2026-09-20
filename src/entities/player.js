@@ -1,7 +1,7 @@
 import { keys } from '../engine/input.js';
 import { ctx, VIEW_HEIGHT, drawStickLegs, drawMuscleArm } from '../engine/renderer.js';
 import {
-  GRAVITY_UP, GRAVITY_DOWN, ACCEL, FRICTION, TURN_ACCEL,
+  GRAVITY_UP, GRAVITY_DOWN, ACCEL, FRICTION, AIR_FRICTION, TURN_ACCEL,
   WALK_MAX_SPEED, RUN_MAX_SPEED,
   JUMP_FORCE, JUMP_CUT_MULTIPLIER, COYOTE_FRAMES, JUMP_BUFFER_FRAMES,
   isColliding
@@ -9,6 +9,7 @@ import {
 import { getLevel } from '../levels/levelLoader.js';
 import { spawnDust } from './particles.js';
 import { playJump } from '../audio/sfx.js';
+import { drawHeldPickaxe, pickaxeFistTarget } from '../weapons/pickaxe.js';
 
 export const player = {
   x: 100, y: 0, width: 22, height: 22,
@@ -16,8 +17,14 @@ export const player = {
   isOnGround: false,
   facing: 1,
   invincible: 0,
+  // Starts unarmed — see weapons/pickaxe.js and entities/weaponPickup.js.
+  // Set true only by collecting what the level 1 boss drops; reset per
+  // level in scenes/playingScene.js's startLevel(), never on a mid-level
+  // death (resetPlayer(), below) since dying shouldn't un-earn it.
+  hasWeapon: false,
   weaponTimer: 0,
-  bazookaCooldown: 0,
+  weaponCooldown: 0,
+  bazookaCooldown: 0, // unused while the bazooka is parked — see weapons/bazooka.js
   coyoteTimer: 0,
   jumpBuffer: 0,
   jumpCut: true,
@@ -55,7 +62,7 @@ export function resetPlayer() {
 
 // Called once per frame while gameState === 'playing'. Handles movement,
 // jumping, gravity, and platform collision. Cross-system reactions (pit
-// death, checkpoints, bazooka firing) are the caller's job — see
+// death, checkpoints, weapon swings) are the caller's job — see
 // scenes/playingScene.js.
 export function updatePlayer(inputLocked) {
   const level = getLevel();
@@ -68,15 +75,27 @@ export function updatePlayer(inputLocked) {
     if (player.velocityX > 0) player.velocityX -= TURN_ACCEL; // reversing: extra kick to kill old momentum
     player.velocityX -= ACCEL;
     player.facing = -1;
+    // clamped only while actively accelerating — see the note below on why
+    // this doesn't happen unconditionally every frame
+    player.velocityX = Math.max(-maxSpeed, Math.min(maxSpeed, player.velocityX));
   } else if (right && !left) {
     if (player.velocityX < 0) player.velocityX += TURN_ACCEL;
     player.velocityX += ACCEL;
     player.facing = 1;
+    player.velocityX = Math.max(-maxSpeed, Math.min(maxSpeed, player.velocityX));
   } else {
-    if (player.velocityX > 0) player.velocityX = Math.max(0, player.velocityX - FRICTION);
-    else if (player.velocityX < 0) player.velocityX = Math.min(0, player.velocityX + FRICTION);
+    // No direction held: friction only, no speed-cap clamp. The cap used to
+    // apply unconditionally every frame, which meant releasing Shift
+    // mid-air (maxSpeed dropping from RUN to WALK) instantly chopped
+    // existing run-speed momentum down to the walk cap on the very next
+    // frame, even with AIR_FRICTION at 0 — a second, more subtle way the
+    // same "why did I stop over the pit" bug could happen. Momentum should
+    // only change via friction (grounded) or active steering (the branches
+    // above), never a passive clamp reacting to a cap that just changed.
+    const friction = player.isOnGround ? FRICTION : AIR_FRICTION;
+    if (player.velocityX > 0) player.velocityX = Math.max(0, player.velocityX - friction);
+    else if (player.velocityX < 0) player.velocityX = Math.min(0, player.velocityX + friction);
   }
-  player.velocityX = Math.max(-maxSpeed, Math.min(maxSpeed, player.velocityX));
 
   // --- coyote time: still allowed to jump briefly after leaving a ledge ---
   if (player.isOnGround) player.coyoteTimer = COYOTE_FRAMES;
@@ -208,25 +227,19 @@ export function drawPlayer(frameCount) {
   ctx.strokeRect(-hw, -hh, player.width, player.height);
 
   // one muscular arm on whichever side the character is facing, rooted at
-  // the center of the square — the same art the spheres use
-  const hand = drawMuscleArm(0, -hh * 0.1, player.facing * (hw + 17), -hh * 0.35);
+  // the center of the square — the same art the spheres use. Once the
+  // pickaxe is earned, the fist aims at a carry/swing target instead of the
+  // fixed unarmed reach, so the arm itself moves with the weapon rather
+  // than holding one static pose while only the axe rotates in its hand.
+  const fist = player.hasWeapon
+    ? pickaxeFistTarget(hw, hh, player.facing, player.weaponTimer)
+    : { x: player.facing * (hw + 17), y: -hh * 0.35 };
+  const hand = drawMuscleArm(0, -hh * 0.1, fist.x, fist.y);
 
-  // the bazooka easter egg — held in the fist at the end of the arm
-  if (player.weaponTimer > 0) {
-    ctx.save();
-    ctx.translate(hand.x, hand.y);
-    ctx.scale(player.facing, 1);
-    ctx.fillStyle = '#3a4a5c';
-    ctx.fillRect(-4, -3, 20, 7);
-    ctx.fillStyle = '#222c38';
-    ctx.fillRect(12, -5, 8, 11);
-    if (player.weaponTimer > 10) {
-      ctx.fillStyle = 'rgba(255, 223, 122, 0.9)';
-      ctx.beginPath();
-      ctx.arc(22, 0, 6, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
+  // persistent once earned — drawn every frame, not just during the 16-frame
+  // swing window, so it doesn't flicker in and out of view
+  if (player.hasWeapon) {
+    drawHeldPickaxe(hand, player.facing, player.weaponTimer);
   }
   ctx.restore();
   ctx.restore();

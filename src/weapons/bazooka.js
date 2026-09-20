@@ -1,3 +1,11 @@
+// Parked, not currently wired into any level (2026-09-19) — the player's
+// earned weapon in level 1 is the melee pickaxe (weapons/pickaxe.js). This
+// stays in the codebase because the bazooka is planned to reappear later in
+// the game; nothing calls updateBazookaInput/updateMissiles/drawMissiles
+// right now, so it has no effect until a future level's scene wires it back
+// in. If/when that happens, player.js will need a `bazookaCooldown` field
+// again (restored below alongside `weaponCooldown`) — the missile logic
+// here still expects it.
 import { ctx } from '../engine/renderer.js';
 import { keys } from '../engine/input.js';
 import { isColliding } from '../engine/physics.js';

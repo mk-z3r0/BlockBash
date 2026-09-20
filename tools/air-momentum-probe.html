@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<!-- Verifies the reported "drops straight down over a pit" issue: releasing
+     the direction key/stick mid-jump used to apply full ground friction in
+     the air too, killing horizontal speed in ~4 frames. Confirms velocityX
+     now holds steady once airborne with no input, until landing. -->
+<html><body style="margin:0;background:#000;">
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true }));</script>
+<canvas id="game" width="800" height="450"></canvas><pre id="out"></pre>
+<script>window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update } from '../src/scenes/sceneManager.js';
+  import { getLevel } from '../src/levels/levelLoader.js';
+  const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+  const out = [];
+
+  setTimeout(() => {
+    key('keydown', ' '); key('keyup', ' '); // title -> playing
+    const lv = getLevel();
+
+    // stand on solid ground, run up to speed, jump, then release direction
+    // entirely mid-air (as if over a pit) and watch velocityX
+    player.x = 700; player.y = lv.groundY - player.height;
+    player.velocityX = 0; player.velocityY = 0; player.invincible = 9999;
+    key('keydown', 'Shift'); key('keydown', 'ArrowRight');
+    for (let i = 0; i < 20; i++) update(); // get up to run speed
+    const speedBeforeJump = player.velocityX;
+    key('keydown', ' '); // jump
+    update();
+    key('keyup', ' '); key('keyup', 'ArrowRight'); key('keyup', 'Shift'); // release everything, mid-air
+    const readings = [];
+    for (let i = 0; i < 30; i++) {
+      update();
+      if (!player.isOnGround) readings.push(player.velocityX.toFixed(2));
+    }
+    out.push('velocityX at takeoff: ' + speedBeforeJump.toFixed(2));
+    out.push('velocityX each airborne frame after releasing input: ' + readings.join(', '));
+    out.push('all airborne readings equal (momentum held, not decaying): ' +
+      readings.every(r => r === readings[0]));
+    out.push('readings roughly match takeoff speed: ' + (Math.abs(parseFloat(readings[0]) - speedBeforeJump) < 0.01));
+
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 200);
+</script></body></html>

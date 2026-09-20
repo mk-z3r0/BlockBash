@@ -68,6 +68,43 @@ export function drawMuscleArm(shoulderX, shoulderY, fistX, fistY) {
   return { x: end.x, y: end.y, angle };
 }
 
+// A pickaxe, drawn with the grip end of the handle AT the transform origin
+// — the caller translates to the hand position first, then scale(facing, 1)
+// + rotate (see weapons/pickaxe.js and entities/enemy.js). The origin being
+// the grip end (not somewhere along the handle) is deliberate: whoever's
+// holding it should look like they're gripping the end of the handle, not
+// its middle. Everything else (rest of handle + head) extends outward from
+// there toward +x/-y. Same shape serves the boss's threat swing, the
+// player's earned swing, and the dropped pickup lying on the ground.
+//
+// Shaped like the classic pickaxe silhouette: one continuous curved head
+// mounted through the end of the handle, tapering to a point at both ends —
+// not two separate axe-blade wedges, which read as a hatchet instead.
+export function drawPickaxeIcon() {
+  // handle — starts exactly at the origin (the grip)
+  ctx.strokeStyle = '#8a6238';
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(18, -13);
+  ctx.stroke();
+
+  // head: a single curved spike through the end of the handle, sharp at
+  // both tips, wide in the middle
+  ctx.fillStyle = '#9aa6bb';
+  ctx.strokeStyle = '#4d5566';
+  ctx.lineWidth = 1.3;
+  ctx.beginPath();
+  ctx.moveTo(15, -28);                     // top tip
+  ctx.quadraticCurveTo(27, -20, 30, -3);   // down the outer (right) edge
+  ctx.lineTo(27, -1);                      // bottom tip
+  ctx.quadraticCurveTo(22, -14, 11, -24);  // back up the inner (left) edge
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+}
+
 export function drawBackground(cameraX) {
   ctx.fillStyle = '#10162c';
   ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);

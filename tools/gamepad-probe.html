@@ -54,12 +54,21 @@
     out.push('4. stick left + A held for 40 ticks: velocityX=' + player.velocityX.toFixed(2) + '  (must be more negative than step 3 — run-capped near -3.6)');
     fakePad.axes[0] = 0; fakePad.buttons[0].pressed = false;
 
-    // --- X (action) should fire the bazooka ---
+    // --- X (action) should do nothing until the weapon is earned, then
+    // trigger a swing (weaponCooldown kicks in) once it is ---
     import('../src/state.js').then(({ state }) => {
-      const missilesBefore = state.missiles.length;
+      player.hasWeapon = false;
+      player.weaponCooldown = 0;
       fakePad.buttons[2].pressed = true; // X
       tick();
-      out.push('5. X pressed: missiles ' + missilesBefore + ' -> ' + state.missiles.length + '  (must increase)');
+      out.push('5. X pressed unarmed: weaponCooldown=' + player.weaponCooldown + '  (must be 0 — gated until earned)');
+      fakePad.buttons[2].pressed = false;
+      tick();
+
+      player.hasWeapon = true;
+      fakePad.buttons[2].pressed = true; // X
+      tick();
+      out.push('5b. X pressed armed: weaponCooldown=' + player.weaponCooldown + '  (must be > 0 — swing attempted)');
       fakePad.buttons[2].pressed = false;
       tick();
 

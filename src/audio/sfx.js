@@ -23,17 +23,25 @@ export function playHit() {
   tone(400, t, 0.3, 'sawtooth', 0.22, sfxGain, 900, 70);
   noiseBurst(t, 0.2, 0.15, sfxGain, 'lowpass', 800);
 }
+export function playExplosion() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  tone(80, t, 0.25, 'sine', 0.3, sfxGain, null);
+  noiseBurst(t, 0.35, 0.28, sfxGain, 'lowpass', 2000);
+}
+// Unused while the bazooka is parked (weapons/bazooka.js) — kept for when
+// it reappears later in the game.
 export function playMissile() {
   if (!audioCtx) return;
   const t = audioCtx.currentTime;
   tone(150, t, 0.2, 'sawtooth', 0.2, sfxGain, 500, 60);
   noiseBurst(t, 0.15, 0.18, sfxGain, 'lowpass', 3000);
 }
-export function playExplosion() {
+export function playDeflect() {
   if (!audioCtx) return;
   const t = audioCtx.currentTime;
-  tone(80, t, 0.25, 'sine', 0.3, sfxGain, null);
-  noiseBurst(t, 0.35, 0.28, sfxGain, 'lowpass', 2000);
+  tone(1400, t, 0.1, 'square', 0.16, sfxGain, 6000, 700);
+  noiseBurst(t, 0.12, 0.2, sfxGain, 'highpass', 5000);
 }
 export function playSurprise() {
   if (!audioCtx) return;
@@ -42,26 +50,29 @@ export function playSurprise() {
   tone(220, t, 0.18, 'square', 0.16, sfxGain, 3500, 900);
   tone(140, t + 0.02, 0.14, 'triangle', 0.12, sfxGain, 2000, 500);
 }
-export function playChainsawStart() {
+export function playPickaxeReady() {
   if (!audioCtx) return;
   const t = audioCtx.currentTime;
-  // a nasty two-pull rev
-  tone(90, t, 0.28, 'sawtooth', 0.26, sfxGain, 1400, 260);
-  noiseBurst(t, 0.3, 0.2, sfxGain, 'bandpass', 1800);
-  tone(120, t + 0.32, 0.45, 'sawtooth', 0.26, sfxGain, 2200, 420);
-  noiseBurst(t + 0.32, 0.5, 0.22, sfxGain, 'bandpass', 2400);
+  // the boss hefts the pickaxe up — a low creak-and-clink threat cue,
+  // replacing the old chainsaw rev now that it's a melee weapon
+  tone(140, t, 0.22, 'triangle', 0.28, sfxGain, 500, 200);
+  noiseBurst(t + 0.05, 0.15, 0.22, sfxGain, 'bandpass', 1400);
 }
-export function playChainsawLoop() {
+export function playPickaxeSwing() {
   if (!audioCtx) return;
   const t = audioCtx.currentTime;
-  tone(300, t, 0.48, 'sawtooth', 0.12, sfxGain, 2600, 340);
-  noiseBurst(t, 0.45, 0.07, sfxGain, 'bandpass', 3000);
+  // a sharp chop — shared by the boss's repeated threat swing, the player's
+  // own earned swing, and (implicitly, via reuse) anything else that ever
+  // wields this weapon
+  noiseBurst(t, 0.12, 0.28, sfxGain, 'bandpass', 2200);
+  tone(180, t + 0.05, 0.15, 'sawtooth', 0.26, sfxGain, 700, 90);
 }
-export function playDeflect() {
+export function playWeaponPickup() {
   if (!audioCtx) return;
   const t = audioCtx.currentTime;
-  tone(1400, t, 0.1, 'square', 0.16, sfxGain, 6000, 700);
-  noiseBurst(t, 0.12, 0.2, sfxGain, 'highpass', 5000);
+  // bright and rewarding — distinct from the combat swing, since this is
+  // the "you got it" moment
+  [523.25, 698.46, 880].forEach((f, i) => tone(f, t + i * 0.08, 0.16, 'triangle', 0.22, sfxGain, 5000));
 }
 export function playCheckpoint() {
   if (!audioCtx) return;

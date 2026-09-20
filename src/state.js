@@ -10,5 +10,6 @@ export const state = {
   coinsCollected: 0,
   currentLevelIndex: 0,
   enemies: [],
-  missiles: []
+  weaponPickups: [],
+  missiles: [] // unused while the bazooka is parked — see weapons/bazooka.js
 };

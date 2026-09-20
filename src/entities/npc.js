@@ -4,11 +4,12 @@ import { STOMP_BOUNCE } from '../engine/physics.js';
 import { getLevel } from '../levels/levelLoader.js';
 import { spawnExplosion, spawnDust } from './particles.js';
 import { playStomp } from '../audio/sfx.js';
+import { spawnWeaponPickup } from './weaponPickup.js';
 import { state } from '../state.js';
 
 // The rescue NPC only exists during the boss cutscene (see
-// scenes/playingScene.js): it runs in from off-screen, jumps the chainsaw
-// boss, and exits stage right. Kept as its own module since Phase 5's
+// scenes/playingScene.js): it runs in from off-screen, jumps the pickaxe-
+// wielding boss, and exits stage right. Kept as its own module since Phase 5's
 // cutscene engine will likely want to reuse "a scripted character" like this.
 export function createRescueNPC(spawnX) {
   return {
@@ -66,6 +67,7 @@ export function updateRescueNPC(npc, viewWidth, cameraX) {
         playStomp();
         spawnExplosion(boss.x + boss.w / 2, boss.y + boss.w / 2, '#8effc0');
         spawnDust(boss.x + boss.w / 2, boss.y + boss.w, 12, { spread: 4, size: 10, life: 28 });
+        spawnWeaponPickup(boss.x + boss.w / 2, groundY);
         npc.velocityY = STOMP_BOUNCE;
         npc.state = 'landing';
         npc.stomped = true;
@@ -81,6 +83,7 @@ export function updateRescueNPC(npc, viewWidth, cameraX) {
         state.score += 200;
         playStomp();
         spawnExplosion(boss.x + boss.w / 2, boss.y + boss.w / 2, '#8effc0');
+        spawnWeaponPickup(boss.x + boss.w / 2, groundY);
       }
       npc.state = 'posing';
       npc.stomped = true;

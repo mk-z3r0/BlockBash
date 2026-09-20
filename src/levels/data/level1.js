@@ -120,36 +120,54 @@ export default {
     { x: 3750, y: 300 - 20,      w: 20, minX: 3700, maxX: 3810, speed: 1.0 },
     { x: 4550, y: 290 - 20,      w: 20, minX: 4500, maxX: 4610, speed: 1.1 },
     { x: 6150, y: 300 - 20,      w: 20, minX: 6100, maxX: 6220, speed: 1.2 },
-    { x: 6980, y: GROUND_Y - 26, w: 26, minX: 6900, maxX: 7100, speed: 1.2, boss: true }
+    // 50% larger than the standard 22px sphere (33px) — the boss should
+    // read as visibly bigger than anything else on screen before it even
+    // wakes up
+    { x: 6980, y: GROUND_Y - 33, w: 33, minX: 6900, maxX: 7100, speed: 1.2, boss: true }
   ],
 
-  // Two tiers, deliberately: coins near groundY (~396, genuinely collectible
-  // while walking — no jump needed at all) vs coins tied to a platform or a
-  // hazard-clearing jump (the existing higher ones, unchanged — reaching
-  // those already requires the skill it should). Level 1 keeps that split
-  // simple; later levels should widen the gap between the two tiers rather
-  // than add a third.
+  // Two tiers, by how they're actually reached: no-jump-needed (walking on
+  // ground or standing on a platform you already had to climb to reach) vs
+  // jump-required (arcing over a pit or a spike bed while airborne). Ground
+  // coins sit 14px above groundY (396); platform coins now use that same
+  // 14px-above-the-surface offset (2026-09-19 — they used to float ~35-40px
+  // above their platform, which meant an *extra* hop was needed even after
+  // you'd already climbed up there. Getting up to the platform is the
+  // intended skill; a second micro-jump once you're standing on it wasn't
+  // adding anything, just friction). Hazard-arc coins are unchanged — those
+  // are deliberately jump-tier, telegraphing the jump that clears the hazard
+  // underneath them, not a platform you stand on.
   coins: [
-    // first half — platform/jump tier (unchanged)
-    [180, 280], [230, 280], [680, 260], [730, 260],
-    [920, 190], [1170, 280], [1220, 280], [1530, 240],
-    [1580, 240], [1770, 160], [2075, 260], [2125, 260],
-    [2370, 220], [2620, 160], [2870, 260], [2920, 260],
-    // first half — walkable tier: open ground, no platform or hazard nearby
+    // first half — platform tier: 14px above the platform surface, same
+    // reachable-while-standing offset as the ground tier below
+    [180, 306], [230, 306],       // platform at x150-270,  y320
+    [680, 286], [730, 286],       // platform at x650-770,  y300
+    [920, 216],                   // platform at x900-1000, y230
+    [1170, 306], [1220, 306],     // platform at x1150-1250, y320
+    [1770, 186],                  // platform at x1750-1850, y200
+    [2075, 286], [2125, 286],     // platform at x2040-2230, y300
+    [2370, 246],                  // platform at x2350-2480, y260
+    [2620, 186],                  // platform at x2600-2700, y200
+    [2870, 286], [2920, 286],     // platform at x2850-2970, y300
+    // first half — jump tier: arcs over the 1500-1560 gap, not a platform
+    [1530, 240], [1580, 240],
+    // first half — ground tier: open ground, no platform or hazard nearby
     [800, 396], [1000, 396], [1900, 396], [2720, 396], [2900, 396],
 
-    // second half — arcs over each hazard telegraph the jump (jump tier,
-    // unchanged in height; the 4320 trio widened in x to match that spike
-    // bed's new 90px width)
-    [3740, 265], [3780, 265],
+    // second half — jump tier: arcs over each hazard telegraph the jump
+    // (unchanged; the 4320 trio widened in x to match that spike bed's new
+    // 90px width)
     [3960, 350], [4004, 315], [4048, 350],
     [4180, 365], [4230, 365],
     [4335, 345], [4365, 300], [4395, 345],
-    [4540, 255], [4580, 255],
-    [5010, 305], [5170, 305],
     [5710, 340], [5745, 340], [5865, 340], [5995, 340],
-    [6140, 265], [6180, 265],
-    // second half — walkable tier
+    // second half — platform tier: same 14px-above-surface offset
+    [3740, 286], [3780, 286],     // "coin perch" platform at x3700-3810, y300
+    [4540, 276], [4580, 276],     // "coin perch" platform at x4500-4610, y290
+    [5010, 326],                  // stepping stone at x4960-5060, y340
+    [5170, 326],                  // stepping stone at x5120-5220, y340
+    [6140, 286], [6180, 286],     // platform at x6100-6220, y300
+    // second half — ground tier
     [5320, 396], [5620, 396], [5660, 396],
     [6400, 396], [6450, 396], [6500, 396]
   ],
@@ -163,11 +181,17 @@ export default {
   goal: { x: 7100, y: 200, width: 10, height: GROUND_Y - 200 },
 
   // Level 1's boss can't be fought — walking into range plays a cutscene
-  // where a rescue NPC deals with it. Later levels get real fights.
+  // where a rescue NPC deals with it, stomping it and leaving its pickaxe
+  // behind (the player's first and only weapon this level — see
+  // weapons/pickaxe.js and entities/weaponPickup.js; the player starts
+  // completely unarmed). Later levels get real fights.
   // Everything past 6030 is kept clear so the NPC's run-in reads cleanly.
   // wakeX sits ~420px short of the boss on purpose: the boss needs room to
   // charge before the rescue NPC intercepts it. Trigger it too close and the
   // boss immediately stops against the player, and the whole leap happens
-  // with nothing moving.
+  // with nothing moving. The cutscene also won't fire until the boss is
+  // fully inside the camera's view (see updateCutscene in playingScene.js) —
+  // wakeX alone isn't enough since the camera eases toward the player rather
+  // than snapping, so it can still lag behind at the moment wakeX is crossed.
   boss: { mode: 'cutscene', wakeX: 6560, chargeSpeed: 2.4 }
 };

@@ -10,19 +10,20 @@ import { updateEnemies, drawEnemies, spawnEnemies } from '../entities/enemy.js';
 import { createRescueNPC, updateRescueNPC, drawRescueNPC } from '../entities/npc.js';
 import { updateParticles, drawParticles, resetParticles, spawnExplosion } from '../entities/particles.js';
 import { resetCoins, updateCoins, drawCoins } from '../entities/coins.js';
-import { updateBazookaInput, updateMissiles, drawMissiles } from '../weapons/bazooka.js';
+import { spawnWeaponPickup, updateWeaponPickups, drawWeaponPickups } from '../entities/weaponPickup.js';
+import { updateWeaponInput } from '../weapons/pickaxe.js';
 import { loadLevel, getLevel } from '../levels/levelLoader.js';
 import { drawPlatforms, drawGoal, drawCheckpoints, drawHazards } from '../levels/levelRenderer.js';
 import { drawBlockHouse } from './blockHouse.js';
 import { levels } from '../levels/registry.js';
 import { showToast, updateToast, drawHUD, toast } from '../ui/hud.js';
-import { playHit, playCheckpoint, playChainsawStart, playChainsawLoop, playExplosion, playWin, playGameOver } from '../audio/sfx.js';
+import { playHit, playCheckpoint, playPickaxeReady, playPickaxeSwing, playExplosion, playWin, playGameOver } from '../audio/sfx.js';
 import { startMusic } from '../audio/audio.js';
 import { switchTo } from './sceneManager.js';
 import { recordProgress } from '../save.js';
 import { drawOverlay } from '../ui/overlays.js';
 
-// --- Cutscene state machine (the chainsaw-boss showdown): null (not
+// --- Cutscene state machine (the pickaxe-boss showdown): null (not
 // started) -> 'freeze' -> 'charge' -> 'rescue' -> 'done'. Scoped to this
 // scene rather than a dedicated module for now — see the Phase 0 notes on
 // why (Phase 5's cutscene engine is where this earns its own home). ---
@@ -50,13 +51,17 @@ function resetBossAndCutscene() {
     boss.alive = true;
     boss.squish = 0;
     boss.awake = false;
-    boss.sawRev = 0;
+    boss.swingPhase = 0;
     boss.shout = 0;
     boss.x = boss.baseX;
     boss.y = boss.baseY;
     boss.hopVY = 0;
     boss.speed = Math.abs(boss.speed) || 1.2;
   });
+  // the fight is restarting — any drop from a previous attempt that never
+  // got picked up (the player died between the boss dying and reaching it)
+  // would otherwise sit stranded next to a boss that's alive again
+  state.weaponPickups = state.weaponPickups.filter(p => p.collected);
 }
 
 function loseLife() {
@@ -80,15 +85,25 @@ function updateCutscene() {
 
   if (cutscene === null) {
     const boss = state.enemies.find(e => e.boss && e.alive);
-    if (boss && player.x + player.width > bossConfig.wakeX) {
+    // Gated on the boss being fully visible in the current camera view, not
+    // just player.x crossing wakeX — wakeX alone could fire while the boss
+    // was still off-screen to the right (camera eases toward the player
+    // rather than snapping, so it lags behind, especially approaching at
+    // run speed). Both conditions still apply: wakeX gives the boss room to
+    // charge before the player's right on top of it, and visibility means
+    // the player actually sees what triggered the cutscene.
+    const bossFullyOnScreen = boss
+      && boss.x >= camera.x
+      && boss.x + boss.w <= camera.x + VIEW_WIDTH;
+    if (boss && player.x + player.width > bossConfig.wakeX && bossFullyOnScreen) {
       cutscene = 'freeze';
       cutsceneTimer = 0;
       player.velocityX = 0;
       player.velocityY = 0;
       boss.awake = true;
-      boss.sawRev = 1;
+      boss.swingPhase = 1;
       boss.shout = 40;
-      playChainsawStart();
+      playPickaxeReady();
     }
   }
 
@@ -98,8 +113,8 @@ function updateCutscene() {
     cutsceneTimer++;
     const boss = state.enemies.find(e => e.boss && e.alive);
     if (boss) {
-      boss.sawRev++;
-      if (boss.sawRev % 26 === 0) playChainsawLoop();
+      boss.swingPhase++;
+      if (boss.swingPhase % 26 === 0) playPickaxeSwing();
     }
     if (cutsceneTimer > 120) {
       cutscene = 'charge';
@@ -114,8 +129,8 @@ function updateCutscene() {
     if (boss) {
       boss.speed = -bossConfig.chargeSpeed;
       boss.x += boss.speed;
-      boss.sawRev++;
-      if (boss.sawRev % 26 === 0) playChainsawLoop();
+      boss.swingPhase++;
+      if (boss.swingPhase % 26 === 0) playPickaxeSwing();
     }
     cutsceneTimer++;
 
@@ -138,6 +153,7 @@ function updateCutscene() {
         boss.squish = 14;
         spawnExplosion(boss.x + boss.w / 2, boss.y + boss.w / 2, '#8effc0');
         playExplosion();
+        spawnWeaponPickup(boss.x + boss.w / 2, getLevel().groundY);
       }
       cutscene = 'rescue';
       cutsceneTimer = 0;
@@ -172,12 +188,14 @@ function startLevel(index) {
   const level = loadLevel(levels[index]);
   state.enemies = spawnEnemies(level.enemySpawns);
   resetCoins();
-  state.missiles = [];
+  state.weaponPickups = [];
+  state.missiles = []; // unused while the bazooka is parked — see weapons/bazooka.js
   resetParticles();
   resetDustTimer();
   resetBossAndCutscene();
   setRespawnPoint(level.playerSpawn.x, level.playerSpawn.y);
   resetPlayer();
+  player.hasWeapon = false; // starts unarmed every fresh level load
   resetCamera();
   state.gameState = 'playing';
   showToast(level.name.toUpperCase(), 100);
@@ -209,8 +227,8 @@ export function drawWorldAndHUD() {
   drawCheckpoints();
   drawGoal();
   drawCoins(state.frameCount);
+  drawWeaponPickups(state.frameCount);
   drawEnemies(state.frameCount, cutscene === 'done');
-  drawMissiles();
   drawParticles();
   drawPlayer(state.frameCount);
   drawPlayerShout();
@@ -233,7 +251,7 @@ export const playingScene = {
     const inputLocked = !!(cutscene && cutscene !== 'done');
 
     const { fellInPit } = updatePlayer(inputLocked);
-    updateBazookaInput(player, inputLocked);
+    updateWeaponInput(player, inputLocked);
 
     if (fellInPit) {
       playHit();
@@ -266,9 +284,9 @@ export const playingScene = {
       if (state.gameState !== 'playing') return;
     }
 
-    updateMissiles();
     updateParticles();
     updateCoins(player);
+    updateWeaponPickups(player);
 
     const goal = getLevel().goal;
     if (isColliding(player, goal)) {
@@ -316,6 +334,7 @@ export const playingScene = {
         boss.squish = 14;
         spawnExplosion(boss.x + boss.w / 2, boss.y + boss.w / 2, '#8effc0');
         playExplosion();
+        spawnWeaponPickup(boss.x + boss.w / 2, getLevel().groundY);
       }
       cutscene = 'done';
       rescueNPC = null;

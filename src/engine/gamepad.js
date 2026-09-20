@@ -2,7 +2,7 @@
 // events — button state can only be polled, once per frame — so this
 // dispatches synthetic keydown/keyup events on every transition, using the
 // exact same `key` value a keyboard press would produce. That's deliberate:
-// every consumer in the game (movement, jump buffering, bazooka firing,
+// every consumer in the game (movement, jump buffering, the earned weapon,
 // pause, skipping the intro) already reads real keyboard events and the
 // shared `keys` state, so a gamepad becomes just another input source
 // feeding that same pipeline — nothing downstream needs to know it exists.

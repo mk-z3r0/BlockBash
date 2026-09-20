@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<!-- Verifies every platform-tier coin is collectible just by standing on
+     its platform — no jump needed beyond climbing up there in the first
+     place. For each coin, finds the platform under it (by x-range) and, if
+     the coin sits well above groundY (i.e. it's not a ground-tier coin),
+     teleports the player to stand on that platform with zero jump input and
+     confirms it gets collected. -->
+<html><body style="margin:0;background:#000;">
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true }));</script>
+<canvas id="game" width="800" height="450"></canvas><pre id="out"></pre>
+<script>window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  import { player, resetPlayer } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update } from '../src/scenes/sceneManager.js';
+  import { getLevel } from '../src/levels/levelLoader.js';
+  import { coins, resetCoins } from '../src/entities/coins.js';
+  const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+  const out = [];
+
+  setTimeout(() => {
+    key('keydown', ' '); key('keyup', ' '); // title -> playing
+    const lv = getLevel();
+    const platforms = lv.platforms.filter(p => !p.ground);
+    // isolate the pure standing-reach geometry from combat — at least one
+    // coin perch (x3700-3810) shares its platform with a patrol enemy,
+    // which is a legitimate design choice but orthogonal to what this check
+    // verifies, and would otherwise knock the player off before the coin
+    // registers depending on exactly where the enemy's patrol has drifted to
+    state.enemies.forEach(e => e.alive = false);
+
+    let checked = 0, ok = 0;
+    const failures = [];
+    coins.forEach((coin, i) => {
+      const platform = platforms.find(p => coin.x >= p.x && coin.x <= p.x + p.width);
+      if (!platform) return; // not platform-associated (ground tier or hazard-arc tier)
+      if (lv.groundY - coin.y < 60) return; // too close to ground to be a platform-tier coin
+
+      checked++;
+      player.x = coin.x - player.width / 2;
+      player.y = platform.y - player.height;
+      player.velocityX = 0; player.velocityY = 0;
+      // no jump input at all — this is the whole point of the check
+      for (let f = 0; f < 8; f++) update();
+      if (coin.collected) ok++;
+      else failures.push(`coin[${i}] at (${coin.x},${coin.y}) over platform x${platform.x}-${platform.x + platform.width} y${platform.y}`);
+      coin.collected = false; // reset for the next check
+    });
+
+    out.push(`platform-tier coins found: ${checked}`);
+    out.push(`collected while standing, zero jump: ${ok}/${checked}  (must equal total)`);
+    if (failures.length) out.push('FAILURES:\n  ' + failures.join('\n  '));
+    out.push('total coins: ' + coins.length + '  (must still be 47)');
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 200);
+</script></body></html>

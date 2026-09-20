@@ -1,6 +1,6 @@
 // Raw keyboard state, plus a single pair of hooks for edge-triggered actions
 // (main.js wires these to audio/mute/scene behavior). Scenes read `keys`
-// directly each frame for held-key checks (movement, bazooka).
+// directly each frame for held-key checks (movement, the earned weapon).
 export const keys = {};
 
 export function initInput({ onKeyDown, onKeyUp } = {}) {

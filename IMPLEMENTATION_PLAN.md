@@ -14,23 +14,31 @@ http (Live Server) — not `file://`.
 src/
   engine/     game loop, physics constants, input, camera, renderer
   entities/   player, enemy, npc, coins, particles
-  weapons/    bazooka
-  levels/     levelLoader, levelRenderer, trickPlatforms (parked), data/level1.js
+  weapons/    pickaxe (melee, earned — see the Level 1 retrofit),
+              bazooka (parked, not wired into any scene — for a later level)
+  levels/     levelLoader, levelRenderer, trickPlatforms (parked), data/level1.js, data/testLevel.js (sandbox dupe, see below)
   scenes/     sceneManager + title, playing, win, gameOver
   ui/         hud, overlays
   audio/      audio (synth), sfx
-tools/        gap-probe, cutscene-probe, shot  (dev tools, need the server running)
+tools/        gap-probe, cutscene-probe, weapon-probe, shot  (dev tools, need the server running)
 ```
+
+`data/testLevel.js` is a straight duplicate of `data/level1.js`, loaded instead
+of it when the game is opened with `?test` in the URL (see `levels/registry.js`)
+— a sandbox for trying out controls/weapons/enemies changes without touching
+the real level 1. It diverges freely once created; nothing keeps it in sync.
 
 | Phase | Status |
 |---|---|
 | 0 — module split + scene manager | done |
 | 1 — data-driven levels, loader, transitions | steps 1–4 done — loader, renderer, spikes, level 1 extended |
-| **Milestone: Level 1 complete** | **not yet reached** — progression + versioned save are done; 3 of 5 retrofit items done (intro cutscene, coin thresholds, skybox resolved); weapon gating and carved platform damage remain |
+| **Milestone: Level 1 complete** | **not yet reached** — progression + versioned save are done; 4 of 5 retrofit items done (intro cutscene, coin thresholds, skybox, weapon gating resolved); carved platform damage remains |
 | 2+ (level tool, chamfers, enemies, weapons, octagons, world manipulation, polish) | not started, re-scoped by the design doc, blocked on the milestone |
 
 Level 1 runs 0–7200px: pits and passive spheres, then a spike half, then an
-unwinnable chainsaw boss resolved by a rescue NPC. Three checkpoints.
+unwinnable boss (50% larger than a normal sphere, wielding a pickaxe)
+resolved by a rescue NPC that stomps it and leaves the pickaxe behind — the
+player's first and only weapon this level. Three checkpoints.
 
 See [Milestone: Level 1 complete](#milestone-level-1-complete) — nothing
 below it starts until that's checked off.
@@ -42,7 +50,7 @@ below it starts until that's checked off.
 | Question | Decision | Why it matters |
 |---|---|---|
 | How does terrain get "rounded"? | **Chamfers — corners cut at 45°, not curves.** Discrete damage states, progressively deeper | Curves would force a collision rewrite. A diagonal is the classic slope problem and stays tractable |
-| The bazooka vs. "player starts unarmed" | **Stays.** Becomes the triangle shooter — earned, not innate, with limited ammo | Triangles *are* the missing corners, so restoring an octagon is literal geometry, not metaphor |
+| The bazooka vs. "player starts unarmed" | **Parked, not converted.** Level 1's retrofit (2026-09-19) got to "player starts unarmed, earns a weapon from a defeated enemy" first, via a melee pickaxe dropped by the boss (`weapons/pickaxe.js`) — the bazooka isn't the player's level 1 weapon anymore. It still exists in the codebase (`weapons/bazooka.js`), just not wired into any scene right now: confirmed (2026-09-19) it's planned to reappear later in the game, so it's parked rather than deleted or converted. The triangle-shooter idea is still the plan for whatever *that* eventually becomes, whenever it's actually built | Triangles *are* the missing corners, so restoring an octagon is literal geometry, not metaphor — that reasoning still holds whenever the triangle shooter actually gets built |
 | Level 1 | **Keep it, retrofit it.** Good concept test | Passive enemies, foreshadowing boss and rescue NPC already fit the story |
 | Spikes (absent from the design doc) | **Debris from the world being carved** | Folds an orphan mechanic into the narrative |
 | What a restored octagon does | **Becomes a square again and flees** — an ally, not a recruit | Restoration is a *rescue* verb. Keeps freed squares out of the combat math |
@@ -65,11 +73,13 @@ approach, one thing for the player to learn.
 Things that are cheap to build in now and expensive to retrofit.
 
 **Weapons must be entity-agnostic.** The design doc has enemies carrying and
-dropping weapons. Today `updateBazookaInput(player)` reads the keyboard
-directly, cooldown state lives on the player object, projectiles carry no
-owner, and `updateMissiles()` only ever tests projectiles against *enemies*.
-For an enemy to fire, projectiles need an owner and collision has to resolve
-against whoever isn't it. Build this at the start of the weapons work.
+dropping weapons — level 1's boss already does the "dropping" half (see the
+Level 1 retrofit). Today `updateWeaponInput(player)` (`weapons/pickaxe.js`)
+reads the keyboard directly, cooldown state lives on the player object, and
+the swing hitbox only ever tests against *enemies*. For an enemy to swing
+back, the hit test has to resolve against whoever isn't the swinger, not be
+hardcoded to "the player attacks, enemies get hit." Build this generically at
+the start of the weapons work, not by special-casing a second weapon module.
 
 **Chamfer is a surface profile, not a flag.** A platform stops being "flat top
 at `y`" and becomes a height-at-x function: for a top corner cut by N px, the
@@ -158,7 +168,9 @@ Base class and the passive → pursuing → aggressive tiers. Enemies hold weapo
 
 **6. Weapons**
 Entity-agnostic (see constraints). Player starts unarmed, weapons drop from
-defeated enemies. Bazooka becomes the triangle shooter with limited ammo.
+defeated enemies — level 1's melee pickaxe (`weapons/pickaxe.js`) is a
+narrow, single-level version of this already; this step generalizes it
+across enemy tiers and adds the ranged triangle shooter with limited ammo.
 
 **7. Octagons**
 Needs 5 and 6 — they're enemies, and restoring them needs the triangle weapon.
@@ -245,6 +257,14 @@ way to simulate more than a frame or two.
   overhead — but that fights the no-platforms-overhead rule. Resolution: use it
   where the player crosses *on top* (the stepping-stone section is already this
   shape); elsewhere put the damage source beside the corridor, not over it.
+- **A boss/cutscene trigger keyed only on player position can fire while the
+  boss is still off-screen.** The camera eases toward the player rather than
+  snapping to them, so it lags — position-only triggers (`player.x` past some
+  `wakeX`) can fire before the camera has actually caught up, especially
+  approaching at run speed. Level 1's ending cutscene checks that the boss is
+  fully within the current camera view (`camera.x`/`VIEW_WIDTH`) in addition
+  to the position trigger. Applies to any future scripted moment tied to a
+  specific world position, not just this one boss.
 
 Benchmark: an autoplayer with a fixed-lookahead policy clears level 1 without
 dying. That proves nothing is impossible or unfair — it says nothing about
@@ -254,8 +274,9 @@ whether it's fun.
 
 ## Level 1 retrofit
 
-Already fits: passive patrolling spheres, the unwinnable chainsaw boss as
-late-game foreshadowing, the rescue NPC as the first supporting NPC.
+Already fits: passive patrolling spheres, the unwinnable pickaxe-armed boss
+(50% bigger than a normal sphere) as late-game foreshadowing, the rescue NPC
+as the first supporting NPC.
 
 To add:
 - [x] Block house at spawn, and the opening cutscene leading into it —
@@ -263,8 +284,17 @@ To add:
   cut to the house → player walks out), `scenes/blockHouse.js` shared between
   the cutscene and level 1's background at spawn so both draw the same house.
   Plays once ever (`save.js`'s `hasSeenIntro`), skippable any time
-- [ ] Gate the bazooka — `B` does nothing until it's earned
-- [x] Coin→life thresholds tuned against its ~45 coins
+- [x] Gate the weapon — `B`/`X` does nothing until it's earned (2026-09-19):
+  level 1 doesn't use the bazooka at all anymore — it's parked in the
+  codebase (`weapons/bazooka.js`), not wired into any scene, since it's
+  planned to reappear in a later level. The player starts fully unarmed; the
+  boss carries a pickaxe (swung, not fired) instead of its old chainsaw, and
+  the rescue NPC's stomp leaves it behind at `boss.x` for the player to walk
+  onto (`entities/weaponPickup.js`). Once picked up, `B`/`X` triggers a
+  short melee swing (`weapons/pickaxe.js`, capped at 2/sec, no cooldown
+  toast) instead of a ranged shot — see the "bazooka vs. unarmed" row in
+  Decisions made above
+- [x] Coin→life thresholds tuned against its ~47 coins
 - [ ] Carved damage on elevated platform undersides above the spike debris
 - [x] ~~The blown-off planet corner visible in the skyline~~ — resolved by
   *not* doing this: it's shown once, in the opening cutscene, and deliberately
@@ -293,10 +323,11 @@ multiplayer, sound direction.
 
 Xbox/standard-mapping gamepad support landed via `engine/gamepad.js`: it
 polls each frame and dispatches synthetic keydown/keyup events on button
-transitions, so the rest of the game (movement, jump buffering, bazooka,
-pause) treats a controller as just another source feeding the same `keys`
-state real keyboard input already populates — no consumer code had to
-change. A=run, B=jump, X=bazooka, Start=menu/pause, stick+d-pad=move — A/B
+transitions, so the rest of the game (movement, jump buffering, the earned
+weapon, pause) treats a controller as just another source feeding the same
+`keys` state real keyboard input already populates — no consumer code had to
+change. A=run, B=jump, X=weapon swing (gated until earned — see the Level 1
+retrofit), Start=menu/pause, stick+d-pad=move — A/B
 match physical position (bottom/right), not the letter each maps to on a
 Nintendo pad; matching by letter put run and jump backwards, per playtest.
 

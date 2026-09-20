@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<!-- New probe: exercises the whole weapon-removal / pickaxe-pickup / boss-size
+     / cutscene-visibility change set end to end. -->
+<html><body style="margin:0;background:#000;">
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true }));</script>
+<canvas id="game" width="800" height="450"></canvas><pre id="out"></pre>
+<script>window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update } from '../src/scenes/sceneManager.js';
+  import { getLevel } from '../src/levels/levelLoader.js';
+  import { camera } from '../src/engine/camera.js';
+  const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+  const out = [];
+
+  setTimeout(async () => {
+    key('keydown', ' '); key('keyup', ' '); // title -> playing
+    const lv = getLevel();
+    const boss = state.enemies.find(e => e.boss);
+
+    out.push('=== weapon gating ===');
+    out.push('player.hasWeapon at level start: ' + player.hasWeapon + '  (must be false)');
+    key('keydown', 'b'); update(); key('keyup', 'b');
+    out.push('weaponCooldown after pressing B unarmed: ' + player.weaponCooldown + '  (must be 0)');
+
+    out.push('=== boss size ===');
+    out.push('boss.w = ' + boss.w + '  (must be 33, 50% more than the standard 22)');
+
+    out.push('=== cutscene visibility gate ===');
+    player.x = lv.boss.wakeX - 40; player.y = lv.groundY - player.height;
+    player.velocityX = 0; player.velocityY = 0; player.invincible = 99999;
+    camera.x = 0; // deliberately NOT pre-seeded, to prove the gate actually holds off
+    key('keydown', 'ArrowRight');
+    let triggeredFrame = null;
+    for (let i = 0; i < 30; i++) {
+      update();
+      if (boss.awake && triggeredFrame === null) triggeredFrame = i;
+    }
+    out.push('with camera starting at 0, boss.awake after 30 frames: ' + boss.awake +
+      (triggeredFrame !== null ? ' (fired at frame ' + triggeredFrame + ')' : '') +
+      '  (should still be false this early — camera has not caught up, so the boss is not fully on-screen yet)');
+    // now let the camera actually catch up
+    for (let i = 0; i < 400 && !boss.awake; i++) update();
+    key('keyup', 'ArrowRight');
+    out.push('boss.awake once the camera catches up: ' + boss.awake +
+      '  camera.x=' + Math.round(camera.x) + ' boss.x=' + Math.round(boss.x) + ' boss.w=' + boss.w +
+      '  fully visible check: ' + (boss.x >= camera.x && boss.x + boss.w <= camera.x + 800));
+
+    out.push('=== full cutscene -> pickup ===');
+    let diedAt = null;
+    for (let i = 0; i < 500; i++) {
+      update();
+      if (!boss.alive) { diedAt = i; break; }
+    }
+    out.push('boss.alive after up to 500 more frames: ' + boss.alive + (diedAt !== null ? ' (died at +' + diedAt + ')' : ''));
+    // the boss dying doesn't end the cutscene by itself — 'rescue' still
+    // has to run its ~100-frame course before 'done' unlocks input again
+    for (let i = 0; i < 150; i++) update();
+    out.push('weaponPickups spawned: ' + state.weaponPickups.length + '  (must be >= 1)');
+    if (state.weaponPickups.length) {
+      const p = state.weaponPickups[0];
+      out.push('pickup at x=' + Math.round(p.x) + ' y=' + Math.round(p.y) + ' collected=' + p.collected);
+    }
+    out.push('player.hasWeapon before walking to it: ' + player.hasWeapon);
+
+    // walk the player onto the pickup
+    if (state.weaponPickups.length) {
+      const p = state.weaponPickups[0];
+      player.x = p.x - player.width / 2;
+      player.y = lv.groundY - player.height;
+      player.velocityX = 0; player.velocityY = 0;
+      for (let i = 0; i < 10; i++) update();
+    }
+    out.push('player.hasWeapon after walking onto the drop: ' + player.hasWeapon + '  (must be true)');
+
+    out.push('=== earned swing now works ===');
+    player.weaponCooldown = 0;
+    key('keydown', 'b'); update(); key('keyup', 'b');
+    out.push('weaponCooldown after pressing B armed: ' + player.weaponCooldown + '  (must be > 0)');
+
+    out.push('=== swing rate capped at 2/sec, no cooldown toast ===');
+    const { toast } = await import('../src/ui/hud.js');
+    player.weaponCooldown = 0;
+    toast.timer = 0; toast.text = null;
+    key('keydown', 'b'); // hold it down across 120 frames (~2 real seconds)
+    let swings = 0;
+    let prevCooldown = 0;
+    for (let i = 0; i < 120; i++) {
+      update();
+      if (player.weaponCooldown > prevCooldown) swings++;
+      prevCooldown = player.weaponCooldown;
+    }
+    key('keyup', 'b');
+    out.push('swings while holding B for 120 frames (2s @60fps): ' + swings + '  (must be 4 — 2/sec)');
+    out.push('toast shown while spamming a blocked swing: ' + JSON.stringify(toast.text) + '  (must be null — no "COOLING DOWN" message anymore)');
+
+    // Reported bug (2026-09-19): holding run while swinging sometimes cost
+    // lives instead of landing the kill — the hit-test used to check only
+    // the exact frame the button was pressed, so a fast-closing (running)
+    // player could miss that one frame and run straight into the enemy on
+    // the next one. Fixed by keeping the hitbox active across the whole
+    // swing animation (see hitEnemiesInRange in weapons/pickaxe.js).
+    out.push('=== run + swing at an enemy should land the kill, not cost a life ===');
+    state.enemies.forEach(e => { e.alive = true; e.x = 1400; e.y = lv.groundY - e.w; e.minX = 1350; e.maxX = 1450; });
+    player.x = 1200; player.y = lv.groundY - player.height;
+    player.velocityX = 0; player.invincible = 0; player.weaponCooldown = 0;
+    const livesBefore = state.lives;
+    key('keydown', 'Shift'); key('keydown', 'ArrowRight');
+    let landedKill = false;
+    for (let i = 0; i < 200; i++) {
+      if (i % 6 === 0) key('keydown', 'b'); else key('keyup', 'b');
+      update();
+      if (state.enemies.some(e => e.x > 1350 && e.x < 1450 && !e.alive)) { landedKill = true; break; }
+    }
+    key('keyup', 'Shift'); key('keyup', 'ArrowRight'); key('keyup', 'b');
+    out.push('landed the kill while running+swinging: ' + landedKill + '  (must be true)');
+    out.push('lives: ' + livesBefore + ' -> ' + state.lives + '  (must be unchanged — no body-contact damage)');
+
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 200);
+</script></body></html>
