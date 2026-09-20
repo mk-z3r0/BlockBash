@@ -21,7 +21,7 @@ export default {
     { x: 1390, width: 110 },   // stepping-stone island
     { x: 1560, width: 590 },
     { x: 2175, width: 1325 },
-    { x: 3570, width: 1130 },
+    { x: 3660, width: 1040 },     // widens the 3500 gap to 160px — mirrors level1.js's physics-lab retune, 2026-09-20
     { x: 4760, width: 740 },
     { x: 5590, width: 1610 }
   ],
@@ -50,25 +50,27 @@ export default {
 
   hazards: [
     { type: 'spikes', x: 3980, width: 48 },
-    { type: 'spikes', x: 4320, width: 90 },
+    { type: 'spikes', x: 4320, width: 160 },
     { type: 'spikes', x: 4920, width: 340 },
-    { type: 'spikes', x: 5700, width: 60 },
+    { type: 'spikes', x: 5700, width: 35 },
     { type: 'spikes', x: 5850, width: 50 },
     { type: 'spikes', x: 5980, width: 50 }
   ],
 
+  // Rescaled to match level1.js's physics-lab retune, 2026-09-20 (~1.79x,
+  // matching how far walkMax grew) — see level1.js for the full note.
   enemies: [
-    { x: 250,  y: GROUND_Y - 22, w: 22, minX: 220,  maxX: 460,  speed: 0.896 },
-    { x: 700,  y: GROUND_Y - 22, w: 22, minX: 650,  maxX: 950,  speed: 1.088 },
-    { x: 660,  y: 300 - 20,      w: 20, minX: 655,  maxX: 750,  speed: 0.704 },
-    { x: 1600, y: GROUND_Y - 22, w: 22, minX: 1580, maxX: 1800, speed: 1.024 },
-    { x: 1760, y: 200 - 20,      w: 20, minX: 1755, maxX: 1830, speed: 0.64 },
-    { x: 2360, y: 260 - 20,      w: 20, minX: 2355, maxX: 2460, speed: 0.704 },
-    { x: 3400, y: GROUND_Y - 22, w: 22, minX: 3300, maxX: 3480, speed: 0.96 },
-    { x: 3750, y: 300 - 20,      w: 20, minX: 3700, maxX: 3810, speed: 0.64 },
-    { x: 4550, y: 290 - 20,      w: 20, minX: 4500, maxX: 4610, speed: 0.704 },
-    { x: 6150, y: 300 - 20,      w: 20, minX: 6100, maxX: 6220, speed: 0.768 },
-    { x: 6980, y: GROUND_Y - 33, w: 33, minX: 6900, maxX: 7100, speed: 0.768, boss: true }
+    { x: 250,  y: GROUND_Y - 22, w: 22, minX: 220,  maxX: 460,  speed: 1.6 },
+    { x: 700,  y: GROUND_Y - 22, w: 22, minX: 650,  maxX: 950,  speed: 1.95 },
+    { x: 660,  y: 300 - 20,      w: 20, minX: 655,  maxX: 750,  speed: 1.26 },
+    { x: 1600, y: GROUND_Y - 22, w: 22, minX: 1580, maxX: 1800, speed: 1.83 },
+    { x: 1760, y: 200 - 20,      w: 20, minX: 1755, maxX: 1830, speed: 1.15 },
+    { x: 2360, y: 260 - 20,      w: 20, minX: 2355, maxX: 2460, speed: 1.26 },
+    { x: 3400, y: GROUND_Y - 22, w: 22, minX: 3300, maxX: 3480, speed: 1.72 },
+    { x: 3750, y: 300 - 20,      w: 20, minX: 3700, maxX: 3810, speed: 1.15 },
+    { x: 4550, y: 290 - 20,      w: 20, minX: 4500, maxX: 4610, speed: 1.26 },
+    { x: 6150, y: 300 - 20,      w: 20, minX: 6100, maxX: 6220, speed: 1.37 },
+    { x: 6980, y: GROUND_Y - 33, w: 33, minX: 6900, maxX: 7100, speed: 1.37, boss: true }
   ],
 
   coins: [
@@ -79,9 +81,10 @@ export default {
     [1530, 240], [1580, 240],
     [800, 396], [1000, 396], [1900, 396], [2720, 396], [2900, 396],
 
-    [3985, 288], [4011, 212], [4043, 343],
+    // symmetric 3-coin trios — mirrors level1.js's design rule, 2026-09-20
+    [4006, 340], [4038, 304], [4070, 340],
     [4180, 365], [4230, 365],
-    [4338, 288], [4385, 212], [4442, 343],
+    [4372, 310], [4422, 299], [4472, 310],
     [5710, 340], [5745, 340], [5865, 340], [5995, 340],
     [3740, 286], [3780, 286],
     [4540, 276], [4580, 276],
@@ -99,5 +102,5 @@ export default {
 
   goal: { x: 7100, y: 200, width: 10, height: GROUND_Y - 200 },
 
-  boss: { mode: 'cutscene', wakeX: 6560, chargeSpeed: 1.536 }
+  boss: { mode: 'cutscene', wakeX: 6560, chargeSpeed: 2.75 }
 };

@@ -7,14 +7,14 @@
 <script type="module">
   import { player } from '../src/entities/player.js';
   import { state } from '../src/state.js';
-  import { update } from '../src/scenes/sceneManager.js';
+  import { update, switchTo } from '../src/scenes/sceneManager.js';
   import { getLevel } from '../src/levels/levelLoader.js';
   import { camera } from '../src/engine/camera.js';
   import { particles } from '../src/entities/particles.js';
   const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
   const out = [];
 
-  setTimeout(() => {
+  setTimeout(async () => {
     key('keydown', ' '); key('keyup', ' ');
     const lv = getLevel();
     const boss = state.enemies.find(e => e.boss);
@@ -38,7 +38,10 @@
     out.push('boss.awake: ' + boss.awake + '  boss.mining: ' + boss.mining + '  (mining must be true right after waking)');
 
     let dirtSeen = false;
-    for (let i = 0; i < 60; i++) { // well inside the 120-frame freeze window
+    const platformCountBefore = lv.platforms.length;
+    const bossCenterX = boss.x + boss.w / 2;
+    const solidAt = x => lv.platforms.some(p => p.ground && x >= p.x && x <= p.x + p.width);
+    for (let i = 0; i < 60; i++) { // well inside the 120-frame freeze window, past swingPhase 59
       const before = particles.length;
       update();
       if (particles.length > before) dirtSeen = true;
@@ -46,9 +49,32 @@
     out.push('dirt particles spawned at some point during freeze: ' + dirtSeen + '  (must be true)');
     out.push('boss.mining still true partway through freeze: ' + boss.mining + '  (must be true)');
 
+    out.push('=== mining carves a real gap (2026-09-20) ===');
+    out.push('platform count before/after the dig: ' + platformCountBefore + '/' + lv.platforms.length + '  (must be +1, one ground segment split in two)');
+    out.push('solid ground under the boss after digging: ' + solidAt(bossCenterX) + '  (must be false — it dug through)');
+
     // push well past the 120-frame freeze window into charge
     for (let i = 0; i < 80; i++) update();
     out.push('boss.mining after freeze ends (now charging): ' + boss.mining + '  (must be false)');
+    out.push('dug gap still there once charging (mined ground stays gone): ' + !solidAt(bossCenterX) + '  (must be true)');
+
+    out.push('=== mined gap restores on a level (re)load ===');
+    // A mid-level death retries via resetBossAndCutscene() (private to
+    // playingScene.js, so not callable directly from here) — but a fresh
+    // level load runs the exact same restore branch on its way to a brand
+    // new platforms array, and IS reachable from a probe: switching back to
+    // 'playing' re-enters startLevel(), which calls resetBossAndCutscene()
+    // BEFORE loadLevel()'s replacement array lands. That exercises the
+    // restore-splice logic itself (finding minedGap's pieces by reference
+    // and swapping the original segment back) even though, on a truly fresh
+    // load, the very next loadLevel() call would have made the old array
+    // moot anyway — the interesting assertion is that the splice runs
+    // without throwing when minedGap is still set from the previous run.
+    let threw = false;
+    try { switchTo('playing'); } catch (e) { threw = true; out.push('restore threw: ' + e.message); }
+    out.push('re-entering the level after a mined gap did not throw: ' + !threw + '  (must be true)');
+    const lv2 = getLevel();
+    out.push('fresh level has an intact platform count (no leftover split): ' + (lv2.platforms.length === platformCountBefore) + '  (must be true)');
 
     out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
     document.getElementById('out').textContent = out.join('\n');

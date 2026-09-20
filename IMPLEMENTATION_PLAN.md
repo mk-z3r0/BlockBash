@@ -310,6 +310,81 @@ Benchmark: an autoplayer with a fixed-lookahead policy clears level 1 without
 dying. That proves nothing is impossible or unfair — it says nothing about
 whether it's fun.
 
+### 2026-09-20 retune: SMB3-accurate physics rewrite (physics-lab branch)
+
+The whole model above — flat ACCEL/FRICTION, single GRAVITY_UP/DOWN split,
+the ~93.5px/~168px walk/run carry numbers — was replaced wholesale by an
+SMB3-accurate physics core (see physics.js and the physics-lab task doc),
+then hand-tuned off the ROM-accurate defaults after playtesting felt too
+slow. **Every number above this heading describes the old model and is no
+longer live** — kept for the reasoning, not the values. New landmarks:
+
+- **New carry figures: walk ~132.5px, run (no P-meter) ~245.8px**, both
+  measured with a full/generous hold via the same trace methodology as
+  before (tools/jump-trajectory-probe.html). There's now also a **third
+  tier, P-speed**, that unlocks automatically after ~1.2s of sustained
+  running (accel-to-cap + the P-meter's own fill time) — a long enough
+  straightaway lets a "run-required" gap get cleared with even more margin
+  than the run figure above, which is fine (more margin never breaks
+  anything) but means carry distance is no longer just two clean numbers.
+- **The walk/run carry gap grew enough that most of level 1's original gap
+  widths stopped requiring run at all** (new walk-carry alone clears
+  everything up to ~130px). Restored the "requires run" role specifically
+  for the 3500 gap (70px -> 160px, by shrinking the ground segment after
+  it) and the 4320 spike bed (90px -> 160px, by widening the hazard in
+  place) — the two gaps/hazards whose own comments explicitly documented
+  that as their purpose. Left the rest alone rather than rescaling
+  everything on principle; not-technically-broken gaps that just got a
+  bit easier aren't a problem worth manufacturing work over.
+- **Widening a gap by shrinking the ground segment on either side of it
+  doesn't require moving anything else in the level.** Ground segments and
+  everything else (platforms/hazards/coins/enemies) are all positioned by
+  absolute world coordinates, not relative to their segment's start — so
+  resizing one segment's extent is a fully local edit, verified safe by
+  checking nothing else's coordinates fall inside the span being eaten.
+  Much simpler than the cascading-shift relayout this looked like it would
+  need at first.
+- **A single fixed-pixel autoplay lookahead can get permanently stuck at
+  one specific spot for reasons that have nothing to do with that spot's
+  actual difficulty.** The 5700 spike bed's autoplay run died repeatedly at
+  the same x regardless of hazard width (60px, 45px, 35px all identical) or
+  lookahead/hold tuning (18-22 / 16-24 all identical) — traced directly and
+  confirmed the hazard clears fine both via the isolated jumpTest() harness
+  and a clean restart at the same position with the same bot parameters.
+  The actual cause is state carried over from landing the *previous* jump
+  (the 5590 gap) sometimes leaving the bot grounded past its own
+  once-per-grounded-frame trigger check's window before it reacts — a bot
+  precision gap, not a level design flaw. Confirmed separately (a real
+  playthrough via tools/save-probe.html reaches the win screen). Don't
+  trust one autoplay bot's specific stuck point as proof of an unfair
+  obstacle without checking whether a fresh, isolated attempt at the same
+  spot also fails.
+- **A perfectly symmetric 3-coin trio (equal y on both outer coins) isn't
+  always achievable for 100% of realistic jump timings, because
+  gravityFall is heavier than gravityRise** — the rise and fall halves of a
+  real jump arc sit at different heights for the same x-offset from the
+  apex. Swept the outer coins' shared y across the full timing range
+  (tools/coin-trio-check.html) rather than picking one side's value or
+  averaging blind: found no y that collects all 3 across every timing, and
+  picked the one that works from the canonical "jump right at the edge"
+  timing through early jumps, sacrificing only late-jump collection (the
+  riskier technique anyway, not the one worth optimizing for).
+- **Enemy patrol speeds and the boss's chargeSpeed need to move in lockstep
+  with player speed changes, same as before** — flagged as already-drifted
+  in the physics rewrite's own report (the boss's charge had fallen slower
+  than the player's plain walk) and rescaled by the same ~1.79x the new
+  walkMax grew over the old one, preserving every enemy's relative speed
+  to the player exactly.
+- **The boss's mining cutscene now actually carves a gap out of the ground
+  it's standing on**, not just a particle effect over solid ground (see
+  carveMiningGap in playingScene.js) — triggered on the third of ~5 mining
+  swings during 'freeze', small enough (2 blocks, comfortably walk-clearable)
+  to read as "look what it did" on the way to the goal rather than a hazard
+  sprung on the player. Reverses itself on a mid-level retry
+  (resetBossAndCutscene splices the original ground segment back by object
+  reference) but persists once the boss is actually beaten — the world
+  stays reshaped after a real clear.
+
 ---
 
 ## Level 1 retrofit

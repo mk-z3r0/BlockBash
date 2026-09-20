@@ -30,6 +30,13 @@ import { drawOverlay } from '../ui/overlays.js';
 let cutscene = null;
 let cutsceneTimer = 0;
 let rescueNPC = null;
+// The boss's mining swings actually carve a gap out of the ground it's
+// standing over partway through 'freeze' (see carveMiningGap) — this
+// tracks the swap so resetBossAndCutscene can put the original ground back
+// on a mid-level retry. On a fresh level load, loadLevel() hands back a
+// brand new platforms array anyway, so restoring against a stale reference
+// here is a harmless no-op (the indexOf lookups just find nothing).
+let minedGap = null;
 
 // Pause is a flag, not a scene transition — switching away from 'playing'
 // and back would re-run enter(), which always means "start a run" or
@@ -63,6 +70,47 @@ function resetBossAndCutscene() {
   // got picked up (the player died between the boss dying and reaching it)
   // would otherwise sit stranded next to a boss that's alive again
   state.weaponPickups = state.weaponPickups.filter(p => p.collected);
+
+  // put back the ground the boss mined out, if any — see minedGap's note
+  if (minedGap) {
+    const platforms = getLevel().platforms;
+    const li = platforms.indexOf(minedGap.leftPiece);
+    if (li !== -1) platforms.splice(li, 1, minedGap.originalSeg);
+    const ri = platforms.indexOf(minedGap.rightPiece);
+    if (ri !== -1) platforms.splice(ri, 1);
+    minedGap = null;
+  }
+}
+
+// Carves a ~2-block gap out of the ground segment the boss is standing on,
+// centered under it — called once partway through the 'freeze' mining
+// beat (see updateCutscene) so the dust/sound it's already spawning reads
+// as actually reshaping the world, not just miming it. Only ever removes
+// ground near the boss's own patrol area (far past where the player is
+// frozen at wakeX), and the gap is small enough to clear on a plain walk —
+// this is a "hey, look what it did" beat on the way to the goal, not a
+// hazard sprung on the player mid-cutscene.
+function carveMiningGap(boss) {
+  if (minedGap) return; // once per cutscene run
+  const level = getLevel();
+  const center = boss.x + boss.w / 2;
+  const seg = level.platforms.find(p => p.ground && center >= p.x && center <= p.x + p.width);
+  if (!seg) return;
+
+  const gapWidth = 44; // ~2 blocks — comfortably walk-clearable
+  const margin = 20;   // leave at least this much solid ground on each side
+  const gapStart = Math.max(seg.x + margin, center - gapWidth / 2);
+  const gapEnd = Math.min(seg.x + seg.width - margin, gapStart + gapWidth);
+  if (gapEnd - gapStart < 20) return; // segment too narrow to safely carve
+
+  const leftPiece = { x: seg.x, y: seg.y, width: gapStart - seg.x, height: seg.height, ground: true };
+  const rightPiece = { x: gapEnd, y: seg.y, width: (seg.x + seg.width) - gapEnd, height: seg.height, ground: true };
+  const idx = level.platforms.indexOf(seg);
+  level.platforms.splice(idx, 1, leftPiece, rightPiece);
+  minedGap = { originalSeg: seg, leftPiece, rightPiece };
+
+  spawnExplosion(center, level.groundY, '#8a6a45');
+  spawnDust(center, level.groundY, 18, { color: 'rgba(120, 90, 60, 0.9)', spread: 5.5, size: 12, life: 34 });
 }
 
 function loseLife() {
@@ -116,11 +164,9 @@ function updateCutscene() {
     const boss = state.enemies.find(e => e.boss && e.alive);
     if (boss) {
       boss.swingPhase++;
-      // The boss spends this beat digging rather than idly revving —
-      // reads as "reshaping the world," foreshadowing the terrain-carving
-      // theme from the design doc without actually touching level
-      // geometry (that's a much bigger future system). swingPhase%26===7
-      // lands the sound/particles near the downswing's peak (progress=1 at
+      // The boss spends this beat digging rather than idly revving — reads
+      // as "reshaping the world." swingPhase%26===7 lands the sound/
+      // particles near the downswing's peak (progress=1 at
       // swingPhase*0.24≈π/2, i.e. swingPhase≈6.5), not at %26===0 which is
       // the raised (progress=0) point in the same oscillation.
       if (boss.swingPhase % 26 === 7) {
@@ -131,6 +177,12 @@ function updateCutscene() {
           size: 10,
           life: 26
         });
+        // The third swing (of ~5 across the freeze beat) is the one that
+        // actually breaks through — a couple of ordinary-looking mining
+        // swings first, then the ground visibly gives way, rather than
+        // carving it on the very first hit before the player's had a beat
+        // to read "it's digging."
+        if (boss.swingPhase === 59) carveMiningGap(boss);
       }
     }
     if (cutsceneTimer > 120) {
