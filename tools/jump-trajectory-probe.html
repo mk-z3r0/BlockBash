@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<!-- Records the player's actual (x, y) trajectory through a real jump over
+     a given hazard, so coins (or anything else meant to sit "on the jump
+     arc") can be placed on the real curve instead of an authored one that
+     doesn't match it. Kept as a permanent tool (2026-09-19) after needing
+     to recreate it twice — re-run this any time a speed/gravity constant
+     changes and something is placed relative to the jump arc; carry
+     *distance* being preserved doesn't mean the curve's shape is. Edit the
+     `jobs` list below to trace whatever hazard/speed combo you need. -->
+<html><body style="margin:0;background:#000;">
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true }));</script>
+<canvas id="game" width="800" height="450"></canvas><pre id="out"></pre>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update } from '../src/scenes/sceneManager.js';
+  import { getLevel } from '../src/levels/levelLoader.js';
+  const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+  const out = [];
+
+  // Edit these to trace a different hazard/speed — jump triggers right at
+  // hazardX (the natural, most-common human timing), holding `held` frames.
+  const jobs = [
+    { label: '3980-4028 (walk)', hazardX: 3980, runSpeed: false, held: 22 },
+    { label: '4320-4410 (run)',  hazardX: 4320, runSpeed: true,  held: 22 }
+  ];
+
+  function trace(hazardX, runSpeed, held) {
+    key('keydown', ' '); key('keyup', ' ');
+    const lv = getLevel();
+    player.x = hazardX - 150; player.y = lv.groundY - player.height;
+    player.velocityX = 0; player.velocityY = 0; player.invincible = 99999;
+    player.isOnGround = true; player.wasOnGround = true;
+    player.coyoteTimer = 0; player.jumpBuffer = 0; player.jumpCut = true;
+    state.enemies.forEach(e => e.alive = false);
+    if (runSpeed) key('keydown', 'Shift');
+    key('keydown', 'ArrowRight');
+    const trail = [];
+    let jumped = false, h = 0;
+    for (let i = 0; i < 300; i++) {
+      if (!jumped && player.isOnGround && player.x + player.width >= hazardX) {
+        key('keydown', ' '); jumped = true; h = held;
+      }
+      if (h > 0 && --h === 0) key('keyup', ' ');
+      update();
+      if (jumped) {
+        trail.push({ x: Math.round(player.x + player.width / 2), y: Math.round(player.y + player.height / 2) });
+        if (player.isOnGround) break;
+      }
+    }
+    key('keyup', ' '); key('keyup', 'ArrowRight'); if (runSpeed) key('keyup', 'Shift');
+    return trail;
+  }
+
+  setTimeout(() => {
+    for (const job of jobs) {
+      out.push(`=== ${job.label} ===`);
+      const t = trace(job.hazardX, job.runSpeed, job.held);
+      out.push('trail x-range: ' + t[0].x + ' to ' + t[t.length - 1].x);
+      out.push('  full trail: ' + t.map(p => `(${p.x},${p.y})`).join(' '));
+    }
+    document.getElementById('out').textContent = out.join('\n');
+  }, 200);
+</script></body></html>

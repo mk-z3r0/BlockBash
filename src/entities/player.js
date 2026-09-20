@@ -4,6 +4,7 @@ import {
   GRAVITY_UP, GRAVITY_DOWN, ACCEL, FRICTION, AIR_FRICTION, TURN_ACCEL,
   WALK_MAX_SPEED, RUN_MAX_SPEED,
   JUMP_FORCE, JUMP_CUT_MULTIPLIER, COYOTE_FRAMES, JUMP_BUFFER_FRAMES,
+  RESPAWN_FREEZE_FRAMES, RESPAWN_INVINCIBLE_FRAMES,
   isColliding
 } from '../engine/physics.js';
 import { getLevel } from '../levels/levelLoader.js';
@@ -29,7 +30,8 @@ export const player = {
   jumpBuffer: 0,
   jumpCut: true,
   wasOnGround: false,
-  shout: 0
+  shout: 0,
+  respawnFreeze: 0 // frames left of ignoring left/right input after a respawn — see resetPlayer()
 };
 
 export let respawnPoint = { x: 100, y: 300 };
@@ -53,7 +55,8 @@ export function resetPlayer() {
   player.velocityX = 0;
   player.velocityY = 0;
   player.isOnGround = false;
-  player.invincible = 90;
+  player.invincible = RESPAWN_INVINCIBLE_FRAMES;
+  player.respawnFreeze = RESPAWN_FREEZE_FRAMES;
   player.coyoteTimer = 0;
   player.jumpBuffer = 0;
   player.jumpCut = true;
@@ -66,8 +69,18 @@ export function resetPlayer() {
 // scenes/playingScene.js.
 export function updatePlayer(inputLocked) {
   const level = getLevel();
-  const left = !inputLocked && (keys['ArrowLeft'] || keys['a']);
-  const right = !inputLocked && (keys['ArrowRight'] || keys['d']);
+  // Frozen right after a respawn: ignores left/right (but not jump) so a
+  // disoriented player can't immediately walk into an enemy or off a ledge
+  // into a pit — see the RESPAWN_FREEZE_FRAMES note in physics.js for why
+  // invincibility alone (below) never covered the pit case. Checked BEFORE
+  // decrementing so the freeze holds for exactly RESPAWN_FREEZE_FRAMES full
+  // frames, not one fewer (a real off-by-one caught by
+  // tools/respawn-safety-probe.html: checking after the decrement let one
+  // frame of input through right on the boundary).
+  const frozen = player.respawnFreeze > 0;
+  if (player.respawnFreeze > 0) player.respawnFreeze--;
+  const left = !inputLocked && !frozen && (keys['ArrowLeft'] || keys['a']);
+  const right = !inputLocked && !frozen && (keys['ArrowRight'] || keys['d']);
   const running = !inputLocked && keys['Shift'];
   const maxSpeed = running ? RUN_MAX_SPEED : WALK_MAX_SPEED;
 

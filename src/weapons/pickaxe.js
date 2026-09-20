@@ -110,6 +110,28 @@ export function pickaxeFistTarget(hw, hh, facing, weaponTimer) {
   return pickaxeFistAt(hw, hh, facing, progress);
 }
 
+// Mining pose (boss cutscene only — see scenes/playingScene.js's 'freeze'
+// state): swinging down into the ground instead of a level combat strike.
+// Shares the same idle/shoulder start as the combat swing above; only the
+// end pose differs. MINE_ANGLE aims the head roughly straight down with a
+// slight forward lean (derived the same way as STRUCK_ANGLE: rotating the
+// head's local center, ~(20.5, -14.5), until it points mostly toward +y).
+const MINE_FIST = (hw, hh, facing) => ({ x: facing * hw * 0.3, y: hh * 0.85 });
+const MINE_ANGLE = 2.0;
+
+export function miningAngleAt(progress) {
+  return IDLE_ANGLE + (MINE_ANGLE - IDLE_ANGLE) * progress;
+}
+
+export function miningFistAt(hw, hh, facing, progress) {
+  const idle = IDLE_FIST(hw, hh, facing);
+  const mine = MINE_FIST(hw, hh, facing);
+  return {
+    x: idle.x + (mine.x - idle.x) * progress,
+    y: idle.y + (mine.y - idle.y) * progress
+  };
+}
+
 // Drawn in the hand every frame the weapon is carried — persistent once
 // earned, not just flickering into view for the swing's 16 frames. `hand`
 // is whatever drawMuscleArm() returned for the caller's arm (fed the target

@@ -104,7 +104,13 @@
     let maxX = player.x, hold = 0, lives0 = state.lives, deaths = [];
     for (let i = 0; i < 12000; i++) {
       if (player.isOnGround && hold === 0) {
-        const ahead = player.x + player.width + 28;
+        // 14px now (was 28, then 20) — a fixed pixel lookahead doesn't scale
+        // with speed on its own, and each further speed cut (2026-09-19,
+        // run now down to 2.304) needs a re-sweep or the same 2150-2190 gap
+        // starts failing again. tools/autoplay-lookahead-sweep.html: 10-16
+        // clear clean, 18+ all fail the same way, so 14 sits with margin.
+        // Re-sweep this any time a speed constant changes.
+        const ahead = player.x + player.width + 14;
         const enemyAhead = state.enemies.some(e => e.alive && !e.boss &&
           e.x > player.x && e.x - (player.x + player.width) < 58 && Math.abs(e.y - player.y) < 40);
         if (!solidAt(ahead) || spikeAt(ahead) || enemyAhead) { key('keydown',' '); hold = 16; }

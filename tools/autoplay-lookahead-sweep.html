@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<!-- One-off: ?lookahead=N runs a single fresh full-level autoplay attempt
+     with that lookahead distance, to find one that still clears level 1
+     with zero deaths after the 20% speed/gravity cut (a fixed-pixel
+     lookahead doesn't automatically scale with a changed speed). Invoke
+     once per candidate value — not meant to sweep multiple values in one
+     page load, since the boss cutscene's module-private state can't be
+     cleanly reset between attempts without going through a real level load. -->
+<html><body style="margin:0;background:#000;">
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true }));</script>
+<canvas id="game" width="800" height="450"></canvas><pre id="out"></pre>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update } from '../src/scenes/sceneManager.js';
+  import { getLevel } from '../src/levels/levelLoader.js';
+  const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+  const q = new URLSearchParams(location.search);
+  const lookahead = Number(q.get('lookahead') || 28);
+  const hold0 = Number(q.get('hold') || 16);
+  const out = [];
+
+  setTimeout(() => {
+    key('keydown', ' '); key('keyup', ' ');
+    const lv = getLevel();
+    const ground = lv.platforms.filter(p => p.ground).sort((a,b)=>a.x-b.x);
+    const solidAt = x => ground.some(p => x >= p.x && x <= p.x + p.width);
+    const spikeAt = x => lv.hazards.some(h => x >= h.x - 2 && x <= h.x + h.width + 2);
+    state.lives = 99;
+    key('keydown', 'ArrowRight'); key('keydown', 'Shift');
+    let maxX = player.x, hold = 0, lives0 = state.lives, deaths = [];
+    for (let i = 0; i < 12000; i++) {
+      if (player.isOnGround && hold === 0) {
+        const ahead = player.x + player.width + lookahead;
+        const enemyAhead = state.enemies.some(e => e.alive && !e.boss &&
+          e.x > player.x && e.x - (player.x + player.width) < 58 && Math.abs(e.y - player.y) < 40);
+        if (!solidAt(ahead) || spikeAt(ahead) || enemyAhead) { key('keydown',' '); hold = hold0; }
+      }
+      if (hold > 0 && --hold === 0) key('keyup', ' ');
+      const beforeX = player.x;
+      update();
+      if (state.lives < lives0) { deaths.push(Math.round(beforeX)); lives0 = state.lives; }
+      if (player.x > maxX) maxX = player.x;
+      if (state.gameState !== 'playing') break;
+    }
+    out.push(`lookahead=${lookahead} hold=${hold0}: furthest=${Math.round(maxX)} deaths=${deaths.length} (${deaths.join(',')}) state=${state.gameState}`);
+    document.getElementById('out').textContent = out.join('\n');
+  }, 200);
+</script></body></html>

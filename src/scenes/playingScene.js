@@ -8,7 +8,7 @@ import {
 } from '../entities/player.js';
 import { updateEnemies, drawEnemies, spawnEnemies } from '../entities/enemy.js';
 import { createRescueNPC, updateRescueNPC, drawRescueNPC } from '../entities/npc.js';
-import { updateParticles, drawParticles, resetParticles, spawnExplosion } from '../entities/particles.js';
+import { updateParticles, drawParticles, resetParticles, spawnExplosion, spawnDust } from '../entities/particles.js';
 import { resetCoins, updateCoins, drawCoins } from '../entities/coins.js';
 import { spawnWeaponPickup, updateWeaponPickups, drawWeaponPickups } from '../entities/weaponPickup.js';
 import { updateWeaponInput } from '../weapons/pickaxe.js';
@@ -17,7 +17,7 @@ import { drawPlatforms, drawGoal, drawCheckpoints, drawHazards } from '../levels
 import { drawBlockHouse } from './blockHouse.js';
 import { levels } from '../levels/registry.js';
 import { showToast, updateToast, drawHUD, toast } from '../ui/hud.js';
-import { playHit, playCheckpoint, playPickaxeReady, playPickaxeSwing, playExplosion, playWin, playGameOver } from '../audio/sfx.js';
+import { playHit, playCheckpoint, playPickaxeReady, playPickaxeSwing, playPickaxeMining, playExplosion, playWin, playGameOver } from '../audio/sfx.js';
 import { startMusic } from '../audio/audio.js';
 import { switchTo } from './sceneManager.js';
 import { recordProgress } from '../save.js';
@@ -56,7 +56,8 @@ function resetBossAndCutscene() {
     boss.x = boss.baseX;
     boss.y = boss.baseY;
     boss.hopVY = 0;
-    boss.speed = Math.abs(boss.speed) || 1.2;
+    boss.speed = Math.abs(boss.speed) || 0.96;
+    boss.mining = false;
   });
   // the fight is restarting — any drop from a previous attempt that never
   // got picked up (the player died between the boss dying and reaching it)
@@ -101,6 +102,7 @@ function updateCutscene() {
       player.velocityX = 0;
       player.velocityY = 0;
       boss.awake = true;
+      boss.mining = true;
       boss.swingPhase = 1;
       boss.shout = 40;
       playPickaxeReady();
@@ -114,11 +116,27 @@ function updateCutscene() {
     const boss = state.enemies.find(e => e.boss && e.alive);
     if (boss) {
       boss.swingPhase++;
-      if (boss.swingPhase % 26 === 0) playPickaxeSwing();
+      // The boss spends this beat digging rather than idly revving —
+      // reads as "reshaping the world," foreshadowing the terrain-carving
+      // theme from the design doc without actually touching level
+      // geometry (that's a much bigger future system). swingPhase%26===7
+      // lands the sound/particles near the downswing's peak (progress=1 at
+      // swingPhase*0.24≈π/2, i.e. swingPhase≈6.5), not at %26===0 which is
+      // the raised (progress=0) point in the same oscillation.
+      if (boss.swingPhase % 26 === 7) {
+        playPickaxeMining();
+        spawnDust(boss.x + boss.w / 2, getLevel().groundY, 10, {
+          color: 'rgba(120, 90, 60, 0.85)',
+          spread: 3.5,
+          size: 10,
+          life: 26
+        });
+      }
     }
     if (cutsceneTimer > 120) {
       cutscene = 'charge';
       cutsceneTimer = 0;
+      if (boss) boss.mining = false; // stops digging to charge — can't do both
     }
   }
 

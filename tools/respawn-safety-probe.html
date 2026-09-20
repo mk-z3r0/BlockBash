@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<!-- Verifies the respawn safety window: horizontal input ignored for the
+     first RESPAWN_FREEZE_FRAMES frames, invincible for RESPAWN_INVINCIBLE_FRAMES,
+     and that a player holding a direction key the whole time still doesn't
+     drift anywhere during the freeze. -->
+<html><body style="margin:0;background:#000;">
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true }));</script>
+<canvas id="game" width="800" height="450"></canvas><pre id="out"></pre>
+<script>window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  import { player, resetPlayer, setRespawnPoint } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update } from '../src/scenes/sceneManager.js';
+  import { getLevel } from '../src/levels/levelLoader.js';
+  import { RESPAWN_FREEZE_FRAMES, RESPAWN_INVINCIBLE_FRAMES } from '../src/engine/physics.js';
+  const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+  const out = [];
+
+  setTimeout(() => {
+    key('keydown', ' '); key('keyup', ' ');
+    const lv = getLevel();
+    setRespawnPoint(1000, lv.groundY - player.height);
+    resetPlayer();
+
+    out.push('RESPAWN_FREEZE_FRAMES=' + RESPAWN_FREEZE_FRAMES + ' RESPAWN_INVINCIBLE_FRAMES=' + RESPAWN_INVINCIBLE_FRAMES);
+    out.push('right after respawn: invincible=' + player.invincible + ' respawnFreeze=' + player.respawnFreeze);
+
+    // hold run+right the WHOLE time, right from the moment of respawn — the
+    // exact "reflexively still holding the stick" scenario
+    key('keydown', 'Shift'); key('keydown', 'ArrowRight');
+    const startX = player.x;
+    let driftedDuringFreeze = false;
+    for (let i = 0; i < RESPAWN_FREEZE_FRAMES; i++) {
+      update();
+      if (Math.abs(player.x - startX) > 0.01) driftedDuringFreeze = true;
+    }
+    out.push(`after ${RESPAWN_FREEZE_FRAMES} frames holding run+right: x moved from ${startX} to ${player.x.toFixed(2)}  drifted=${driftedDuringFreeze}  (must be false)`);
+    out.push('respawnFreeze now: ' + player.respawnFreeze + '  (must be 0)');
+
+    // one more frame — movement should now work
+    update();
+    out.push('one frame after freeze ends, velocityX=' + player.velocityX.toFixed(2) + '  (must be > 0 — moving now)');
+
+    // invincibility should last the full RESPAWN_INVINCIBLE_FRAMES from the
+    // moment of respawn (not from when freeze ends)
+    const framesSoFar = RESPAWN_FREEZE_FRAMES + 1;
+    out.push('invincible after ' + framesSoFar + ' frames: ' + player.invincible +
+      '  (should be ' + Math.max(0, RESPAWN_INVINCIBLE_FRAMES - framesSoFar) + ')');
+    for (let i = framesSoFar; i < RESPAWN_INVINCIBLE_FRAMES; i++) update();
+    out.push('invincible right at frame ' + RESPAWN_INVINCIBLE_FRAMES + ': ' + player.invincible + '  (must be 0)');
+
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 200);
+</script></body></html>

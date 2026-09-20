@@ -211,10 +211,44 @@ reports how many jump timings actually clear each obstacle. Headless Chromium
 barely fires `requestAnimationFrame`, so ticking `update()` by hand is the only
 way to simulate more than a frame or two.
 
-- **Jump arc:** rises ~144px, ~47 frames airborne regardless of speed. Horizontal
-  carry depends on which speed cap is active — walk ~93.5px, run ~168px (same
-  physics, just a lower speed cap; see physics.js). Any gap/hazard analysis
-  needs both numbers now, not one.
+- **Jump arc:** rises ~225px, ~73 frames airborne regardless of speed —
+  original was ~144px/~47 frames, cut twice now (2026-09-19 twice: 20% off
+  speed+gravity together each time, most recently after playtesting with an
+  actual kid — see physics.js's note above GRAVITY_UP for why that pairing
+  cancels out and leaves horizontal carry unchanged). Horizontal carry
+  depends on which speed cap is active — walk ~93.5px, run ~168px (same
+  physics, just a lower speed cap; see physics.js) — and has stayed exactly
+  there through both cuts. Any gap/hazard analysis needs both numbers now,
+  not one.
+- **A fixed-pixel autoplay lookahead doesn't scale with a speed change on its
+  own, and needs re-sweeping every time.** Each of the two speed cuts so far
+  broke the autoplay at the 2150 gap with the previous lookahead value still
+  in place — not because the gap became unfair, but because a fixed pixel
+  distance is a *smaller fraction* of a frame's travel at a slower speed,
+  shifting exactly when the bot commits to jumping. Swept it
+  (tools/autoplay-lookahead-sweep.html) both times: 28px -> 20px after the
+  first cut, 20px -> 14px after the second. Don't assume a fixed-pixel test
+  constant survives the next one either — re-sweep it.
+- **A gap can erode to a razor-thin landing margin over several rounds of
+  the same percentage speed cut, even though total carry distance is
+  preserved each time.** The 2150 gap's margin at run speed went from
+  comfortable to exactly +0px (a real ~15px-wide window to jump *within*,
+  but zero slack in the landing itself) after two cuts, even though nothing
+  about that gap was ever touched directly — carry distance staying fixed
+  doesn't mean every individual gap's specific margin does, because the
+  discrete frame-by-frame arc shape still shifts. Narrowed 40px -> 25px to
+  restore real margin (same treatment as the very first gap, just for a
+  different underlying cause). Worth spot-checking gaps close to a speed
+  cap's max carry after any future speed/gravity change, not just re-running
+  the full-level autoplay and calling it done.
+- **Jump-trajectory-matched coin placements (the two 3-coin arcs over the
+  3980 and 4320 spike beds) also drift out of alignment with each
+  speed/gravity change**, even at the SAME hazard, because the curve's shape
+  changes even though endpoints (carry distance) don't. Re-sample with
+  tools/jump-trajectory-probe.html (records the player's real (x,y) each
+  frame of an actual jump) any time a speed constant changes — checked after
+  the second cut here and the run-speed trio had already started missing
+  coins at the edges of its timing window.
 - **Never put a platform directly above a jump-off point.** The player rises
   into it and a correctly-timed jump becomes a death. This caused the worst bug
   in level 1.
@@ -253,6 +287,12 @@ way to simulate more than a frame or two.
   don't let a full-power leap off a pit land in spikes.
 - **Don't start an enemy patrol at a checkpoint.** Respawning into a sphere is a
   cheap death.
+- **Enemies don't jump/hop yet, on purpose (2026-09-19).** The old "surprise
+  hop" (a sphere randomly popping straight up) is parked behind
+  `enemy.canHop` in entities/enemy.js, off by default — saved for a later
+  level rather than deleted, since the animation/timing code still works
+  fine. A level opts a specific enemy back in with `canHop: true` in its
+  spawn data.
 - **Debris reads as damage from above,** so spikes want a carved surface
   overhead — but that fights the no-platforms-overhead rule. Resolution: use it
   where the player crosses *on top* (the stepping-stone section is already this
@@ -326,8 +366,9 @@ polls each frame and dispatches synthetic keydown/keyup events on button
 transitions, so the rest of the game (movement, jump buffering, the earned
 weapon, pause) treats a controller as just another source feeding the same
 `keys` state real keyboard input already populates — no consumer code had to
-change. A=run, B=jump, X=weapon swing (gated until earned — see the Level 1
-retrofit), Start=menu/pause, stick+d-pad=move — A/B
+change. A=run, B=jump, Y=weapon swing (gated until earned — see the Level 1
+retrofit; moved from X to Y on 2026-09-19, closer to Super Metroid's
+weapon/item-select slot), Start=menu/pause, stick+d-pad=move — A/B
 match physical position (bottom/right), not the letter each maps to on a
 Nintendo pad; matching by letter put run and jump backwards, per playtest.
 

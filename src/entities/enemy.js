@@ -3,7 +3,7 @@ import { drawStickLegs, drawMuscleArm, drawPickaxeIcon } from '../engine/rendere
 import { isColliding, STOMP_BOUNCE } from '../engine/physics.js';
 import { spawnExplosion } from './particles.js';
 import { playStomp, playSurprise } from '../audio/sfx.js';
-import { pickaxeAngleAt, pickaxeFistAt } from '../weapons/pickaxe.js';
+import { pickaxeAngleAt, pickaxeFistAt, miningAngleAt, miningFistAt } from '../weapons/pickaxe.js';
 import { state } from '../state.js';
 
 // Builds live enemies from a level's raw spawn data.
@@ -18,7 +18,8 @@ export function spawnEnemies(spawns) {
     hopTimer: 90 + Math.floor(Math.random() * 150), // ticks down to the next surprise hop
     shout: 0,
     awake: false,     // boss only: has the pickaxe come out yet
-    swingPhase: 0     // boss only: drives the threatening pickaxe swing
+    swingPhase: 0,    // boss only: drives the threatening pickaxe swing
+    mining: false     // boss only: swinging down into the ground (cutscene 'freeze') vs a level combat swing (see the mining pose in weapons/pickaxe.js)
   }));
 }
 
@@ -50,8 +51,12 @@ export function updateEnemies(player, cutsceneActive) {
         enemy.x = Math.max(enemy.minX, Math.min(enemy.x, enemy.maxX - enemy.w));
       }
 
-      // --- surprise! every so often a sphere randomly hops instead of just rolling ---
-      if (enemy.hopVY === 0 && enemy.y === enemy.baseY) {
+      // --- surprise! every so often a sphere randomly hops instead of just
+      // rolling — parked behind `canHop` (2026-09-19): enemies shouldn't
+      // jump yet, that's saved for a later level. Off by default; a level's
+      // enemy spawn data opts in with `canHop: true` per enemy when that
+      // lands, rather than this code needing to come back at all. ---
+      if (enemy.canHop && enemy.hopVY === 0 && enemy.y === enemy.baseY) {
         enemy.hopTimer--;
         if (enemy.hopTimer <= 0) {
           enemy.hopVY = -7.5;
@@ -137,18 +142,21 @@ export function drawEnemies(frameCount, cutsceneDone) {
 
     // one muscular arm on the side it's travelling toward, rooted at the
     // sphere's center — exactly the same art as the player's. Once the
-    // pickaxe is out, the fist target rides the same idle(shoulder) <->
-    // struck(handle level with the ground) sweep as the player's swing
-    // (weapons/pickaxe.js) — just driven by an oscillating phase instead of
-    // a one-shot timer, since the boss's is a continuous threat, not a
-    // single button-press swing. Sharing the same two poses is what keeps
-    // the boss's swing reading as the same motion as the player's.
+    // pickaxe is out, the fist target rides the same idle(shoulder) <-> end
+    // sweep as the player's swing (weapons/pickaxe.js) — just driven by an
+    // oscillating phase instead of a one-shot timer, since the boss's is a
+    // continuous threat, not a single button-press swing. While `mining`
+    // (the cutscene's 'freeze' state — see scenes/playingScene.js) it swings
+    // down into the ground instead of the level combat strike used the rest
+    // of the time it's awake.
     if (!squashed) {
       const side = enemy.speed >= 0 ? 1 : -1;
       const r = enemy.w / 2;
       const hasPickaxe = enemy.boss && enemy.awake && !cutsceneDone;
       const swingProgress = hasPickaxe ? (Math.sin(enemy.swingPhase * 0.24) + 1) / 2 : 0;
-      const fist = hasPickaxe ? pickaxeFistAt(r, r, side, swingProgress) : { x: side * (r + 17), y: -r * 0.35 };
+      const angleAt = enemy.mining ? miningAngleAt : pickaxeAngleAt;
+      const fistAt = enemy.mining ? miningFistAt : pickaxeFistAt;
+      const fist = hasPickaxe ? fistAt(r, r, side, swingProgress) : { x: side * (r + 17), y: -r * 0.35 };
       const hand = drawMuscleArm(0, -r * 0.1, fist.x, fist.y);
 
       // the boss whips out its pickaxe once it's awake, swinging it as a
@@ -161,7 +169,7 @@ export function drawEnemies(frameCount, cutsceneDone) {
         // weapons/pickaxe.js) — keeps the pickaxe pointing away from the
         // body on both sides instead of swinging through it
         ctx.scale(side, 1);
-        ctx.rotate(pickaxeAngleAt(swingProgress));
+        ctx.rotate(angleAt(swingProgress));
         drawPickaxeIcon();
         ctx.restore();
       }

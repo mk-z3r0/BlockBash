@@ -43,7 +43,7 @@
     player.x = 1000; player.velocityX = 0;
     fakePad.axes[0] = -1; // full left
     for (let i = 0; i < 40; i++) tick();
-    out.push('3. stick full left for 40 ticks: velocityX=' + player.velocityX.toFixed(2) + '  (must be negative, walk-capped near -2.0)');
+    out.push('3. stick full left for 40 ticks: velocityX=' + player.velocityX.toFixed(2) + '  (must be negative, walk-capped near -1.6)');
     fakePad.axes[0] = 0;
 
     // --- A (index 0, bottom button = run) should raise the speed cap ---
@@ -51,25 +51,25 @@
     fakePad.axes[0] = -1;
     fakePad.buttons[0].pressed = true; // A = run
     for (let i = 0; i < 40; i++) tick();
-    out.push('4. stick left + A held for 40 ticks: velocityX=' + player.velocityX.toFixed(2) + '  (must be more negative than step 3 — run-capped near -3.6)');
+    out.push('4. stick left + A held for 40 ticks: velocityX=' + player.velocityX.toFixed(2) + '  (must be more negative than step 3 — run-capped near -2.88)');
     fakePad.axes[0] = 0; fakePad.buttons[0].pressed = false;
 
-    // --- X (action) should do nothing until the weapon is earned, then
+    // --- Y (action) should do nothing until the weapon is earned, then
     // trigger a swing (weaponCooldown kicks in) once it is ---
     import('../src/state.js').then(({ state }) => {
       player.hasWeapon = false;
       player.weaponCooldown = 0;
-      fakePad.buttons[2].pressed = true; // X
+      fakePad.buttons[3].pressed = true; // Y
       tick();
-      out.push('5. X pressed unarmed: weaponCooldown=' + player.weaponCooldown + '  (must be 0 — gated until earned)');
-      fakePad.buttons[2].pressed = false;
+      out.push('5. Y pressed unarmed: weaponCooldown=' + player.weaponCooldown + '  (must be 0 — gated until earned)');
+      fakePad.buttons[3].pressed = false;
       tick();
 
       player.hasWeapon = true;
-      fakePad.buttons[2].pressed = true; // X
+      fakePad.buttons[3].pressed = true; // Y
       tick();
-      out.push('5b. X pressed armed: weaponCooldown=' + player.weaponCooldown + '  (must be > 0 — swing attempted)');
-      fakePad.buttons[2].pressed = false;
+      out.push('5b. Y pressed armed: weaponCooldown=' + player.weaponCooldown + '  (must be > 0 — swing attempted)');
+      fakePad.buttons[3].pressed = false;
       tick();
 
       // --- Start (menu) should pause ---

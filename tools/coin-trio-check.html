@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<!-- Verifies both spike-bed coin trios can be collected in a single
+     continuous jump (the exact complaint: "about impossible to get all 3 in
+     one jump"), using the same realistic jump timing (jump right at the
+     hazard's leading edge) the trajectory they were sampled from used. -->
+<html><body style="margin:0;background:#000;">
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true }));</script>
+<canvas id="game" width="800" height="450"></canvas><pre id="out"></pre>
+<script>window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update } from '../src/scenes/sceneManager.js';
+  import { getLevel } from '../src/levels/levelLoader.js';
+  import { coins } from '../src/entities/coins.js';
+  const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+  const out = [];
+
+  function jumpOver(hazardX, runSpeed, coinXs, leadPx) {
+    key('keydown', ' '); key('keyup', ' ');
+    const lv = getLevel();
+    player.x = hazardX - 150; player.y = lv.groundY - player.height;
+    player.velocityX = 0; player.velocityY = 0; player.invincible = 99999;
+    player.isOnGround = true; player.wasOnGround = true;
+    player.coyoteTimer = 0; player.jumpBuffer = 0; player.jumpCut = true;
+    state.enemies.forEach(e => e.alive = false);
+    coinXs.forEach(x => { const c = coins.find(c => c.x === x); if (c) c.collected = false; });
+    if (runSpeed) key('keydown', 'Shift');
+    key('keydown', 'ArrowRight');
+    let jumped = false, held = 0;
+    for (let i = 0; i < 200; i++) {
+      if (!jumped && player.isOnGround && player.x + player.width >= hazardX - leadPx) {
+        key('keydown', ' '); jumped = true; held = 22;
+      }
+      if (held > 0 && --held === 0) key('keyup', ' ');
+      update();
+      if (jumped && player.isOnGround) break;
+    }
+    key('keyup', ' '); key('keyup', 'ArrowRight'); if (runSpeed) key('keyup', 'Shift');
+    return coinXs.map(x => coins.find(c => c.x === x)?.collected);
+  }
+
+  setTimeout(() => {
+    for (const lead of [-15, -10, -5, 0, 5, 10, 15]) {
+      const r1 = jumpOver(3980, false, [3985, 4011, 4043], lead);
+      out.push(`3980-4028 (WALK) lead=${lead}: ` + JSON.stringify(r1));
+    }
+    for (const lead of [-15, -10, -5, 0, 5, 10, 15]) {
+      const r2 = jumpOver(4320, true, [4338, 4385, 4442], lead);
+      out.push(`4320-4410 (RUN) lead=${lead}: ` + JSON.stringify(r2));
+    }
+
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 200);
+</script></body></html>

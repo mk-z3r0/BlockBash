@@ -23,7 +23,9 @@ const DEADZONE = 0.35;
 const BUTTON_MAP = [
   { key: 'Shift',       read: pad => !!pad.buttons[0]?.pressed },                                 // A (bottom): run
   { key: ' ',          read: pad => !!pad.buttons[1]?.pressed },                                  // B (right): jump
-  { key: 'b',           read: pad => !!pad.buttons[2]?.pressed },                                 // X: action/weapon
+  // Y (top), not X — closer to Super Metroid's item-select/weapon-switch
+  // slot than X's position, per feedback (2026-09-19).
+  { key: 'b',           read: pad => !!pad.buttons[3]?.pressed },                                 // Y: action/weapon
   { key: 'Escape',      read: pad => !!pad.buttons[9]?.pressed },                                 // Start: menu/pause
   { key: 'ArrowLeft',   read: pad => !!pad.buttons[14]?.pressed || pad.axes[0] < -DEADZONE },
   { key: 'ArrowRight',  read: pad => !!pad.buttons[15]?.pressed || pad.axes[0] > DEADZONE }

@@ -75,6 +75,14 @@ export function playPickaxeReady() {
   tone(140, t, 0.22, 'triangle', 0.28, sfxGain, 500, 200);
   noiseBurst(t + 0.05, 0.15, 0.22, sfxGain, 'bandpass', 1400);
 }
+export function playPickaxeMining() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  // a duller strike than playPickaxeSwing's combat chop — biting into
+  // dirt/rock instead of the air, for the boss's cutscene "digging" beat
+  tone(85, t, 0.18, 'triangle', 0.3, sfxGain, 350, 100);
+  noiseBurst(t, 0.22, 0.32, sfxGain, 'lowpass', 900);
+}
 export function playPickaxeSwing() {
   if (!audioCtx) return;
   const t = audioCtx.currentTime;
