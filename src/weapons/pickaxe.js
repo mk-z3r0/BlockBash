@@ -116,7 +116,12 @@ export function pickaxeFistTarget(hw, hh, facing, weaponTimer) {
 // end pose differs. MINE_ANGLE aims the head roughly straight down with a
 // slight forward lean (derived the same way as STRUCK_ANGLE: rotating the
 // head's local center, ~(20.5, -14.5), until it points mostly toward +y).
-const MINE_FIST = (hw, hh, facing) => ({ x: facing * hw * 0.3, y: hh * 0.85 });
+//
+// The fist reaches out past the body on the facing side, not down the
+// centerline (2026-09-20): the pit the boss digs now opens immediately to
+// its right rather than under it (carveMiningGap), so a centered chop read
+// as the hole appearing somewhere the pick never touched.
+const MINE_FIST = (hw, hh, facing) => ({ x: facing * (hw + 12), y: hh * 0.8 });
 const MINE_ANGLE = 2.0;
 
 export function miningAngleAt(progress) {

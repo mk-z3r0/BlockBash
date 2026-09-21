@@ -123,7 +123,16 @@
         const ahead = player.x + player.width + 21;
         const enemyAhead = state.enemies.some(e => e.alive && !e.boss &&
           e.x > player.x && e.x - (player.x + player.width) < 58 && Math.abs(e.y - player.y) < 40);
-        if (!solidAt(ahead) || spikeAt(ahead) || enemyAhead) { key('keydown',' '); hold = 16; }
+        // Solid blocks that have to be jumped ONTO rather than over — the
+        // staircase treads and the tall wall (2026-09-20). solidAt() only
+        // looks at ground segments, so without this the bot walks straight
+        // into a step and stalls there forever. A non-ground platform
+        // counts as blocking only when its vertical span actually overlaps
+        // the player's: floating platforms well overhead don't trigger it.
+        const wallAhead = lv.platforms.some(p => !p.ground && p.width > 1 &&
+          ahead >= p.x && ahead <= p.x + p.width &&
+          p.y < player.y + player.height && p.y + p.height > player.y);
+        if (!solidAt(ahead) || spikeAt(ahead) || enemyAhead || wallAhead) { key('keydown',' '); hold = 16; }
       }
       if (hold > 0 && --hold === 0) key('keyup', ' ');
       const beforeX = player.x;   // loseLife() teleports to the checkpoint

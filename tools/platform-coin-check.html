@@ -51,7 +51,7 @@
     out.push(`platform-tier coins found: ${checked}`);
     out.push(`collected while standing, zero jump: ${ok}/${checked}  (must equal total)`);
     if (failures.length) out.push('FAILURES:\n  ' + failures.join('\n  '));
-    out.push('total coins: ' + coins.length + '  (must still be 47)');
+    out.push('total coins: ' + coins.length + '  (must still be 52 — 47 plus the 5 added with the staircase/tall wall, 2026-09-20)');
     out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
     document.getElementById('out').textContent = out.join('\n');
   }, 200);

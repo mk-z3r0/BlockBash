@@ -82,26 +82,36 @@ function resetBossAndCutscene() {
   }
 }
 
-// Carves a ~2-block gap out of the ground segment the boss is standing on,
-// centered under it — called once partway through the 'freeze' mining
-// beat (see updateCutscene) so the dust/sound it's already spawning reads
-// as actually reshaping the world, not just miming it. Only ever removes
-// ground near the boss's own patrol area (far past where the player is
-// frozen at wakeX), and the gap is small enough to clear on a plain walk —
-// this is a "hey, look what it did" beat on the way to the goal, not a
-// hazard sprung on the player mid-cutscene.
+// Where the boss's pickaxe is landing while it mines: just past its right
+// edge, since it faces right through the whole 'freeze' beat.
+function digPointFor(boss) {
+  return boss.x + boss.w + 8;
+}
+
+// Carves a ~2-block gap out of the ground immediately to the RIGHT of the
+// boss — never under it. Enemies have no ground collision of their own
+// (see updateEnemies), so a pit opening under the boss's feet would just
+// leave it hanging in mid-air over its own hole; digging to the side it's
+// actually facing keeps the whole beat readable. Called once partway
+// through the mining beat (see updateCutscene) so the dust/sound it's
+// already spawning reads as actually reshaping the world, not miming it.
+// The gap is small enough to clear on a plain walk — a "hey, look what it
+// did" beat on the way to the goal, not a hazard sprung on the player.
 function carveMiningGap(boss) {
   if (minedGap) return; // once per cutscene run
   const level = getLevel();
-  const center = boss.x + boss.w / 2;
-  const seg = level.platforms.find(p => p.ground && center >= p.x && center <= p.x + p.width);
+  const digX = digPointFor(boss);
+  const seg = level.platforms.find(p => p.ground && digX >= p.x && digX <= p.x + p.width);
   if (!seg) return;
 
   const gapWidth = 44; // ~2 blocks — comfortably walk-clearable
   const margin = 20;   // leave at least this much solid ground on each side
-  const gapStart = Math.max(seg.x + margin, center - gapWidth / 2);
-  const gapEnd = Math.min(seg.x + seg.width - margin, gapStart + gapWidth);
-  if (gapEnd - gapStart < 20) return; // segment too narrow to safely carve
+  // Never dig the goal's own footing out from under it — the boss patrols
+  // close enough to the flag that an unclamped dig could reach it.
+  const goalGuard = level.goal ? level.goal.x - 24 : Infinity;
+  const gapStart = Math.max(seg.x + margin, digX);
+  const gapEnd = Math.min(seg.x + seg.width - margin, goalGuard, gapStart + gapWidth);
+  if (gapEnd - gapStart < 20) return; // no room to carve without hitting something
 
   const leftPiece = { x: seg.x, y: seg.y, width: gapStart - seg.x, height: seg.height, ground: true };
   const rightPiece = { x: gapEnd, y: seg.y, width: (seg.x + seg.width) - gapEnd, height: seg.height, ground: true };
@@ -109,6 +119,7 @@ function carveMiningGap(boss) {
   level.platforms.splice(idx, 1, leftPiece, rightPiece);
   minedGap = { originalSeg: seg, leftPiece, rightPiece };
 
+  const center = (gapStart + gapEnd) / 2;
   spawnExplosion(center, level.groundY, '#8a6a45');
   spawnDust(center, level.groundY, 18, { color: 'rgba(120, 90, 60, 0.9)', spread: 5.5, size: 12, life: 34 });
 }
@@ -152,7 +163,16 @@ function updateCutscene() {
       boss.awake = true;
       boss.mining = true;
       boss.swingPhase = 1;
-      boss.shout = 40;
+      // No "!" yet — it hasn't noticed the player, it's busy digging. That
+      // beat belongs to 'turn' below. (updateEnemies skips its own shout
+      // countdown entirely while a cutscene is active, so a bubble set here
+      // would just hang over the boss for the whole scene.)
+      // Faces right for the whole mining beat — it hasn't noticed the
+      // player yet, it's busy digging. Facing is read off the sign of
+      // `speed` (see drawEnemies), and the boss stops patrolling the
+      // moment it's awake, so setting it once here holds until the 'turn'
+      // beat flips it back. The hole it digs lands on this same side.
+      boss.speed = Math.abs(boss.speed);
       playPickaxeReady();
     }
   }
@@ -171,7 +191,9 @@ function updateCutscene() {
       // the raised (progress=0) point in the same oscillation.
       if (boss.swingPhase % 26 === 7) {
         playPickaxeMining();
-        spawnDust(boss.x + boss.w / 2, getLevel().groundY, 10, {
+        // dust flies from where the pick actually lands (its right side),
+        // not from under the boss — same spot the gap opens up
+        spawnDust(digPointFor(boss), getLevel().groundY, 10, {
           color: 'rgba(120, 90, 60, 0.85)',
           spread: 3.5,
           size: 10,
@@ -186,9 +208,32 @@ function updateCutscene() {
       }
     }
     if (cutsceneTimer > 120) {
+      cutscene = 'turn';
+      cutsceneTimer = 0;
+      if (boss) boss.mining = false; // stops digging to look up — can't do both
+    }
+  }
+
+  // Beat between digging and charging: the boss turns away from its fresh
+  // hole, spots the player, and brandishes the pickaxe before it moves.
+  // Without this the turn and the charge happen on the same frame, which
+  // reads as the boss having known you were there the whole time.
+  if (cutscene === 'turn') {
+    player.velocityX = 0;
+    player.shout = 30;
+    cutsceneTimer++;
+    const boss = state.enemies.find(e => e.boss && e.alive);
+    if (boss) {
+      boss.speed = -Math.abs(boss.speed); // face left, toward the player
+      boss.swingPhase++;
+      if (cutsceneTimer === 1) {
+        boss.shout = 45; // "!" — it's seen you
+        playPickaxeReady();
+      }
+    }
+    if (cutsceneTimer > 45) {
       cutscene = 'charge';
       cutsceneTimer = 0;
-      if (boss) boss.mining = false; // stops digging to charge — can't do both
     }
   }
 

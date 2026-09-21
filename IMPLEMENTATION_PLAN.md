@@ -385,6 +385,47 @@ longer live** — kept for the reasoning, not the values. New landmarks:
   reference) but persists once the boss is actually beaten — the world
   stays reshaped after a real clear.
 
+### 2026-09-20 later: climb obstacles, and where the boss digs
+
+- **Ground-flush solid blocks are a third obstacle shape**, alongside pits
+  and hazards: a staircase (2990-3222, four treads a tile apart) and one
+  tall wall (6300, 3 tiles). Unlike every floating platform in the level
+  these sit *on* the ground line, so they're climbed/jumped-onto rather
+  than jumped-across, and crucially **they can't kill you** — failing one
+  means stalling against its side, not dying. No death counter catches
+  that, which is why they get their own probe (tools/climb-probe.html)
+  rather than relying on gap-probe's autoplay death count.
+- **Adding them broke the autoplay bot in a way that looked like nothing at
+  all.** Its jump trigger was `!solidAt(ahead) || spikeAt(ahead) ||
+  enemyAhead`, and `solidAt()` only ever looked at *ground* segments — a
+  solid block ahead reads as perfectly solid ground, so the bot walked
+  into the first tread and stood there pushing right forever, with zero
+  deaths logged. Fixed by adding a `wallAhead` test (a non-ground platform
+  whose vertical span overlaps the player's — floating platforms overhead
+  correctly don't trigger it) to both gap-probe.html and
+  autoplay-lookahead-sweep.html. Worth remembering that "no deaths" and
+  "made progress" are different assertions.
+- **Sizing: a 16-frame hold clears 82px, a full hold 117px** (both speed
+  tiers are tier 2 at the current caps, so walk and run jump the same
+  height). 3 tiles (66px) leaves real margin — 10/13 approach timings land
+  on top of the wall — while still being the tallest thing in the level.
+- **The boss digs to the side it's facing, never underneath itself.**
+  Enemies have no ground collision at all (updateEnemies only moves x
+  between minX/maxX), so a pit opening under the boss left it visibly
+  hanging in mid-air over its own hole. It now faces right for the whole
+  mining beat and the gap opens immediately to its right, then a new
+  'turn' beat flips it to face left, pops its "!" and holds a moment
+  before the charge — previously the turn and the charge happened on the
+  same frame, which read as the boss having known you were there all along.
+- **That dig position then constrained the boss's patrol range.** Digging
+  to the right meant the dig point tracked the boss's right edge, and the
+  boss patrolled to 7100 — right up against the goal flag at 7100 — so
+  carveMiningGap's goal-clearance clamp silently squeezed the gap to zero
+  width whenever the boss woke on the right half of its patrol, and the
+  dig just… didn't happen. Pulled maxX back to 7010. A cutscene beat that
+  depends on an entity's *runtime* position needs that position's whole
+  range checked, not just its spawn point.
+
 ---
 
 ## Level 1 retrofit

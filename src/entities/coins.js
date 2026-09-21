@@ -7,7 +7,7 @@ import { state } from '../state.js';
 
 // Coins accumulate across a whole run, not just one level — reset alongside
 // score/lives in playingScene's retryCurrentLevel/startNewRun, never on a
-// plain level-to-level advance. Tuned against level 1's ~45 coins so a full
+// plain level-to-level advance. Tuned against level 1's ~52 coins so a full
 // clear earns more than one extra life without maxing out MAX_LIVES on its
 // own (see the Level 1 retrofit checklist in IMPLEMENTATION_PLAN.md).
 const COINS_PER_LIFE = 20;

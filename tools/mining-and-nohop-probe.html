@@ -40,6 +40,8 @@
     let dirtSeen = false;
     const platformCountBefore = lv.platforms.length;
     const bossCenterX = boss.x + boss.w / 2;
+    const digPoint = boss.x + boss.w + 8 + 10; // just inside the gap carveMiningGap opens to the right
+    const bossSpeedWhileMining = boss.speed;
     const solidAt = x => lv.platforms.some(p => p.ground && x >= p.x && x <= p.x + p.width);
     for (let i = 0; i < 60; i++) { // well inside the 120-frame freeze window, past swingPhase 59
       const before = particles.length;
@@ -49,14 +51,17 @@
     out.push('dirt particles spawned at some point during freeze: ' + dirtSeen + '  (must be true)');
     out.push('boss.mining still true partway through freeze: ' + boss.mining + '  (must be true)');
 
-    out.push('=== mining carves a real gap (2026-09-20) ===');
+    out.push('=== mining carves a real gap, to the boss\'s RIGHT (2026-09-20) ===');
     out.push('platform count before/after the dig: ' + platformCountBefore + '/' + lv.platforms.length + '  (must be +1, one ground segment split in two)');
-    out.push('solid ground under the boss after digging: ' + solidAt(bossCenterX) + '  (must be false — it dug through)');
+    out.push('boss faced right while mining (speed > 0): ' + (bossSpeedWhileMining > 0) + '  (must be true)');
+    out.push('solid ground still under the boss: ' + solidAt(bossCenterX) + '  (must be TRUE — it must not dig itself into a hole)');
+    out.push('ground dug out to the boss\'s right: ' + !solidAt(digPoint) + '  (must be true)');
 
-    // push well past the 120-frame freeze window into charge
+    // push past the freeze window, through the new 'turn' beat, into charge
     for (let i = 0; i < 80; i++) update();
-    out.push('boss.mining after freeze ends (now charging): ' + boss.mining + '  (must be false)');
-    out.push('dug gap still there once charging (mined ground stays gone): ' + !solidAt(bossCenterX) + '  (must be true)');
+    out.push('boss.mining after freeze ends: ' + boss.mining + '  (must be false)');
+    out.push('boss turned to face left (speed < 0): ' + (boss.speed < 0) + '  (must be true — it spots the player)');
+    out.push('dug gap still there afterwards (mined ground stays gone): ' + !solidAt(digPoint) + '  (must be true)');
 
     out.push('=== mined gap restores on a level (re)load ===');
     // A mid-level death retries via resetBossAndCutscene() (private to

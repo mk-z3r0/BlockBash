@@ -91,12 +91,32 @@ export default {
     { x: 2600, y: 200, width: 100, height: 18 },
     { x: 2850, y: 300, width: 120, height: 18 },
 
+    // Staircase (2026-09-20) — four solid blocks flush with the ground,
+    // each a tile (22px) taller than the last, filling what used to be a
+    // long dead-flat run between the last first-half platform (ends 2970)
+    // and the checkpoint at 3300. Unlike every other platform in this
+    // level these sit ON the ground rather than floating, so they're
+    // climbed rather than jumped to — a different shape of obstacle, and
+    // a gentle one: a single tile of rise per step is nothing against a
+    // jump that peaks at 117px. Coins sit on each tread as the reward for
+    // going up instead of walking past.
+    { x: 2990, y: 388, width: 58, height: 22 },
+    { x: 3048, y: 366, width: 58, height: 44 },
+    { x: 3106, y: 344, width: 58, height: 66 },
+    { x: 3164, y: 322, width: 58, height: 88 },
+
     // --- second half ---
     { x: 3700, y: 300, width: 110, height: 18 },  // coin perch, before the first spikes
     { x: 4500, y: 290, width: 110, height: 18 },  // coin perch
     { x: 4960, y: 340, width: 100, height: 18 },  // stepping stones over the long bed
     { x: 5120, y: 340, width: 100, height: 18 },
-    { x: 6100, y: 300, width: 120, height: 18 }
+    { x: 6100, y: 300, width: 120, height: 18 },
+    // The tall wall (2026-09-20) — 3 tiles (66px) of solid block in the
+    // long empty run-up to the boss. The one obstacle in the level that
+    // has to be jumped *onto* in a single committed hop rather than
+    // stepped up: a 16-frame hold clears 82px, so 66px leaves real margin
+    // while still being the tallest thing here by some way. Coin on top.
+    { x: 6300, y: 344, width: 66, height: 66 }
   ],
 
   hazards: [
@@ -137,6 +157,11 @@ export default {
     { x: 1600, y: GROUND_Y - 22, w: 22, minX: 1580, maxX: 1800, speed: 1.83 },
     { x: 1760, y: 200 - 20,      w: 20, minX: 1755, maxX: 1830, speed: 1.15 },
     { x: 2360, y: 260 - 20,      w: 20, minX: 2355, maxX: 2460, speed: 1.26 },
+    // Two additions (2026-09-20) filling the thinnest stretch of the
+    // spheres half: the wide 2040-2230 platform had coins but nothing
+    // guarding them, and the run into the new staircase was empty ground.
+    { x: 2100, y: 300 - 20,      w: 20, minX: 2045, maxX: 2225, speed: 1.26 },
+    { x: 2900, y: GROUND_Y - 22, w: 22, minX: 2760, maxX: 2980, speed: 1.6 },
     { x: 3400, y: GROUND_Y - 22, w: 22, minX: 3300, maxX: 3480, speed: 1.72 },
     { x: 3750, y: 300 - 20,      w: 20, minX: 3700, maxX: 3810, speed: 1.15 },
     { x: 4550, y: 290 - 20,      w: 20, minX: 4500, maxX: 4610, speed: 1.26 },
@@ -144,7 +169,13 @@ export default {
     // 50% larger than the standard 22px sphere (33px) — the boss should
     // read as visibly bigger than anything else on screen before it even
     // wakes up
-    { x: 6980, y: GROUND_Y - 33, w: 33, minX: 6900, maxX: 7100, speed: 1.37, boss: true }
+    // maxX pulled back from 7100 to 7010 (2026-09-20): the boss digs a pit
+    // immediately to its right during the cutscene (carveMiningGap in
+    // scenes/playingScene.js), and patrolling right up to the goal flag at
+    // 7100 left no room between its right edge and the flag to put one —
+    // the dig silently no-op'd whenever it woke on the right half of its
+    // old patrol.
+    { x: 6980, y: GROUND_Y - 33, w: 33, minX: 6900, maxX: 7010, speed: 1.37, boss: true }
   ],
 
   // Two tiers, by how they're actually reached: no-jump-needed (walking on
@@ -170,6 +201,9 @@ export default {
     [2370, 246],                  // platform at x2350-2480, y260
     [2620, 186],                  // platform at x2600-2700, y200
     [2870, 286], [2920, 286],     // platform at x2850-2970, y300
+    // one per staircase tread (2026-09-20) — same 14px-above-the-surface
+    // offset, so each is collected just by walking up, never an extra hop
+    [3019, 374], [3077, 352], [3135, 330], [3193, 308],
     // first half — jump tier: arcs over the 1500-1560 gap, not a platform
     [1530, 240], [1580, 240],
     // first half — ground tier: open ground, no platform or hazard nearby
@@ -215,6 +249,7 @@ export default {
     [5010, 326],                  // stepping stone at x4960-5060, y340
     [5170, 326],                  // stepping stone at x5120-5220, y340
     [6140, 286], [6180, 286],     // platform at x6100-6220, y300
+    [6333, 330],                  // on top of the tall wall at x6300-6366, y344
     // second half — ground tier
     [5320, 396], [5620, 396], [5660, 396],
     [6400, 396], [6450, 396], [6500, 396]

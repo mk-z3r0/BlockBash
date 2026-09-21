@@ -40,12 +40,19 @@ export default {
     { x: 2600, y: 200, width: 100, height: 18 },
     { x: 2850, y: 300, width: 120, height: 18 },
 
+    // staircase — mirrors level1.js, 2026-09-20
+    { x: 2990, y: 388, width: 58, height: 22 },
+    { x: 3048, y: 366, width: 58, height: 44 },
+    { x: 3106, y: 344, width: 58, height: 66 },
+    { x: 3164, y: 322, width: 58, height: 88 },
+
     // --- second half ---
     { x: 3700, y: 300, width: 110, height: 18 },  // coin perch, before the first spikes
     { x: 4500, y: 290, width: 110, height: 18 },  // coin perch
     { x: 4960, y: 340, width: 100, height: 18 },  // stepping stones over the long bed
     { x: 5120, y: 340, width: 100, height: 18 },
-    { x: 6100, y: 300, width: 120, height: 18 }
+    { x: 6100, y: 300, width: 120, height: 18 },
+    { x: 6300, y: 344, width: 66, height: 66 }   // tall wall — mirrors level1.js
   ],
 
   hazards: [
@@ -66,11 +73,14 @@ export default {
     { x: 1600, y: GROUND_Y - 22, w: 22, minX: 1580, maxX: 1800, speed: 1.83 },
     { x: 1760, y: 200 - 20,      w: 20, minX: 1755, maxX: 1830, speed: 1.15 },
     { x: 2360, y: 260 - 20,      w: 20, minX: 2355, maxX: 2460, speed: 1.26 },
+    { x: 2100, y: 300 - 20,      w: 20, minX: 2045, maxX: 2225, speed: 1.26 },
+    { x: 2900, y: GROUND_Y - 22, w: 22, minX: 2760, maxX: 2980, speed: 1.6 },
     { x: 3400, y: GROUND_Y - 22, w: 22, minX: 3300, maxX: 3480, speed: 1.72 },
     { x: 3750, y: 300 - 20,      w: 20, minX: 3700, maxX: 3810, speed: 1.15 },
     { x: 4550, y: 290 - 20,      w: 20, minX: 4500, maxX: 4610, speed: 1.26 },
     { x: 6150, y: 300 - 20,      w: 20, minX: 6100, maxX: 6220, speed: 1.37 },
-    { x: 6980, y: GROUND_Y - 33, w: 33, minX: 6900, maxX: 7100, speed: 1.37, boss: true }
+    // maxX pulled back to leave room for the cutscene dig — see level1.js
+    { x: 6980, y: GROUND_Y - 33, w: 33, minX: 6900, maxX: 7010, speed: 1.37, boss: true }
   ],
 
   coins: [
@@ -78,6 +88,7 @@ export default {
     [920, 216], [1170, 306], [1220, 306],
     [1770, 186], [2075, 286], [2125, 286],
     [2370, 246], [2620, 186], [2870, 286], [2920, 286],
+    [3019, 374], [3077, 352], [3135, 330], [3193, 308],   // staircase treads
     [1530, 240], [1580, 240],
     [800, 396], [1000, 396], [1900, 396], [2720, 396], [2900, 396],
 
@@ -89,7 +100,7 @@ export default {
     [3740, 286], [3780, 286],
     [4540, 276], [4580, 276],
     [5010, 326], [5170, 326],
-    [6140, 286], [6180, 286],
+    [6140, 286], [6180, 286], [6333, 330],   // 6333 = on top of the tall wall
     [5320, 396], [5620, 396], [5660, 396],
     [6400, 396], [6450, 396], [6500, 396]
   ],
