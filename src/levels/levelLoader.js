@@ -43,7 +43,11 @@ export function loadLevel(data) {
       };
     }),
     checkpoints: (data.checkpoints || []).map(c => ({ ...c, activated: false })),
-    goal: { ...data.goal },
+    // No `goal` any more (2026-09-21): levels used to end at a flag placed
+    // short of the actual edge, which meant "level cleared" could fire
+    // without the player ever reaching — or even seeing — the edge it was
+    // standing in for. The edge itself is the goal now; see `worldEdgeX`
+    // above and the transition trigger in scenes/playingScene.js.
     boss: data.boss ? { ...data.boss } : null,
     house: data.house ? { ...data.house } : null,
 

@@ -141,7 +141,7 @@
       if (player.x > maxX) maxX = player.x;
       if (state.gameState !== 'playing') break;
     }
-    out.push(`  furthest: ${Math.round(maxX)} / goal ${lv.goal.x}   deaths: ${deaths.length}`);
+    out.push(`  furthest: ${Math.round(maxX)} / edge ${lv.worldEdgeX}   deaths: ${deaths.length}`);
     out.push(`  died near x: ${deaths.length ? deaths.join(', ') : 'never'}`);
     out.push(`  gameState: ${state.gameState}`);
     out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));

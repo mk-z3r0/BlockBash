@@ -105,7 +105,12 @@ export function drawPickaxeIcon() {
   ctx.stroke();
 }
 
-export function drawBackground(cameraX) {
+// cameraY is 0 for all normal play (see engine/camera.js) — it only moves
+// during the level-edge transition's camera pan, and everything here
+// parallaxes against it at a much lower factor than the world itself, so
+// the backdrop drifts rather than tracking, and the drop past the edge
+// reads as genuinely deep rather than as the whole image sliding.
+export function drawBackground(cameraX, cameraY = 0) {
   ctx.fillStyle = '#10162c';
   ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
 
@@ -115,13 +120,14 @@ export function drawBackground(cameraX) {
   for (let i = 0; i < 8; i++) {
     const cx = (i * 420 + farOffset) % (VIEW_WIDTH + 800) - 200;
     ctx.beginPath();
-    ctx.arc(cx, 90 + (i % 3) * 40, 60, 0, Math.PI * 2);
+    ctx.arc(cx, 90 + (i % 3) * 40 - cameraY * 0.15, 60, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
 
   ctx.save();
   const gridOffset = -cameraX * 0.4;
+  const gridOffsetY = -cameraY * 0.4;
   ctx.strokeStyle = 'rgba(242, 193, 78, 0.05)';
   ctx.lineWidth = 1;
   const spacing = 40;
@@ -131,7 +137,7 @@ export function drawBackground(cameraX) {
     ctx.lineTo(x, VIEW_HEIGHT);
     ctx.stroke();
   }
-  for (let y = 0; y < VIEW_HEIGHT; y += spacing) {
+  for (let y = (gridOffsetY % spacing); y < VIEW_HEIGHT; y += spacing) {
     ctx.beginPath();
     ctx.moveTo(0, y);
     ctx.lineTo(VIEW_WIDTH, y);

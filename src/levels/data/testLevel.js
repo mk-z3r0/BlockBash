@@ -111,7 +111,7 @@ export default {
     { x: 5300, y: GROUND_Y - 70, width: 8, height: 70 }
   ],
 
-  goal: { x: 7100, y: 200, width: 10, height: GROUND_Y - 200 },
+  // no goal flag — the world's edge is the goal now, see level1.js
 
   boss: { mode: 'cutscene', wakeX: 6560, chargeSpeed: 2.75 }
 };

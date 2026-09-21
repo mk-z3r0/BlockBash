@@ -1,4 +1,4 @@
-import { ctx, VIEW_WIDTH, drawBackground } from '../engine/renderer.js';
+import { ctx, VIEW_WIDTH, VIEW_HEIGHT, drawBackground } from '../engine/renderer.js';
 import { isColliding } from '../engine/physics.js';
 import { camera, updateCamera, resetCamera } from '../engine/camera.js';
 import { state } from '../state.js';
@@ -13,11 +13,11 @@ import { resetCoins, updateCoins, drawCoins } from '../entities/coins.js';
 import { spawnWeaponPickup, updateWeaponPickups, drawWeaponPickups } from '../entities/weaponPickup.js';
 import { updateWeaponInput } from '../weapons/pickaxe.js';
 import { loadLevel, getLevel } from '../levels/levelLoader.js';
-import { drawPlatforms, drawGoal, drawCheckpoints, drawHazards, drawWorldEdge } from '../levels/levelRenderer.js';
+import { drawPlatforms, drawCheckpoints, drawHazards, drawWorldEdge } from '../levels/levelRenderer.js';
 import { drawBlockHouse } from './blockHouse.js';
 import { levels } from '../levels/registry.js';
 import { showToast, updateToast, drawHUD, toast } from '../ui/hud.js';
-import { playHit, playCheckpoint, playPickaxeReady, playPickaxeSwing, playPickaxeMining, playExplosion, playWin, playGameOver } from '../audio/sfx.js';
+import { playHit, playCheckpoint, playPickaxeReady, playPickaxeSwing, playPickaxeMining, playExplosion, playWin, playGameOver, playJump } from '../audio/sfx.js';
 import { startMusic } from '../audio/audio.js';
 import { switchTo } from './sceneManager.js';
 import { recordProgress } from '../save.js';
@@ -38,24 +38,33 @@ let rescueNPC = null;
 // here is a harmless no-op (the indexOf lookups just find nothing).
 let minedGap = null;
 
-// --- Edge-of-the-world transition: null -> 'approach' -> 'pause' ->
-// 'rotate' -> 'hold' -> (advances to the next level, or wins if this was
-// the last one). Fires once the goal is reached AND the boss cutscene has
-// resolved (see the goal-collision check in update()) — the cube-planet
-// premise made literal: the level doesn't just end, the world tips 90° and
-// the next face becomes the new ground. Same "state machine scoped to this
-// scene" shape as the boss cutscene above, not a separate scene, because it
-// needs the same live world state (platforms/player/camera) that scene
-// already owns — see the Phase 0 notes on why cutscenes live here for now.
-// Skippable any time with a key press, same convention as the opening
-// cutscene (see introScene.js's finish()).
+// --- Edge-of-the-world transition: null -> 'approach' -> 'brink' ->
+// 'leap' -> 'land' -> (advances to the next level, or wins if this was the
+// last one). The cube-planet premise made literal: the level doesn't just
+// end, the player walks to the edge of this face, looks down, jumps — and
+// the world rotates 90° underneath them so they come down on the next face.
+//
+// Same "state machine scoped to this scene" shape as the boss cutscene
+// above, not a separate scene, because it needs the same live world state
+// (platforms/player/camera) that scene already owns — see the Phase 0 notes
+// on why cutscenes live here for now.
 let transition = null;
 let transitionTimer = 0;
-// The extra rotation applied around the world's edge in drawWorldAndHUD,
-// 0 (untouched) through -PI/2 (fully tipped). Kept separate from
-// transitionTimer/transition so drawWorldAndHUD doesn't need to know which
-// sub-state produced this frame's angle, only what the angle currently is.
+// The rotation applied to the world around the edge point in
+// drawWorldAndHUD, 0 (untouched) through -PI/2 (fully tipped). Kept
+// separate from transitionTimer/transition so drawWorldAndHUD doesn't need
+// to know which beat produced this frame's angle, only what it currently is.
 let transitionAngle = 0;
+// Where the leap started, captured when 'leap' begins so the arc has a
+// fixed origin to interpolate from rather than chasing a moving player.
+let leapFromX = 0;
+
+// How close to the edge the player has to get for the ending to start.
+// There's no goal flag any more (2026-09-21) — the edge IS the goal — so
+// this is what replaces touching it. 100px keeps the old pacing exactly:
+// it's where the flag used to stand, leaving the last stretch of ground as
+// the scripted walk-up.
+const EDGE_TRIGGER_MARGIN = 100;
 
 // Auto-walk speed during 'approach' — deliberately gentler than the
 // player's own walk cap (see physics.js's P.walkMax): this is a scripted,
@@ -64,12 +73,23 @@ const APPROACH_SPEED = 1.6;
 const APPROACH_ACCEL = 0.12;
 // Safety cap on 'approach' — normally it ends as soon as the player's
 // walked to the edge, this just guarantees the transition can't hang
-// forever if something about the level geometry is ever unusual enough
-// that the target is never quite reached.
+// forever if a level's geometry is ever unusual enough that the target is
+// never quite reached.
 const APPROACH_MAX_FRAMES = 150;
-const EDGE_PAUSE_FRAMES = 30;
-const EDGE_ROTATE_FRAMES = 90;
-const EDGE_HOLD_FRAMES = 30;
+// Long enough for the camera pan below to actually land and be read as a
+// look down over the drop, rather than a twitch before the jump.
+const BRINK_FRAMES = 80;
+const LEAP_FRAMES = 84;
+const LEAP_HEIGHT = 88;   // arc peak above the surface
+const LEAP_REACH = 74;    // how far past the corner the player comes down
+// The world finishes rotating a little before the player lands, so they're
+// coming down onto ground that's already settled rather than onto something
+// still visibly moving.
+const LEAP_ROTATE_DONE_AT = 0.82;
+const LAND_FRAMES = 34;
+// How fast the camera eases toward centring the player during 'brink'.
+// Slow enough to read as a deliberate look downward.
+const BRINK_CAMERA_EASE = 0.07;
 
 // Smoothstep-style ease — the rotation should read as a deliberate tip,
 // not a linear spin at constant speed. Standard cubic ease-in-out.
@@ -77,11 +97,9 @@ function easeInOutCubic(t) {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
 
-// Starts the edge transition — called once, from the goal-collision check,
-// once the boss is no longer blocking the flag. Locks input the same way
-// the boss cutscene does (see `inputLocked` in update()); 'approach' then
-// drives the player's velocityX itself rather than leaving it at 0, since
-// this beat is a scripted walk, not a freeze.
+// Starts the edge transition — called once, from the edge-proximity check
+// in update(), once the boss is no longer blocking the way. Locks input the
+// same way the boss cutscene does (see `inputLocked` in update()).
 function beginEdgeTransition() {
   transition = 'approach';
   transitionTimer = 0;
@@ -89,12 +107,11 @@ function beginEdgeTransition() {
   player.velocityY = 0;
 }
 
-// Advances whichever sub-state is active. Returns nothing — callers just
-// check `transition` afterward, same pattern as updateCutscene(). Split out
-// of update() because 'approach'/'pause' still want the rest of update()'s
-// normal per-frame work (particles, coin bob, enemy patrol) running
-// alongside them, while 'rotate'/'hold' deliberately don't — see update()'s
-// own top-of-function branch for that split.
+// Advances whichever beat is active. Split out of update() because
+// 'approach'/'brink' still want the rest of update()'s normal per-frame
+// work (particles, coin bob, enemy patrol) running alongside them, while
+// 'leap'/'land' deliberately don't — see update()'s own top-of-function
+// branch for that split.
 function updateEdgeTransition() {
   const level = getLevel();
   const edgeStopX = level.worldEdgeX - player.width;
@@ -106,35 +123,66 @@ function updateEdgeTransition() {
     if (player.x >= edgeStopX || transitionTimer > APPROACH_MAX_FRAMES) {
       player.x = edgeStopX;
       player.velocityX = 0;
-      transition = 'pause';
+      transition = 'brink';
       transitionTimer = 0;
     }
-  } else if (transition === 'pause') {
+    return;
+  }
+
+  if (transition === 'brink') {
+    // Stand at the lip and look down. The camera centres the player on
+    // both axes — x as well as y, so the empty space past the edge takes
+    // up the whole right half of the screen instead of being crammed
+    // against the frame — which is the only way the drop is legible at
+    // all, since there's deliberately nothing drawn out there to give it
+    // scale (see levelRenderer.js's drawWorldEdge).
     player.velocityX = 0;
+    camera.x += ((player.x + player.width / 2 - VIEW_WIDTH / 2) - camera.x) * BRINK_CAMERA_EASE;
+    camera.y += ((player.y + player.height / 2 - VIEW_HEIGHT / 2) - camera.y) * BRINK_CAMERA_EASE;
     transitionTimer++;
-    if (transitionTimer > EDGE_PAUSE_FRAMES) {
-      transition = 'rotate';
+    if (transitionTimer > BRINK_FRAMES) {
+      transition = 'leap';
+      transitionTimer = 0;
+      leapFromX = player.x;
+      playJump();
+    }
+    return;
+  }
+
+  if (transition === 'leap') {
+    // Fully scripted: a fixed arc out over the edge while the world turns
+    // underneath. Not physics-driven, because "down" is exactly the thing
+    // that's changing during this beat — running gravity through it would
+    // mean picking one of the two floors to fall toward, and it looks
+    // wrong against either. The camera holds still so the corner the world
+    // is pivoting around stays put on screen.
+    transitionTimer++;
+    const t = Math.min(1, transitionTimer / LEAP_FRAMES);
+    const surfaceY = level.groundY - player.height;
+    player.x = leapFromX + (level.worldEdgeX + LEAP_REACH - leapFromX) * t;
+    player.y = surfaceY - LEAP_HEIGHT * Math.sin(Math.PI * t);
+    player.facing = 1;
+
+    const spin = Math.min(1, t / LEAP_ROTATE_DONE_AT);
+    transitionAngle = -Math.PI / 2 * easeInOutCubic(spin);
+
+    if (t >= 1) {
+      player.y = surfaceY; // down on the new face, feet on its surface
+      transition = 'land';
       transitionTimer = 0;
     }
-  } else if (transition === 'rotate') {
+    return;
+  }
+
+  if (transition === 'land') {
     transitionTimer++;
-    const progress = Math.min(1, transitionTimer / EDGE_ROTATE_FRAMES);
-    transitionAngle = -Math.PI / 2 * easeInOutCubic(progress);
-    if (progress >= 1) {
-      transition = 'hold';
-      transitionTimer = 0;
-    }
-  } else if (transition === 'hold') {
-    transitionTimer++;
-    if (transitionTimer > EDGE_HOLD_FRAMES) {
-      finishEdgeTransition();
-    }
+    if (transitionTimer > LAND_FRAMES) finishEdgeTransition();
   }
 }
 
-// The payoff — same branch the goal-collision check used to run inline
-// before the transition existed: advance to the next level, or win if this
-// was the last one. Also what the skip key jumps straight to.
+// The payoff — the same branch the goal collision used to run inline before
+// any of this existed: advance to the next level, or win if this was the
+// last one. Also what the skip key jumps straight to.
 function finishEdgeTransition() {
   transition = null;
   transitionTimer = 0;
@@ -156,7 +204,8 @@ function finishEdgeTransition() {
 let paused = false;
 
 function bossActive() {
-  // the boss blocks the flag until the cutscene NPC has dealt with it
+  // the boss blocks the way to the edge until the cutscene NPC has dealt
+  // with it — see the edge-proximity check in update()
   if (cutscene === 'done') return false;
   return state.enemies.some(e => e.boss && e.alive);
 }
@@ -217,11 +266,13 @@ function carveMiningGap(boss) {
 
   const gapWidth = 44; // ~2 blocks — comfortably walk-clearable
   const margin = 20;   // leave at least this much solid ground on each side
-  // Never dig the goal's own footing out from under it — the boss patrols
-  // close enough to the flag that an unclamped dig could reach it.
-  const goalGuard = level.goal ? level.goal.x - 24 : Infinity;
+  // Never dig into the last stretch before the edge. The player's scripted
+  // walk-up to the edge runs with real physics (see updateEdgeTransition's
+  // 'approach'), so a hole anywhere in that corridor wouldn't be a
+  // decoration — they'd walk straight into it mid-cutscene.
+  const approachGuard = level.worldEdgeX - EDGE_TRIGGER_MARGIN - 24;
   const gapStart = Math.max(seg.x + margin, digX);
-  const gapEnd = Math.min(seg.x + seg.width - margin, goalGuard, gapStart + gapWidth);
+  const gapEnd = Math.min(seg.x + seg.width - margin, approachGuard, gapStart + gapWidth);
   if (gapEnd - gapStart < 20) return; // no room to carve without hitting something
 
   const leftPiece = { x: seg.x, y: seg.y, width: gapStart - seg.x, height: seg.height, ground: true };
@@ -246,13 +297,14 @@ function loseLife() {
     resetPlayer();
     resetBossAndCutscene();
     // Not reachable with level 1's own geometry today (nothing near the
-    // goal can hit the player during 'approach'/'pause' — no enemy patrol
-    // reaches it, no hazard or gap exists past the boss fight), but a
-    // future level's goal could sit somewhere less safe, and a stale
-    // 'approach'/'pause' surviving a respawn would keep silently driving
-    // the post-respawn player toward an edge they're nowhere near anymore.
-    // 'rotate'/'hold' can't be interrupted by a death at all — update()
-    // returns before any of the hit/pit checks even run during those two.
+    // edge can hit the player during 'approach'/'brink' — no enemy patrol
+    // reaches it, no hazard or gap exists past the boss fight, and
+    // carveMiningGap is explicitly barred from digging into that corridor),
+    // but a future level's ending could sit somewhere less safe, and a
+    // stale 'approach'/'brink' surviving a respawn would keep silently
+    // driving the post-respawn player toward an edge they're nowhere near
+    // anymore. 'leap'/'land' can't be interrupted by a death at all —
+    // update() returns before any hit/pit check runs during those two.
     transition = null;
     transitionTimer = 0;
     transitionAngle = 0;
@@ -464,14 +516,15 @@ export function drawWorldAndHUD() {
   // tilt of one small patch of planet surface. Everything that's actually
   // PART of the world (ground, platforms, the edge wall, the player,
   // enemies, particles) still rotates together below.
-  drawBackground(camera.x);
+  drawBackground(camera.x, camera.y);
   ctx.save();
-  ctx.translate(-camera.x, 0);
+  ctx.translate(-camera.x, -camera.y);
 
-  // The edge-transition's 'rotate'/'hold' beats pivot the whole world
-  // around the literal edge point (worldEdgeX, groundY) — see
+  // The world — everything that tips when the level ends. The rotation
+  // pivots around the literal edge point (worldEdgeX, groundY); see
   // updateEdgeTransition(). transitionAngle is 0 the rest of the time, so
   // this is a no-op transform for every normal frame of play.
+  ctx.save();
   if (transitionAngle !== 0) {
     const level = getLevel();
     ctx.translate(level.worldEdgeX, level.groundY);
@@ -485,14 +538,23 @@ export function drawWorldAndHUD() {
   drawWorldEdge(state.frameCount);
   drawHazards();
   drawCheckpoints();
-  drawGoal();
   drawCoins(state.frameCount);
   drawWeaponPickups(state.frameCount);
   drawEnemies(state.frameCount, cutscene === 'done');
   drawParticles();
+  if (rescueNPC) drawRescueNPC(rescueNPC, state.frameCount);
+  ctx.restore();
+
+  // The player is drawn OUTSIDE that rotation on purpose: during the leap
+  // it's the world that turns, not them. They stay upright through the
+  // whole arc and come down on whichever face has swung into place — which
+  // is the entire point of the beat, and reads completely differently from
+  // the player spinning along with the scenery. Outside the rotation but
+  // still inside the camera translate, so they're positioned in ordinary
+  // world coordinates exactly as before.
   drawPlayer(state.frameCount);
   drawPlayerShout();
-  if (rescueNPC) drawRescueNPC(rescueNPC, state.frameCount);
+
   ctx.restore();
   drawHUD();
 }
@@ -509,15 +571,16 @@ export const playingScene = {
     if (paused) return;
     state.frameCount++;
 
-    // 'rotate'/'hold' are a pure visual — the world is being spun around
-    // its own edge, there's no meaningful "up" to apply gravity toward and
-    // nothing to collide against mid-spin. Advance only the transition's
-    // own timer and skip player/enemy/particle physics entirely for these
-    // two beats. ('approach'/'pause' are handled further down, alongside
-    // the rest of update()'s normal per-frame work, same as the boss
-    // cutscene's 'freeze'/'charge' beats already are — only the actual
-    // spin needs this harder cutoff.)
-    if (transition === 'rotate' || transition === 'hold') {
+    // 'leap'/'land' are pure choreography — the player is on a scripted arc
+    // and the world is spinning around its own edge underneath them, so
+    // there's no meaningful "up" to apply gravity toward and nothing
+    // stable to collide against. Advance only the transition's own timer
+    // and skip player/enemy/particle physics entirely for these two beats.
+    // ('approach'/'brink' are handled further down, alongside the rest of
+    // update()'s normal per-frame work, same as the boss cutscene's
+    // 'freeze'/'charge' beats already are — only the leap needs this
+    // harder cutoff.)
+    if (transition === 'leap' || transition === 'land') {
       updateEdgeTransition();
       return;
     }
@@ -562,22 +625,27 @@ export const playingScene = {
     updateCoins(player);
     updateWeaponPickups(player);
 
-    // 'approach'/'pause': the scripted walk-to-the-edge beats. Everything
+    // 'approach'/'brink': the scripted walk-to-the-edge beats. Everything
     // above still runs (particles, coin bob, enemy patrol stay alive right
-    // up to the edge), but the goal check and camera-follow below are
-    // meaningless once we're already past the goal and walking off the end
-    // of the level, so bail out before reaching them.
+    // up to the edge), but the trigger check and camera-follow below are
+    // meaningless once we're already walking the last stretch — and
+    // 'brink' drives the camera itself — so bail out before reaching them.
     if (transition) {
       updateEdgeTransition();
       updateToast();
       return;
     }
 
-    const goal = getLevel().goal;
-    if (isColliding(player, goal)) {
+    // Reaching the edge is what ends the level now — there's no goal flag
+    // to touch (2026-09-21). Triggering a margin short of the actual drop
+    // leaves room for the scripted walk-up, and means the player can never
+    // out-run the trigger and walk off the edge under their own power.
+    const level = getLevel();
+    const triggerX = level.worldEdgeX - EDGE_TRIGGER_MARGIN;
+    if (player.x + player.width >= triggerX) {
       if (bossActive()) {
-        // the sphere body-blocks the flag — taunt and shove the player back
-        player.x = goal.x - player.width - 30;
+        // the sphere body-blocks the way — taunt and shove the player back
+        player.x = triggerX - player.width - 30;
         player.velocityX = 0;
         if (toast.timer <= 0) showToast("THE SPHERE WON'T LET YOU", 80);
       } else {
@@ -587,7 +655,7 @@ export const playingScene = {
     }
 
     updateToast();
-    updateCamera(player.x, VIEW_WIDTH, getLevel().worldWidth);
+    updateCamera(player.x, VIEW_WIDTH, level.worldWidth);
   },
 
   draw() {
@@ -598,12 +666,16 @@ export const playingScene = {
   },
 
   handleKeyDown(e, alreadyDown) {
-    // Skippable any time with a key press, same convention as the opening
-    // cutscene (introScene.js) — checked before Escape's own pause toggle
-    // so Escape skips the transition rather than pausing mid-spin, and
-    // before the `paused` early-return below so it works even if the game
-    // somehow got paused going into this (e.g. a held key repeat).
-    if (transition && !alreadyDown) {
+    // Skipping the ending is Escape only — NOT "any key" the way the
+    // opening cutscene does it (2026-09-21). The intro can take any key
+    // because the player isn't playing when it runs; this fires while
+    // they're mid-stride, very likely still holding or tapping movement
+    // and jump, and "any key" meant an ordinary jump input during the
+    // walk-up instantly cleared the level with none of the ending seen.
+    // Checked before Escape's own pause toggle below, so Escape skips
+    // rather than pausing mid-leap, and before the `paused` early-return
+    // so it still works if the game somehow got paused going into this.
+    if (transition && e.key === 'Escape' && !alreadyDown) {
       finishEdgeTransition();
       return;
     }

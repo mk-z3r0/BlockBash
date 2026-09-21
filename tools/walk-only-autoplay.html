@@ -27,7 +27,15 @@
         const ahead = player.x + player.width + 24;
         const enemyAhead = state.enemies.some(e => e.alive && !e.boss &&
           e.x > player.x && e.x - (player.x + player.width) < 55 && Math.abs(e.y - player.y) < 40);
-        if (!solidAt(ahead) || spikeAt(ahead) || enemyAhead) { key('keydown', ' '); hold = 16; }
+        // Solid blocks jumped ONTO rather than over (the staircase treads,
+        // the tall wall) — solidAt() only looks at ground segments, so
+        // without this the bot walks into a tread and stalls there with no
+        // deaths logged, which reads as "walk can't cross this" when really
+        // the bot just never tried. Same fix as gap-probe.html's.
+        const wallAhead = lv.platforms.some(p => !p.ground && p.width > 1 &&
+          ahead >= p.x && ahead <= p.x + p.width &&
+          p.y < player.y + player.height && p.y + p.height > player.y);
+        if (!solidAt(ahead) || spikeAt(ahead) || enemyAhead || wallAhead) { key('keydown', ' '); hold = 16; }
       }
       if (hold > 0 && --hold === 0) key('keyup', ' ');
       const beforeX = player.x;
@@ -37,7 +45,7 @@
       if (state.gameState !== 'playing') break;
       if (stuckCounter > 1200) { out.push(`bot stopped making forward progress near x=${Math.round(player.x)} (stuck for 1200+ ticks, likely a wall only run can cross)`); break; }
     }
-    out.push(`furthest reached: ${Math.round(maxX)} / goal ${lv.goal.x}`);
+    out.push(`furthest reached: ${Math.round(maxX)} / edge ${lv.worldEdgeX}`);
     out.push(`deaths: ${deaths.length}   died near: ${deaths.length ? deaths.slice(0,15).join(', ') : 'never'}${deaths.length>15?' ...':''}`);
     out.push(`gameState: ${state.gameState}`);
     document.getElementById('out').textContent = out.join('\n');

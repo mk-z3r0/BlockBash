@@ -487,16 +487,70 @@ Skippable any time with a keypress, same convention as the opening cutscene.
   patch of planet surface tilting 90°. Everything that's actually *part* of
   the world (ground, platforms, the edge wall, player, enemies, particles)
   still rotates together.
-- **Any probe that teleports the player onto the goal and expects an
+- **Any probe that teleports the player to the end of a level and expects an
   immediate advance/win from a single `update()` call now needs a skip
-  keypress in between** (`save-probe.html`, `progression-probe.html`) — the
-  goal touch now only *starts* the transition. Caught this the boring way:
-  ran the regression sweep, watched `progression-probe.html`'s "reach goal
-  at level 1 (last)" line come back `state=playing` instead of `state=win`.
-  Worth remembering for level 2's own probes later: a key press without a
-  matching `keyup` is a held-key repeat on the *second* call, not a second
-  fresh press — `input.js`'s `alreadyDown` tracking (correctly) ignores it,
-  which is exactly what silently broke the first pass at this fix.
+  keypress in between** (`save-probe.html`, `progression-probe.html`) —
+  reaching the end now only *starts* the transition. Caught this the boring
+  way: ran the regression sweep, watched `progression-probe.html`'s "reach
+  goal at level 1 (last)" line come back `state=playing` instead of
+  `state=win`. Worth remembering for level 2's own probes later: a key press
+  without a matching `keyup` is a held-key repeat on the *second* call, not a
+  second fresh press — `input.js`'s `alreadyDown` tracking (correctly)
+  ignores it, which is exactly what silently broke the first pass at this fix.
+
+### 2026-09-21 revision: playtested, and largely rebuilt
+
+Seeing it in motion changed most of it. What the first pass got wrong:
+
+- **Don't draw anything past the edge.** The first pass filled the space
+  beyond the edge with a ground-coloured slab standing in for "the next
+  face seen side-on". It read as more ground with no outline — the one
+  place the player most needs to read "this stops HERE" was the least
+  legible thing on screen. Past the edge is now empty: the parallax grid
+  shows straight through, and the drop is obvious. The only things drawn
+  are the bright corner seam and a translucent band for the cube's
+  *interior* (behind the cut face, never past it).
+- **A glow that rises above the ground surface reads as a doorway, not a
+  cliff.** The seam used to extend 60px above `groundY`. It now starts
+  exactly at the top surface and fades downward.
+- **The camera has to actually look down, or the depth isn't there.**
+  Added `camera.y` (0 for all normal play) and a 'brink' beat that eases
+  the player to the centre of the screen on *both* axes before the jump.
+  Centring x matters as much as y: it puts the empty space past the edge
+  across the whole right half of the frame instead of crammed against it.
+- **The player jumps; the world rotates under them.** Much better than the
+  original "player stands still and rotates with the scenery" — the player
+  is now drawn OUTSIDE the rotation transform, stays upright through a
+  scripted arc, and lands on whichever face has swung into place. The arc
+  is scripted rather than physics-driven because "down" is precisely what's
+  changing during that beat; gravity would have to pick one of the two
+  floors and looks wrong against either. Rotation finishes at ~82% of the
+  arc so they come down on ground that's already settled.
+  Convenient geometry: the new face's surface ends up at exactly the same
+  screen height as the old one, so a flat arc from edge to landing works
+  without any vertical fudging.
+- **The goal flag is gone entirely, and that fixes a real bug.** It sat
+  100px short of the actual edge and touching it cleared the level, so a
+  clear could fire without the player reaching — or even seeing — the edge
+  it stood for. The edge itself is the trigger now
+  (`EDGE_TRIGGER_MARGIN`), `goal` is off the level-data shape, and
+  `carveMiningGap`'s old "don't dig away the flag" guard became "don't dig
+  into the walk-up corridor" (which matters more: that walk runs with real
+  physics, so a hole there would drop the player mid-cutscene).
+- **"Skippable with any key" was wrong for this one.** The intro can take
+  any key because the player isn't playing when it runs. This fires
+  mid-stride with movement and jump very likely being pressed, so an
+  ordinary jump input during the walk-up instantly cleared the level with
+  none of the ending seen — almost certainly the "clear without reaching
+  the edge" bug as experienced. Skip is Escape only now.
+- **A third bot had the same silent-stall bug and nobody noticed.**
+  `walk-only-autoplay.html` never got the `wallAhead` fix the other two
+  bots got when the staircase landed, so it had been stopping dead at the
+  first tread — reported as "likely a wall only run can cross", which read
+  as a finding rather than a broken bot. Fixed; it now climbs the stairs
+  and stops at the 3500 gap instead, which is genuinely run-only by
+  design. When one bot gets a fix for a whole class of obstacle, check
+  every bot.
 
 ---
 

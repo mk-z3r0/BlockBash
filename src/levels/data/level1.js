@@ -179,10 +179,10 @@ export default {
     // wakes up
     // maxX pulled back from 7100 to 7010 (2026-09-20): the boss digs a pit
     // immediately to its right during the cutscene (carveMiningGap in
-    // scenes/playingScene.js), and patrolling right up to the goal flag at
-    // 7100 left no room between its right edge and the flag to put one —
-    // the dig silently no-op'd whenever it woke on the right half of its
-    // old patrol.
+    // scenes/playingScene.js), and patrolling any further right left no
+    // room between its right edge and the protected walk-up to the world's
+    // edge to put one — the dig silently no-op'd whenever it woke on the
+    // right half of its old patrol.
     { x: 6980, y: GROUND_Y - 33, w: 33, minX: 6900, maxX: 7010, speed: 1.37, boss: true }
   ],
 
@@ -269,7 +269,11 @@ export default {
     { x: 5300, y: GROUND_Y - 70, width: 8, height: 70 }   // after the long spike bed
   ],
 
-  goal: { x: 7100, y: 200, width: 10, height: GROUND_Y - 200 },
+  // No goal flag (2026-09-21) — the edge of the world is the goal. The old
+  // flag sat at x:7100, 100px short of where the ground actually ends, and
+  // touching it cleared the level; that's what let a clear fire without the
+  // player ever reaching the edge. See scenes/playingScene.js's
+  // EDGE_TRIGGER_MARGIN for what starts the ending now.
 
   // Level 1's boss can't be fought — walking into range plays a cutscene
   // where a rescue NPC deals with it, stomping it and leaving its pickaxe

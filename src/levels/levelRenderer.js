@@ -130,68 +130,66 @@ export function drawHazards() {
   }
 }
 
-// The literal edge of this cube face: past `worldEdgeX` (where the ground
-// data actually stops — see levelLoader.js), the world falls away into a
-// sheer vertical face belonging to the adjacent face of the cube, with a
-// glowing seam marking the 90° corner and a few decorative ledges hinting
-// at what's over there. Nothing here collides with anything — it's backdrop
-// for scenes/playingScene.js's edge-transition state machine, which is what
-// actually walks the player up to this point and (eventually) rotates the
-// world around it. Computed from level data rather than authored per level,
-// so it appears at the end of every level for free.
-const EDGE_WALL_WIDTH = 500;  // wider than worldWidth's camera headroom (300px) — see level1.js's worldWidth comment
-const EDGE_WALL_HEIGHT = 900; // deep enough to fill the screen at any camera angle once the player's this close
-const EDGE_LEDGES = [
-  // {depth, width}: distance below groundY, and how far the ledge juts out
-  // from the wall face — decorative previews of "the next face", rotated
-  // 90° from how a normal platform would sit (they read as ledges on a
-  // cliff, not floating platforms, since nothing here is standable)
-  { depth: 70,  width: 70 },
-  { depth: 200, width: 95 },
-  { depth: 360, width: 60 }
-];
+// The literal edge of this cube face, at `worldEdgeX` (where the ground data
+// actually stops — see levelLoader.js). Nothing here collides with anything:
+// it's backdrop for scenes/playingScene.js's edge-transition state machine,
+// which is what walks the player up to this point and rotates the world
+// around it. Computed from level data rather than authored per level, so it
+// appears at the end of every level for free.
+//
+// Two things this deliberately does NOT do, both from playtesting it
+// (2026-09-21):
+//
+// - Nothing is drawn PAST the edge. An earlier pass filled that space with
+//   a ground-coloured slab meant to read as "the next face seen side-on",
+//   and it just read as more ground with no outline — the one place the
+//   player most needs to understand "this stops here" was the least clear
+//   thing on screen. Past the edge is now empty: the parallax grid shows
+//   straight through, which is what makes the drop legible at all once the
+//   camera pans down to look at it.
+// - The seam never rises above `groundY`. A glow sticking up into the air
+//   above the surface reads as a beam or a doorway, not as the lip of a
+//   cliff. It starts exactly at the top surface and fades downward.
+//
+// What's left is the geometry that's actually true of a cube corner: the
+// bright line where the two faces meet, and the solid interior of the cube
+// behind/below it. That interior band is also what the player lands on —
+// rotate the whole thing -PI/2 about the corner and the seam becomes the
+// new ground's surface line, with the band filling in beneath it.
+const EDGE_INTERIOR_DEPTH = 700; // becomes how far the new ground extends rightward once rotated
+const EDGE_INTERIOR_BACK = 320;  // becomes how far it extends downward once rotated
+const EDGE_SEAM_FADE = 520;      // how far down the corner glow reaches before it's gone
 
 export function drawWorldEdge(frameCount) {
   const { worldEdgeX, groundY } = getLevel();
 
-  // the face itself — same fill as ground, so it visibly reads as the same
-  // material continuing around a corner rather than a different substance
-  ctx.fillStyle = '#1c2547';
-  ctx.fillRect(worldEdgeX, groundY, EDGE_WALL_WIDTH, EDGE_WALL_HEIGHT);
+  // The cube's interior — behind the cut face and below the surface, i.e.
+  // left of the seam and under the ground, never past the edge. Kept
+  // translucent so the background still reads through it as depth rather
+  // than as a second slab of terrain.
+  ctx.fillStyle = 'rgba(35, 47, 92, 0.38)';
+  ctx.fillRect(worldEdgeX - EDGE_INTERIOR_BACK, groundY, EDGE_INTERIOR_BACK, EDGE_INTERIOR_DEPTH);
 
-  // hint ledges jutting out of the face
-  ctx.fillStyle = '#232f5c';
-  ctx.strokeStyle = '#3a4a82';
-  ctx.lineWidth = 2;
-  for (const l of EDGE_LEDGES) {
-    const ly = groundY + l.depth;
-    ctx.fillRect(worldEdgeX, ly, l.width, 16);
-    ctx.strokeRect(worldEdgeX + 1, ly + 1, l.width - 2, 14);
-  }
+  // The corner itself: brightest exactly at the surface, fading with depth.
+  // Reads as a glowing lip from here; after the world rotates it's the
+  // surface line of the face the player lands on, receding into the
+  // distance — the same gradient works for both because it IS both.
+  const pulse = 0.85 + Math.sin(frameCount * 0.05) * 0.15;
+  const seam = ctx.createLinearGradient(0, groundY, 0, groundY + EDGE_SEAM_FADE);
+  seam.addColorStop(0, `rgba(94, 231, 255, ${pulse})`);
+  seam.addColorStop(0.35, 'rgba(94, 231, 255, 0.45)');
+  seam.addColorStop(1, 'rgba(94, 231, 255, 0)');
+  ctx.fillStyle = seam;
+  ctx.fillRect(worldEdgeX - 2, groundY, 4, EDGE_SEAM_FADE);
 
-  // the glowing seam marking the actual 90° corner — a soft vertical bar
-  // straddling worldEdgeX, pulsing gently so it reads as live energy at the
-  // join rather than a painted line
-  const pulse = 0.55 + Math.sin(frameCount * 0.05) * 0.25;
-  const grad = ctx.createLinearGradient(worldEdgeX - 10, 0, worldEdgeX + 10, 0);
-  grad.addColorStop(0, 'rgba(94, 231, 255, 0)');
-  grad.addColorStop(0.5, `rgba(94, 231, 255, ${pulse})`);
-  grad.addColorStop(1, 'rgba(94, 231, 255, 0)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(worldEdgeX - 10, groundY - 60, 20, 260);
-}
-
-export function drawGoal() {
-  const { goal } = getLevel();
-  ctx.fillStyle = '#5ee7ff';
-  ctx.fillRect(goal.x, goal.y, 4, goal.height);
-  ctx.fillStyle = '#f2c14e';
-  ctx.beginPath();
-  ctx.moveTo(goal.x + 4, goal.y + 6);
-  ctx.lineTo(goal.x + 44, goal.y + 18);
-  ctx.lineTo(goal.x + 4, goal.y + 34);
-  ctx.closePath();
-  ctx.fill();
+  // a soft bloom either side of the line, same fade, so the corner has some
+  // weight to it without widening the line itself
+  const bloom = ctx.createLinearGradient(worldEdgeX - 9, 0, worldEdgeX + 9, 0);
+  bloom.addColorStop(0, 'rgba(94, 231, 255, 0)');
+  bloom.addColorStop(0.5, `rgba(94, 231, 255, ${pulse * 0.28})`);
+  bloom.addColorStop(1, 'rgba(94, 231, 255, 0)');
+  ctx.fillStyle = bloom;
+  ctx.fillRect(worldEdgeX - 9, groundY, 18, EDGE_SEAM_FADE * 0.55);
 }
 
 export function drawCheckpoints() {
