@@ -32,7 +32,15 @@ const GROUND_Y = 410;
 export default {
   id: 'level1',
   name: 'The First Stand',
-  worldWidth: 7200,
+  // Bumped from 7200 (2026-09-20, edge-of-world transition): ground itself
+  // still ends at 7200 (unchanged — see the last `ground` entry below), but
+  // the camera's own clamp is `worldWidth - VIEW_WIDTH`, so worldWidth needs
+  // real headroom past the actual edge or the camera can never pan far
+  // enough to reveal the edge-of-world wall (levelRenderer.js's
+  // drawWorldEdge) before the player is already standing on top of it. This
+  // 300px of "extra" width is never walkable — nothing solid exists out
+  // there — it exists purely so the camera can see the wall coming.
+  worldWidth: 7500,
   groundY: GROUND_Y,
   playerSpawn: { x: 100, y: 300 },
 
@@ -72,7 +80,7 @@ export default {
     { x: 1390, width: 110 },   // stepping-stone island
     { x: 1560, width: 590 },
     { x: 2175, width: 1325 },
-    { x: 3570, width: 1130 },
+    { x: 3660, width: 1040 },     // shrunk from 3570 (2026-09-20): widens the 3500 gap to 160px, restoring its "requires run" role — see the physics-lab retune note below
     { x: 4760, width: 740 },
     { x: 5590, width: 1610 }
   ],
@@ -91,12 +99,32 @@ export default {
     { x: 2600, y: 200, width: 100, height: 18 },
     { x: 2850, y: 300, width: 120, height: 18 },
 
+    // Staircase (2026-09-20) — four solid blocks flush with the ground,
+    // each a tile (22px) taller than the last, filling what used to be a
+    // long dead-flat run between the last first-half platform (ends 2970)
+    // and the checkpoint at 3300. Unlike every other platform in this
+    // level these sit ON the ground rather than floating, so they're
+    // climbed rather than jumped to — a different shape of obstacle, and
+    // a gentle one: a single tile of rise per step is nothing against a
+    // jump that peaks at 117px. Coins sit on each tread as the reward for
+    // going up instead of walking past.
+    { x: 2990, y: 388, width: 58, height: 22 },
+    { x: 3048, y: 366, width: 58, height: 44 },
+    { x: 3106, y: 344, width: 58, height: 66 },
+    { x: 3164, y: 322, width: 58, height: 88 },
+
     // --- second half ---
     { x: 3700, y: 300, width: 110, height: 18 },  // coin perch, before the first spikes
     { x: 4500, y: 290, width: 110, height: 18 },  // coin perch
     { x: 4960, y: 340, width: 100, height: 18 },  // stepping stones over the long bed
     { x: 5120, y: 340, width: 100, height: 18 },
-    { x: 6100, y: 300, width: 120, height: 18 }
+    { x: 6100, y: 300, width: 120, height: 18 },
+    // The tall wall (2026-09-20) — 3 tiles (66px) of solid block in the
+    // long empty run-up to the boss. The one obstacle in the level that
+    // has to be jumped *onto* in a single committed hop rather than
+    // stepped up: a 16-frame hold clears 82px, so 66px leaves real margin
+    // while still being the tallest thing here by some way. Coin on top.
+    { x: 6300, y: 344, width: 66, height: 66 }
   ],
 
   hazards: [
@@ -108,37 +136,54 @@ export default {
     // Deliberately the first hard gate: level 1's other three jumpable
     // spike beds (48-60px) all clear on foot, so this is the one spot that
     // actually teaches "sometimes you need to hold run," not just permits it.
-    { type: 'spikes', x: 4320, width: 90 },
+    { type: 'spikes', x: 4320, width: 160 },
     // the long bed — crossed via stepping stones, not jumped. It starts well
     // clear of the 4700 pit: a full-power jump off that lip carries ~162px,
     // and landing in spikes because you jumped hard is a rotten way to die.
     { type: 'spikes', x: 4920, width: 340 },
-    { type: 'spikes', x: 5700, width: 60 },
+    { type: 'spikes', x: 5700, width: 35 },
     { type: 'spikes', x: 5850, width: 50 },
     { type: 'spikes', x: 5980, width: 50 }    // last hazard: 6030+ stays clear for the boss cutscene
   ],
 
-  // Every patrol speed here has been cut 20% twice now (matching the
-  // player's WALK/RUN_MAX_SPEED cuts in physics.js), 2026-09-19. Unlike the
-  // player's jump, there's no compensating change needed for enemies — they
-  // don't jump (see the `canHop` gate in entities/enemy.js; it defaults off
-  // until a later level turns it on), so there's no arc to preserve, just a
-  // flat speed reduction each time.
+  // Rescaled 2026-09-20 for the SMB3-accurate physics rewrite + hand-tuned
+  // accel/walkMax/runMax (physics-lab branch): the old speeds (0.64-1.088,
+  // tuned against the pre-rewrite player model's walkMax 1.28/runMax 2.304)
+  // were flagged as a known gap in that rewrite's own report — even the
+  // boss's chargeSpeed (1.536) had fallen slower than the new player's
+  // plain walk (2.29), so nothing here could threaten a walking player
+  // anymore. Every value here (and chargeSpeed below) is scaled by the same
+  // ~1.79x the walkMax cap grew (1.28 -> 2.29), preserving each enemy's
+  // relative speed to the player exactly as before. Unlike the player's
+  // jump, there's no arc to preserve for enemies — they don't jump (see the
+  // `canHop` gate in entities/enemy.js; off until a later level turns it
+  // on) — so this is a flat rescale, nothing more.
   enemies: [
-    { x: 250,  y: GROUND_Y - 22, w: 22, minX: 220,  maxX: 460,  speed: 0.896 },
-    { x: 700,  y: GROUND_Y - 22, w: 22, minX: 650,  maxX: 950,  speed: 1.088 },
-    { x: 660,  y: 300 - 20,      w: 20, minX: 655,  maxX: 750,  speed: 0.704 },
-    { x: 1600, y: GROUND_Y - 22, w: 22, minX: 1580, maxX: 1800, speed: 1.024 },
-    { x: 1760, y: 200 - 20,      w: 20, minX: 1755, maxX: 1830, speed: 0.64 },
-    { x: 2360, y: 260 - 20,      w: 20, minX: 2355, maxX: 2460, speed: 0.704 },
-    { x: 3400, y: GROUND_Y - 22, w: 22, minX: 3300, maxX: 3480, speed: 0.96 },
-    { x: 3750, y: 300 - 20,      w: 20, minX: 3700, maxX: 3810, speed: 0.64 },
-    { x: 4550, y: 290 - 20,      w: 20, minX: 4500, maxX: 4610, speed: 0.704 },
-    { x: 6150, y: 300 - 20,      w: 20, minX: 6100, maxX: 6220, speed: 0.768 },
+    { x: 250,  y: GROUND_Y - 22, w: 22, minX: 220,  maxX: 460,  speed: 1.6 },
+    { x: 700,  y: GROUND_Y - 22, w: 22, minX: 650,  maxX: 950,  speed: 1.95 },
+    { x: 660,  y: 300 - 20,      w: 20, minX: 655,  maxX: 750,  speed: 1.26 },
+    { x: 1600, y: GROUND_Y - 22, w: 22, minX: 1580, maxX: 1800, speed: 1.83 },
+    { x: 1760, y: 200 - 20,      w: 20, minX: 1755, maxX: 1830, speed: 1.15 },
+    { x: 2360, y: 260 - 20,      w: 20, minX: 2355, maxX: 2460, speed: 1.26 },
+    // Two additions (2026-09-20) filling the thinnest stretch of the
+    // spheres half: the wide 2040-2230 platform had coins but nothing
+    // guarding them, and the run into the new staircase was empty ground.
+    { x: 2100, y: 300 - 20,      w: 20, minX: 2045, maxX: 2225, speed: 1.26 },
+    { x: 2900, y: GROUND_Y - 22, w: 22, minX: 2760, maxX: 2980, speed: 1.6 },
+    { x: 3400, y: GROUND_Y - 22, w: 22, minX: 3300, maxX: 3480, speed: 1.72 },
+    { x: 3750, y: 300 - 20,      w: 20, minX: 3700, maxX: 3810, speed: 1.15 },
+    { x: 4550, y: 290 - 20,      w: 20, minX: 4500, maxX: 4610, speed: 1.26 },
+    { x: 6150, y: 300 - 20,      w: 20, minX: 6100, maxX: 6220, speed: 1.37 },
     // 50% larger than the standard 22px sphere (33px) — the boss should
     // read as visibly bigger than anything else on screen before it even
     // wakes up
-    { x: 6980, y: GROUND_Y - 33, w: 33, minX: 6900, maxX: 7100, speed: 0.768, boss: true }
+    // maxX pulled back from 7100 to 7010 (2026-09-20): the boss digs a pit
+    // immediately to its right during the cutscene (carveMiningGap in
+    // scenes/playingScene.js), and patrolling any further right left no
+    // room between its right edge and the protected walk-up to the world's
+    // edge to put one — the dig silently no-op'd whenever it woke on the
+    // right half of its old patrol.
+    { x: 6980, y: GROUND_Y - 33, w: 33, minX: 6900, maxX: 7010, speed: 1.37, boss: true }
   ],
 
   // Two tiers, by how they're actually reached: no-jump-needed (walking on
@@ -164,28 +209,47 @@ export default {
     [2370, 246],                  // platform at x2350-2480, y260
     [2620, 186],                  // platform at x2600-2700, y200
     [2870, 286], [2920, 286],     // platform at x2850-2970, y300
+    // one per staircase tread (2026-09-20) — same 14px-above-the-surface
+    // offset, so each is collected just by walking up, never an extra hop
+    [3019, 374], [3077, 352], [3135, 330], [3193, 308],
     // first half — jump tier: arcs over the 1500-1560 gap, not a platform
     [1530, 240], [1580, 240],
     // first half — ground tier: open ground, no platform or hazard nearby
     [800, 396], [1000, 396], [1900, 396], [2720, 396], [2900, 396],
 
     // second half — jump tier: arcs over each hazard telegraph the jump.
-    // The two 3-coin trios are sampled directly off the player's real jump
-    // trajectory (tools/jump-trajectory-probe.html — records actual (x,y)
-    // each frame of a real jump, rather than authoring a curve by eye), so
-    // all 3 are reachable in one continuous jump instead of needing an
-    // impossible mid-air course correction. The 3980 trio matches a
-    // WALK-speed jump timed right at the hazard's leading edge (that hazard
-    // is walk-clearable); the 4320 trio matches a RUN-speed jump the same
-    // way (that one requires run) — mixing up which speed a trio was traced
-    // at is exactly what made them uncollectable. Re-sampled 2026-09-19
-    // after a further speed/gravity cut shifted the arc's shape enough that
-    // the run trio started missing at the edges of its timing window —
-    // carry *distance* being preserved doesn't mean the curve's shape is;
-    // re-run the trace tool any time a speed constant changes.
-    [3985, 288], [4011, 212], [4043, 343],
+    // The two 3-coin trios are built from the player's real jump trajectory
+    // (tools/jump-trajectory-probe.html — records actual (x,y) each frame of
+    // a real jump, rather than authoring a curve by eye) — re-run any time a
+    // speed constant changes, since carry *distance* being preserved doesn't
+    // mean the curve's shape is. Re-sampled 2026-09-20 for the SMB3-accurate
+    // physics rewrite + hand-tuned accel/walkMax/runMax.
+    //
+    // Design rule (2026-09-20): a 3-coin group is built as a true symmetric
+    // parabola, not a raw trace of all 3 points off the (asymmetric —
+    // gravityFall is heavier than gravityRise, confirmed to matter in
+    // practice, see below) real curve. The center coin sits at the real
+    // trajectory's apex; the two outer coins sit at equal x-offsets from it,
+    // sharing one y, so the trio reads as one clean, mirrored arc rather
+    // than a lopsided one. The 3980 trio matches a WALK-speed jump timed
+    // right at the hazard's leading edge (that hazard is walk-clearable);
+    // the 4320 trio matches a RUN-speed jump the same way (that hazard —
+    // widened to 160px this pass — requires run).
+    //
+    // The run trio's shared y (310) was swept, not guessed: no single y
+    // collects all 3 across every timing in tools/coin-trio-check.html's
+    // full -15..+15 lead sweep, because the rise and fall halves of the
+    // real arc sit at different heights for the same x-offset from the
+    // apex — true left/right symmetry and 100%-of-every-timing
+    // collectibility aren't both achievable here. 310 collects all 3 from
+    // the canonical "jump right at the edge" timing (lead 0) through early
+    // jumps (lead +5..+15); only late jumps (lead -5..-15, i.e. already
+    // past the edge before jumping) miss the near/left coin. That's the
+    // right side to give up: jumping late over a hazard is the riskier
+    // technique anyway, not the one worth optimizing for.
+    [4006, 340], [4038, 304], [4070, 340],
     [4180, 365], [4230, 365],
-    [4338, 288], [4385, 212], [4442, 343],
+    [4372, 310], [4422, 299], [4472, 310],
     [5710, 340], [5745, 340], [5865, 340], [5995, 340],
     // second half — platform tier: same 14px-above-surface offset
     [3740, 286], [3780, 286],     // "coin perch" platform at x3700-3810, y300
@@ -193,6 +257,7 @@ export default {
     [5010, 326],                  // stepping stone at x4960-5060, y340
     [5170, 326],                  // stepping stone at x5120-5220, y340
     [6140, 286], [6180, 286],     // platform at x6100-6220, y300
+    [6333, 330],                  // on top of the tall wall at x6300-6366, y344
     // second half — ground tier
     [5320, 396], [5620, 396], [5660, 396],
     [6400, 396], [6450, 396], [6500, 396]
@@ -204,7 +269,11 @@ export default {
     { x: 5300, y: GROUND_Y - 70, width: 8, height: 70 }   // after the long spike bed
   ],
 
-  goal: { x: 7100, y: 200, width: 10, height: GROUND_Y - 200 },
+  // No goal flag (2026-09-21) — the edge of the world is the goal. The old
+  // flag sat at x:7100, 100px short of where the ground actually ends, and
+  // touching it cleared the level; that's what let a clear fire without the
+  // player ever reaching the edge. See scenes/playingScene.js's
+  // EDGE_TRIGGER_MARGIN for what starts the ending now.
 
   // Level 1's boss can't be fought — walking into range plays a cutscene
   // where a rescue NPC deals with it, stomping it and leaving its pickaxe
@@ -219,5 +288,5 @@ export default {
   // fully inside the camera's view (see updateCutscene in playingScene.js) —
   // wakeX alone isn't enough since the camera eases toward the player rather
   // than snapping, so it can still lag behind at the moment wakeX is crossed.
-  boss: { mode: 'cutscene', wakeX: 6560, chargeSpeed: 1.536 }
+  boss: { mode: 'cutscene', wakeX: 6560, chargeSpeed: 2.75 }
 };

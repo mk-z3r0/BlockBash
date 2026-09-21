@@ -35,7 +35,11 @@
         const ahead = player.x + player.width + lookahead;
         const enemyAhead = state.enemies.some(e => e.alive && !e.boss &&
           e.x > player.x && e.x - (player.x + player.width) < 58 && Math.abs(e.y - player.y) < 40);
-        if (!solidAt(ahead) || spikeAt(ahead) || enemyAhead) { key('keydown',' '); hold = hold0; }
+        // solid blocks jumped ONTO, not over — see gap-probe.html's note
+        const wallAhead = lv.platforms.some(p => !p.ground && p.width > 1 &&
+          ahead >= p.x && ahead <= p.x + p.width &&
+          p.y < player.y + player.height && p.y + p.height > player.y);
+        if (!solidAt(ahead) || spikeAt(ahead) || enemyAhead || wallAhead) { key('keydown',' '); hold = hold0; }
       }
       if (hold > 0 && --hold === 0) key('keyup', ' ');
       const beforeX = player.x;

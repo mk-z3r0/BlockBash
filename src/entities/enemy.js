@@ -1,6 +1,6 @@
 import { ctx } from '../engine/renderer.js';
 import { drawStickLegs, drawMuscleArm, drawPickaxeIcon } from '../engine/renderer.js';
-import { isColliding, STOMP_BOUNCE } from '../engine/physics.js';
+import { isColliding, P } from '../engine/physics.js';
 import { spawnExplosion } from './particles.js';
 import { playStomp, playSurprise } from '../audio/sfx.js';
 import { pickaxeAngleAt, pickaxeFistAt, miningAngleAt, miningFistAt } from '../weapons/pickaxe.js';
@@ -81,14 +81,14 @@ export function updateEnemies(player, cutsceneActive) {
     if (isColliding(player, eBox)) {
       if (enemy.boss) {
         // the boss can't be killed by the player — bounce off harmlessly
-        player.velocityY = STOMP_BOUNCE;
+        player.velocityY = P.STOMP_BOUNCE;
         player.x = enemy.x - player.width - 5;
       } else {
         const fromAbove = player.velocityY > 0 && (player.y + player.height) - enemy.y < enemy.w * 0.6;
         if (fromAbove) {
           enemy.alive = false;
           enemy.squish = 14;
-          player.velocityY = STOMP_BOUNCE;
+          player.velocityY = P.STOMP_BOUNCE;
           state.score += 100;
           playStomp();
         } else if (player.invincible <= 0) {

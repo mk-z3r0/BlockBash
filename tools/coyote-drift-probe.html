@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- Measures exactly how far past a ledge (horizontally and vertically) the
      player can be when a coyote-time jump still fires — i.e. how "clearly
-     over the pit" a late jump press can look before COYOTE_FRAMES expires. -->
+     over the pit" a late jump press can look before P.coyoteFrames expires. -->
 <html><body style="margin:0;background:#000;">
 <script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true }));</script>
 <canvas id="game" width="800" height="450"></canvas><pre id="out"></pre>
@@ -11,7 +11,7 @@
   import { state } from '../src/state.js';
   import { update } from '../src/scenes/sceneManager.js';
   import { getLevel } from '../src/levels/levelLoader.js';
-  import { COYOTE_FRAMES } from '../src/engine/physics.js';
+  import { P } from '../src/engine/physics.js';
   const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
   const out = [];
 
@@ -23,12 +23,12 @@
     const edgeX = seg.x + seg.width;
     // Explicit, complete reset — this runs many times in one page load (once
     // per frame value swept), so nothing can be left over from a previous
-    // call's jump (isOnGround, coyoteTimer, jumpBuffer, jumpCut all matter
+    // call's jump (isOnGround, coyoteTimer, jumpBuffer all matter
     // to whether the next jump press fires).
     player.x = edgeX - 250; player.y = lv.groundY - player.height;
     player.velocityX = 0; player.velocityY = 0; player.invincible = 99999;
     player.isOnGround = true; player.wasOnGround = true;
-    player.coyoteTimer = 0; player.jumpBuffer = 0; player.jumpCut = true;
+    player.coyoteTimer = 0; player.jumpBuffer = 0;
     state.enemies.forEach(e => e.alive = false);
     if (runSpeed) key('keydown', 'Shift');
     key('keydown', 'ArrowRight');
@@ -52,11 +52,11 @@
   }
 
   setTimeout(() => {
-    out.push('COYOTE_FRAMES = ' + COYOTE_FRAMES);
+    out.push('P.coyoteFrames = ' + P.coyoteFrames);
     for (const runSpeed of [false, true]) {
       out.push(`\n=== ${runSpeed ? 'RUN' : 'WALK'} speed ===`);
       let lastJumpFrame = null;
-      for (let f = 0; f <= COYOTE_FRAMES + 1; f++) {
+      for (let f = 0; f <= P.coyoteFrames + 1; f++) {
         const r = measure(runSpeed, f);
         out.push(`${f} frames after leaving ground: pastEdge=${Math.round(r.pastEdgeX)}px belowSurface=${Math.round(r.belowSurfaceY)}px jumped=${r.jumped}`);
         if (r.jumped) lastJumpFrame = f;

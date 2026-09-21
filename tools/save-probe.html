@@ -56,8 +56,12 @@
     state.score = 555;
     state.enemies.forEach(e => e.alive = false);
     const lv = getLevel();
-    player.x = lv.goal.x; player.y = lv.goal.y + 5; player.velocityX = 0; player.velocityY = 0;
-    update();
+    // walk into the edge trigger zone — there's no goal flag any more
+    // (2026-09-21), reaching the world's edge is what ends the level
+    player.x = lv.worldEdgeX - 110; player.y = lv.groundY - player.height;
+    player.velocityX = 0; player.velocityY = 0;
+    update(); // starts the edge-of-world transition; doesn't win on its own
+    key('keydown', 'Escape'); key('keyup', 'Escape'); // Escape skips it to the payoff
     out.push('10. real playthrough to the win screen: gameState=' + state.gameState);
     out.push('11. what actually landed in localStorage: ' + localStorage.getItem('blockbash-save'));
 

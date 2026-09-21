@@ -10,6 +10,7 @@
   import { update } from '../src/scenes/sceneManager.js';
   import { keys } from '../src/engine/input.js';
   import { pollGamepad } from '../src/engine/gamepad.js';
+  import { P } from '../src/engine/physics.js';
   const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
   const out = [];
 
@@ -40,18 +41,28 @@
     out.push('2. B released: keys[" "]=' + !!keys[' '] + '  (must be false)');
 
     // --- left stick should drive movement ---
-    player.x = 1000; player.velocityX = 0;
+    // respawnFreeze is reset to 0 before each timed run — otherwise the
+    // ~0.5s post-spawn freeze (set by resetPlayer() when title->playing
+    // fired above) silently eats into the tick budget below. That went
+    // unnoticed under the old, much larger ACCEL (saturated to cap in ~4-5
+    // frames regardless); the real SMB3-accurate accel (physics-lab,
+    // 2026-09-20) ramps up over dozens of frames, so a shortened window
+    // shows up as a real shortfall instead of a rounding error. Tick counts
+    // below are sized to comfortably clear each cap from a standing start
+    // (walkMax needs ~28 frames, runMax ~46 — see physics.js's accel).
+    player.x = 1000; player.velocityX = 0; player.respawnFreeze = 0;
     fakePad.axes[0] = -1; // full left
-    for (let i = 0; i < 40; i++) tick();
-    out.push('3. stick full left for 40 ticks: velocityX=' + player.velocityX.toFixed(2) + '  (must be negative, walk-capped near -1.6)');
+    for (let i = 0; i < 60; i++) tick();
+    out.push('3. stick full left for 60 ticks: velocityX=' + player.velocityX.toFixed(2) + '  (must be negative, walk-capped near -' + P.walkMax.toFixed(2) + ')');
     fakePad.axes[0] = 0;
 
     // --- A (index 0, bottom button = run) should raise the speed cap ---
-    player.x = 1000; player.velocityX = 0;
+    player.x = 1000; player.velocityX = 0; player.respawnFreeze = 0;
+    player.pMeter = 0; player.pMeterTimer = 0; // fresh P-meter — this checks the runMax cap, not pSpeedMax
     fakePad.axes[0] = -1;
     fakePad.buttons[0].pressed = true; // A = run
-    for (let i = 0; i < 40; i++) tick();
-    out.push('4. stick left + A held for 40 ticks: velocityX=' + player.velocityX.toFixed(2) + '  (must be more negative than step 3 — run-capped near -2.88)');
+    for (let i = 0; i < 60; i++) tick();
+    out.push('4. stick left + A held for 60 ticks: velocityX=' + player.velocityX.toFixed(2) + '  (must be more negative than step 3 — run-capped near -' + P.runMax.toFixed(2) + ')');
     fakePad.axes[0] = 0; fakePad.buttons[0].pressed = false;
 
     // --- Y (action) should do nothing until the weapon is earned, then

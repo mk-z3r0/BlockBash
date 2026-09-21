@@ -77,7 +77,7 @@
     out.push('== SPIKES ==');
     lv.hazards.forEach(hz => {
       const seg = ground.find(p => hz.x >= p.x && hz.x <= p.x + p.width);
-      if (hz.width > 150) { out.push(`  ${hz.x}-${hz.x+hz.width} (${hz.width}px): platform crossing, tested below`); return; }
+      if (hz.width > 200) { out.push(`  ${hz.x}-${hz.x+hz.width} (${hz.width}px): platform crossing, tested below`); return; }
       const r = styles.map(([n,l,h]) => `${n}:${jumpTest(hz.x, seg.x, hz.x + hz.width, l, h)}`);
       out.push(`  ${hz.x}-${hz.x+hz.width} (${hz.width}px)  ${r.join('  ')}`);
     });
@@ -85,7 +85,7 @@
     // ---- 2b. how wide is the timing window on each spike? ----
     out.push('== SPIKE TIMING WINDOW (px of lead before the spikes) ==');
     lv.hazards.forEach(hz => {
-      if (hz.width > 150) return;
+      if (hz.width > 200) return;
       const seg = ground.find(p => hz.x >= p.x && hz.x <= p.x + p.width);
       const okLeads = [];
       for (let lead = 0; lead <= 160; lead += 10) {
@@ -104,16 +104,35 @@
     let maxX = player.x, hold = 0, lives0 = state.lives, deaths = [];
     for (let i = 0; i < 12000; i++) {
       if (player.isOnGround && hold === 0) {
-        // 14px now (was 28, then 20) — a fixed pixel lookahead doesn't scale
-        // with speed on its own, and each further speed cut (2026-09-19,
-        // run now down to 2.304) needs a re-sweep or the same 2150-2190 gap
-        // starts failing again. tools/autoplay-lookahead-sweep.html: 10-16
-        // clear clean, 18+ all fail the same way, so 14 sits with margin.
-        // Re-sweep this any time a speed constant changes.
-        const ahead = player.x + player.width + 14;
+        // 21px now (physics-lab retune, 2026-09-20) — a fixed pixel lookahead
+        // doesn't scale with speed on its own; re-swept via
+        // tools/autoplay-lookahead-sweep.html?lookahead=N after the SMB3
+        // physics rewrite + hand-tuned accel/walkMax/runMax bump. Re-sweep
+        // any time a speed constant changes.
+        //
+        // Known remaining limitation, not re-chased further (2026-09-20):
+        // this simple bot still dies repeatedly around x=5686, just short of
+        // the 5700 spike bed, on most lookahead/hold combos tried (18-22 /
+        // 16-24). Confirmed via direct trace this is NOT the spike bed
+        // itself being uncrossable — jumpTest() clears it fine in isolation,
+        // and a clean restart at the same x with the same lookahead/hold
+        // also clears it. It's state carried over from landing the
+        // *previous* jump (the 5500-5590 gap) that sometimes leaves the bot
+        // grounded past its own trigger check's window before it reacts —
+        // a bot-precision gap, not evidence a human would struggle here.
+        const ahead = player.x + player.width + 21;
         const enemyAhead = state.enemies.some(e => e.alive && !e.boss &&
           e.x > player.x && e.x - (player.x + player.width) < 58 && Math.abs(e.y - player.y) < 40);
-        if (!solidAt(ahead) || spikeAt(ahead) || enemyAhead) { key('keydown',' '); hold = 16; }
+        // Solid blocks that have to be jumped ONTO rather than over — the
+        // staircase treads and the tall wall (2026-09-20). solidAt() only
+        // looks at ground segments, so without this the bot walks straight
+        // into a step and stalls there forever. A non-ground platform
+        // counts as blocking only when its vertical span actually overlaps
+        // the player's: floating platforms well overhead don't trigger it.
+        const wallAhead = lv.platforms.some(p => !p.ground && p.width > 1 &&
+          ahead >= p.x && ahead <= p.x + p.width &&
+          p.y < player.y + player.height && p.y + p.height > player.y);
+        if (!solidAt(ahead) || spikeAt(ahead) || enemyAhead || wallAhead) { key('keydown',' '); hold = 16; }
       }
       if (hold > 0 && --hold === 0) key('keyup', ' ');
       const beforeX = player.x;   // loseLife() teleports to the checkpoint
@@ -122,7 +141,7 @@
       if (player.x > maxX) maxX = player.x;
       if (state.gameState !== 'playing') break;
     }
-    out.push(`  furthest: ${Math.round(maxX)} / goal ${lv.goal.x}   deaths: ${deaths.length}`);
+    out.push(`  furthest: ${Math.round(maxX)} / edge ${lv.worldEdgeX}   deaths: ${deaths.length}`);
     out.push(`  died near x: ${deaths.length ? deaths.join(', ') : 'never'}`);
     out.push(`  gameState: ${state.gameState}`);
     out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));

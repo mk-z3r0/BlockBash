@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<!-- Verifies the two "climb" obstacles added 2026-09-20 — the staircase at
+     2990-3222 and the tall wall at 6300 — are actually surmountable, and
+     reports how wide the timing window is on the wall (the only one that
+     needs a committed single jump rather than a step up).
+
+     These are solid blocks flush with the ground, a different shape from
+     everything gap-probe.html measures: there's no pit to fall in and no
+     spike to die on, so "failure" here is stalling against the side of a
+     block forever, which no death counter would ever catch. -->
+<html><body style="margin:0;background:#000;">
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true }));</script>
+<canvas id="game" width="800" height="450"></canvas><pre id="out"></pre>
+<script>window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update } from '../src/scenes/sceneManager.js';
+  import { getLevel } from '../src/levels/levelLoader.js';
+  const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+  const out = [];
+
+  function place(x, lv) {
+    player.x = x; player.y = lv.groundY - player.height;
+    player.velocityX = 0; player.velocityY = 0;
+    player.isOnGround = true; player.wasOnGround = true;
+    player.coyoteTimer = 0; player.jumpBuffer = 0;
+    player.respawnFreeze = 0; player.pMeter = 0; player.pMeterTimer = 0;
+    player.invincible = 99999;
+    state.enemies.forEach(e => { e.alive = false; });
+  }
+
+  // Drives the same policy gap-probe.html's autoplay uses (jump when a
+  // solid block's vertical span is about to overlap yours), which is the
+  // closest thing to "a player walking up to this and dealing with it".
+  function climb(startX, runSpeed, frames, lv) {
+    place(startX, lv);
+    key('keydown', 'ArrowRight'); if (runSpeed) key('keydown', 'Shift');
+    let hold = 0, highestFeet = Infinity, maxX = player.x;
+    for (let i = 0; i < frames; i++) {
+      if (player.isOnGround && hold === 0) {
+        const ahead = player.x + player.width + 21;
+        const wallAhead = lv.platforms.some(p => !p.ground && p.width > 1 &&
+          ahead >= p.x && ahead <= p.x + p.width &&
+          p.y < player.y + player.height && p.y + p.height > player.y);
+        if (!lv.platforms.some(p => p.ground && ahead >= p.x && ahead <= p.x + p.width) || wallAhead) {
+          key('keydown', ' '); hold = 16;
+        }
+      }
+      if (hold > 0 && --hold === 0) key('keyup', ' ');
+      update();
+      if (player.isOnGround) highestFeet = Math.min(highestFeet, player.y + player.height);
+      maxX = Math.max(maxX, player.x);
+    }
+    key('keyup', ' '); key('keyup', 'ArrowRight'); if (runSpeed) key('keyup', 'Shift');
+    return { highestFeet, maxX };
+  }
+
+  setTimeout(() => {
+    key('keydown', ' '); key('keyup', ' ');
+    const lv = getLevel();
+
+    // solid blocks standing on the ground line, left to right
+    const blocks = lv.platforms
+      .filter(p => !p.ground && Math.abs((p.y + p.height) - lv.groundY) < 1)
+      .sort((a, b) => a.x - b.x);
+    out.push('ground-flush solid blocks found: ' + blocks.map(b => `${b.x}(${b.height}px)`).join(' '));
+
+    const stairs = blocks.filter(b => b.x < 4000);
+    const walls = blocks.filter(b => b.x >= 4000);
+
+    out.push('');
+    out.push('== STAIRCASE ==');
+    if (stairs.length) {
+      const topStep = stairs[stairs.length - 1];
+      const topSurface = topStep.y;
+      const past = topStep.x + topStep.width;
+      for (const run of [false, true]) {
+        const r = climb(stairs[0].x - 120, run, 420, lv);
+        out.push(`  ${run ? 'RUN ' : 'WALK'}: highest footing y=${r.highestFeet} (top tread is ${topSurface})` +
+          `  reachedTop=${r.highestFeet <= topSurface + 2}  gotPast=${r.maxX > past}  (both must be true)`);
+      }
+    } else out.push('  none found');
+
+    out.push('');
+    out.push('== TALL WALL (timing window) ==');
+    for (const w of walls) {
+      const surface = w.y;
+      const oks = [];
+      for (let lead = 0; lead <= 120; lead += 10) {
+        place(w.x - 220, lv);
+        key('keydown', 'ArrowRight');
+        let jumped = false, hold = 0, landedOnTop = false;
+        for (let i = 0; i < 220; i++) {
+          if (!jumped && player.isOnGround && player.x + player.width >= w.x - lead) {
+            key('keydown', ' '); jumped = true; hold = 16;
+          }
+          if (hold > 0 && --hold === 0) key('keyup', ' ');
+          update();
+          if (jumped && player.isOnGround && player.y + player.height <= surface + 2) landedOnTop = true;
+        }
+        key('keyup', ' '); key('keyup', 'ArrowRight');
+        if (landedOnTop) oks.push(lead);
+      }
+      out.push(`  wall at ${w.x} (${w.height}px tall): lands on top jumping ${oks.length ? oks[0] + '-' + oks[oks.length - 1] + 'px early' : 'NEVER'}  (${oks.length}/13 timings)`);
+    }
+
+    out.push('');
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 200);
+</script></body></html>

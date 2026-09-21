@@ -28,16 +28,22 @@
     state.score = 42;
 
     // --- reach the goal at level 0: should ADVANCE, not win, score persists ---
+    // (2026-09-21: there's no goal flag any more — reaching the world's
+    // EDGE is what ends a level, and it starts a transition rather than
+    // advancing on the spot. Escape skips that transition straight to the
+    // payoff this test actually cares about.)
     const lv0 = getLevel();
-    player.x = lv0.goal.x; player.y = lv0.goal.y + 5; player.velocityX = 0; player.velocityY = 0;
+    player.x = lv0.worldEdgeX - 110; player.y = lv0.groundY - player.height; player.velocityX = 0; player.velocityY = 0;
     update();
+    key('keydown', 'Escape'); key('keyup', 'Escape');
     out.push('after reaching goal at level 0: ' + snap());
 
     // --- reach the goal at level 1 (now the last level): should WIN ---
     state.enemies.forEach(e => { if (e.boss) e.alive = false; });
     const lv1 = getLevel();
-    player.x = lv1.goal.x; player.y = lv1.goal.y + 5; player.velocityX = 0; player.velocityY = 0;
+    player.x = lv1.worldEdgeX - 110; player.y = lv1.groundY - player.height; player.velocityX = 0; player.velocityY = 0;
     update();
+    key('keydown', 'Escape'); key('keyup', 'Escape');
     out.push('after reaching goal at level 1 (last): ' + snap());
 
     // --- from win, restart: should go back to level 0 (a fresh run) ---
@@ -48,8 +54,9 @@
     state.enemies.forEach(e => { if (e.boss) e.alive = false; });
     state.score = 77;
     const lvA = getLevel();
-    player.x = lvA.goal.x; player.y = lvA.goal.y + 5; player.velocityX = 0; player.velocityY = 0;
+    player.x = lvA.worldEdgeX - 110; player.y = lvA.groundY - player.height; player.velocityX = 0; player.velocityY = 0;
     update();
+    key('keydown', 'Escape'); key('keyup', 'Escape');
     out.push('advanced to level 1 again: ' + snap());
 
     state.lives = 1;

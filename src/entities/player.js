@@ -1,12 +1,6 @@
 import { keys } from '../engine/input.js';
 import { ctx, VIEW_HEIGHT, drawStickLegs, drawMuscleArm } from '../engine/renderer.js';
-import {
-  GRAVITY_UP, GRAVITY_DOWN, ACCEL, FRICTION, AIR_FRICTION, TURN_ACCEL,
-  WALK_MAX_SPEED, RUN_MAX_SPEED,
-  JUMP_FORCE, JUMP_CUT_MULTIPLIER, COYOTE_FRAMES, JUMP_BUFFER_FRAMES,
-  RESPAWN_FREEZE_FRAMES, RESPAWN_INVINCIBLE_FRAMES,
-  isColliding
-} from '../engine/physics.js';
+import { P, isColliding } from '../engine/physics.js';
 import { getLevel } from '../levels/levelLoader.js';
 import { spawnDust } from './particles.js';
 import { playJump } from '../audio/sfx.js';
@@ -28,10 +22,11 @@ export const player = {
   bazookaCooldown: 0, // unused while the bazooka is parked — see weapons/bazooka.js
   coyoteTimer: 0,
   jumpBuffer: 0,
-  jumpCut: true,
   wasOnGround: false,
   shout: 0,
-  respawnFreeze: 0 // frames left of ignoring left/right input after a respawn — see resetPlayer()
+  respawnFreeze: 0, // frames left of ignoring left/right input after a respawn — see resetPlayer()
+  pMeter: 0,      // 0..P.pMeterSegments — full unlocks the pSpeedMax run cap, see physics.js
+  pMeterTimer: 0  // frames toward the next fill/drain tick, see physics.js's pMeterFillFrames/pMeterDrainFrames
 };
 
 export let respawnPoint = { x: 100, y: 300 };
@@ -46,7 +41,74 @@ export function resetDustTimer() {
 }
 
 export function bufferJump() {
-  player.jumpBuffer = JUMP_BUFFER_FRAMES;
+  player.jumpBuffer = P.jumpBufferFrames;
+}
+
+// --- axis-separated platform collision (2026-09-20) ---
+// Move + resolve X, THEN move + resolve Y — never both axes off one
+// combined move. The previous approach moved x and y together in one step
+// and picked whichever of the four overlaps (left/right/top/bottom) came
+// out smallest, which works fine at low speed but misreads a fast landing
+// as a side hit once horizontal speed and gravity both grew: landing
+// dead-center on a platform's top edge with enough velocityX built up can
+// leave the top overlap larger than the side overlap for a frame, so the
+// old code would think you'd run into the platform's side instead of
+// landing on it. Resolving one axis at a time removes the ambiguity
+// entirely — each axis only ever has two candidate sides, picked by the
+// sign of that axis's velocity, never by comparing overlap sizes.
+//
+// Each axis move is substepped so a single frame's move can't tunnel past
+// (or otherwise skip testing against) a platform thinner than the move
+// itself — e.g. level1's checkpoint poles are 8px wide, and jump/fall
+// speed regularly exceeds that in a single frame. Substep size is half the
+// smallest solid platform dimension in the level, per the same margin used
+// elsewhere in this codebase for "small enough not to skip an edge."
+function resolvePlatformsX(platforms) {
+  for (const platform of platforms) {
+    if (platform.width <= 1) continue; // a fully retracted ledge is not solid
+    if (!isColliding(player, platform)) continue;
+    if (player.velocityX >= 0) player.x = platform.x - player.width;
+    else player.x = platform.x + platform.width;
+    player.velocityX = 0;
+  }
+}
+
+function resolvePlatformsY(platforms) {
+  for (const platform of platforms) {
+    if (platform.width <= 1) continue;
+    if (!isColliding(player, platform)) continue;
+    if (player.velocityY >= 0) {
+      player.y = platform.y - player.height;
+      player.velocityY = 0;
+      player.isOnGround = true;
+    } else {
+      player.y = platform.y + platform.height;
+      player.velocityY = 0;
+    }
+  }
+}
+
+function moveAndResolveAxis(axis, platforms) {
+  const isX = axis === 'x';
+  const velocity = isX ? player.velocityX : player.velocityY;
+  if (velocity === 0) return;
+
+  let minDim = Infinity;
+  for (const p of platforms) {
+    if (p.width <= 1) continue;
+    minDim = Math.min(minDim, p.width, p.height);
+  }
+  const maxStep = Number.isFinite(minDim) ? Math.max(1, minDim / 2) : Math.abs(velocity);
+  const steps = Math.max(1, Math.ceil(Math.abs(velocity) / maxStep));
+  const stepAmount = velocity / steps;
+
+  for (let i = 0; i < steps; i++) {
+    if (isX) player.x += stepAmount; else player.y += stepAmount;
+    if (isX) resolvePlatformsX(platforms); else resolvePlatformsY(platforms);
+    // a collision just zeroed the velocity for this axis — nothing left to
+    // substep, so stop rather than continuing to move at the old velocity
+    if ((isX ? player.velocityX : player.velocityY) === 0) break;
+  }
 }
 
 export function resetPlayer() {
@@ -55,12 +117,13 @@ export function resetPlayer() {
   player.velocityX = 0;
   player.velocityY = 0;
   player.isOnGround = false;
-  player.invincible = RESPAWN_INVINCIBLE_FRAMES;
-  player.respawnFreeze = RESPAWN_FREEZE_FRAMES;
+  player.invincible = P.RESPAWN_INVINCIBLE_FRAMES;
+  player.respawnFreeze = P.RESPAWN_FREEZE_FRAMES;
   player.coyoteTimer = 0;
   player.jumpBuffer = 0;
-  player.jumpCut = true;
   player.wasOnGround = false;
+  player.pMeter = 0;
+  player.pMeterTimer = 0;
 }
 
 // Called once per frame while gameState === 'playing'. Handles movement,
@@ -71,9 +134,9 @@ export function updatePlayer(inputLocked) {
   const level = getLevel();
   // Frozen right after a respawn: ignores left/right (but not jump) so a
   // disoriented player can't immediately walk into an enemy or off a ledge
-  // into a pit — see the RESPAWN_FREEZE_FRAMES note in physics.js for why
+  // into a pit — see the P.RESPAWN_FREEZE_FRAMES note in physics.js for why
   // invincibility alone (below) never covered the pit case. Checked BEFORE
-  // decrementing so the freeze holds for exactly RESPAWN_FREEZE_FRAMES full
+  // decrementing so the freeze holds for exactly P.RESPAWN_FREEZE_FRAMES full
   // frames, not one fewer (a real off-by-one caught by
   // tools/respawn-safety-probe.html: checking after the decrement let one
   // frame of input through right on the boundary).
@@ -82,100 +145,111 @@ export function updatePlayer(inputLocked) {
   const left = !inputLocked && !frozen && (keys['ArrowLeft'] || keys['a']);
   const right = !inputLocked && !frozen && (keys['ArrowRight'] || keys['d']);
   const running = !inputLocked && keys['Shift'];
-  const maxSpeed = running ? RUN_MAX_SPEED : WALK_MAX_SPEED;
 
-  if (left && !right) {
-    if (player.velocityX > 0) player.velocityX -= TURN_ACCEL; // reversing: extra kick to kill old momentum
-    player.velocityX -= ACCEL;
-    player.facing = -1;
-    // clamped only while actively accelerating — see the note below on why
-    // this doesn't happen unconditionally every frame
-    player.velocityX = Math.max(-maxSpeed, Math.min(maxSpeed, player.velocityX));
-  } else if (right && !left) {
-    if (player.velocityX < 0) player.velocityX += TURN_ACCEL;
-    player.velocityX += ACCEL;
-    player.facing = 1;
-    player.velocityX = Math.max(-maxSpeed, Math.min(maxSpeed, player.velocityX));
+  // --- P-meter: fills while |vx| >= runMax, drains otherwise — driven
+  // purely by current speed, not by which button is held (see physics.js).
+  // Frame counts, not distances, so P.SCALE never applies here. ---
+  if (Math.abs(player.velocityX) >= P.runMax) {
+    if (++player.pMeterTimer >= P.pMeterFillFrames) {
+      player.pMeterTimer = 0;
+      player.pMeter = Math.min(P.pMeterSegments, player.pMeter + 1);
+    }
+  } else if (++player.pMeterTimer >= P.pMeterDrainFrames) {
+    player.pMeterTimer = 0;
+    player.pMeter = Math.max(0, player.pMeter - 1);
+  }
+  const hasPMeter = player.pMeter >= P.pMeterSegments;
+
+  // --- horizontal: ONE accel value for every tier (walk/run/P-speed) —
+  // only the CAP below differs by tier, never the ramp-up rate. Skidding
+  // (input opposing current velocity) uses its own steeper skidDecel;
+  // ground friction and easing back down to a cap that just dropped are
+  // both ground-only — momentum is preserved in the air except through
+  // active steering (airControlMultiplier), matching the real game. See
+  // physics.js for why this replaced the old flat ACCEL/TURN_ACCEL model. ---
+  const runCap = hasPMeter ? P.pSpeedMax : P.runMax;
+  const maxSpeed = running ? runCap : P.walkMax;
+  const airborneLocked = !player.isOnGround && P.lockAirMomentum;
+  const airMul = player.isOnGround ? 1 : P.airControlMultiplier;
+  const hitDir = (left && right) ? 0 : left ? -1 : right ? 1 : 0;
+
+  if (hitDir === 0) {
+    if (!airborneLocked) {
+      const decel = player.isOnGround ? P.groundFriction : P.airFriction;
+      if (player.velocityX > 0) player.velocityX = Math.max(0, player.velocityX - decel);
+      else if (player.velocityX < 0) player.velocityX = Math.min(0, player.velocityX + decel);
+    }
+    // else: airborne-locked with no input held — frozen at takeoff speed
   } else {
-    // No direction held: friction only, no speed-cap clamp. The cap used to
-    // apply unconditionally every frame, which meant releasing Shift
-    // mid-air (maxSpeed dropping from RUN to WALK) instantly chopped
-    // existing run-speed momentum down to the walk cap on the very next
-    // frame, even with AIR_FRICTION at 0 — a second, more subtle way the
-    // same "why did I stop over the pit" bug could happen. Momentum should
-    // only change via friction (grounded) or active steering (the branches
-    // above), never a passive clamp reacting to a cap that just changed.
-    const friction = player.isOnGround ? FRICTION : AIR_FRICTION;
-    if (player.velocityX > 0) player.velocityX = Math.max(0, player.velocityX - friction);
-    else if (player.velocityX < 0) player.velocityX = Math.min(0, player.velocityX + friction);
+    const opposing = (player.velocityX > 0 && hitDir < 0) || (player.velocityX < 0 && hitDir > 0);
+    if (!airborneLocked || opposing) {
+      player.facing = hitDir;
+      if (opposing) {
+        player.velocityX += hitDir * P.skidDecel * airMul;
+      } else if (Math.abs(player.velocityX) < maxSpeed) {
+        player.velocityX += hitDir * P.accel * airMul;
+      } else if (player.isOnGround) {
+        // above the current cap (e.g. Shift released mid-run) — ease back
+        // down to it, grounded only
+        player.velocityX -= hitDir * P.groundFriction;
+      }
+    }
+    // else: airborne-locked with input held in the SAME direction as
+    // current velocity — frozen at takeoff speed until landing or reversal
   }
 
   // --- coyote time: still allowed to jump briefly after leaving a ledge ---
-  if (player.isOnGround) player.coyoteTimer = COYOTE_FRAMES;
+  if (player.isOnGround) player.coyoteTimer = P.coyoteFrames;
   else if (player.coyoteTimer > 0) player.coyoteTimer--;
 
   // --- jump buffer: a press just before landing still fires the jump ---
   if (player.jumpBuffer > 0) player.jumpBuffer--;
 
   if (!inputLocked && player.jumpBuffer > 0 && player.coyoteTimer > 0) {
-    player.velocityY = JUMP_FORCE;
+    // Jump power is sampled ONCE from horizontal speed at takeoff and
+    // latched for the whole jump — never recomputed mid-air. tier = how
+    // many speedTierBounds the takeoff |vx| clears, capped at 3.
+    let tier = 0;
+    for (const bound of P.speedTierBounds) {
+      if (Math.abs(player.velocityX) >= bound) tier++;
+    }
+    tier = Math.min(tier, 3);
+    player.velocityY = P.baseJumpVelocity + P.jumpTable[tier];
     player.isOnGround = false;
     player.coyoteTimer = 0;
     player.jumpBuffer = 0;
-    player.jumpCut = false;
     playJump();
     spawnDust(player.x + player.width / 2, player.y + player.height, 9, { spread: 3.2, size: 8, life: 20 });
   }
 
-  // --- variable jump height: releasing the key early cuts the jump short ---
+  // --- gravity: three states, re-evaluated every frame — there is no
+  // jump-cut velocity multiplier; releasing jump just switches from the
+  // light rise gravity to the heavier fall gravity immediately, which is
+  // what actually produces variable jump height in the real game. Holding
+  // jump back down mid-rise re-enters the light gravity too, as long as vy
+  // is still above riseGravityThreshold — that's correct SMB3 behavior,
+  // not a bug to fix. See physics.js for the ROM sourcing on all of this. ---
   const jumpHeld = keys[' '] || keys['ArrowUp'] || keys['w'];
-  if (!jumpHeld && !player.jumpCut && player.velocityY < 0) {
-    player.velocityY *= JUMP_CUT_MULTIPLIER;
-    player.jumpCut = true;
-  }
-
-  // --- gravity: heavier on the way down for a snappier, more predictable arc ---
-  player.velocityY += (player.velocityY < 0) ? GRAVITY_UP : GRAVITY_DOWN;
+  const rising = player.velocityY < -P.riseGravityThreshold && jumpHeld;
+  player.velocityY += rising ? P.gravityRise : P.gravityFall;
+  player.velocityY = Math.min(player.velocityY, P.terminalVelocity);
   const incomingFallSpeed = player.velocityY;
 
-  // --- move ---
-  player.x += player.velocityX;
-  player.y += player.velocityY;
+  // --- move + resolve, one axis at a time — see the note above
+  // moveAndResolveAxis for why this replaced a combined move with
+  // min-overlap resolution ---
+  moveAndResolveAxis('x', level.platforms);
 
-  // --- world bounds ---
+  // --- world bounds (x) --- checked right after the x-axis resolves, same
+  // as the world edges were always the x-axis's other kind of wall
   if (player.x < 0) { player.x = 0; player.velocityX = 0; }
   if (player.x + player.width > level.worldWidth) {
     player.x = level.worldWidth - player.width;
     player.velocityX = 0;
   }
 
-  // --- platform collisions ---
   player.isOnGround = false;
-  for (const platform of level.platforms) {
-    if (platform.width <= 1) continue; // a fully retracted ledge is not solid
-    if (isColliding(player, platform)) {
-      const overlapLeft   = (player.x + player.width) - platform.x;
-      const overlapRight  = (platform.x + platform.width) - player.x;
-      const overlapTop    = (player.y + player.height) - platform.y;
-      const overlapBottom = (platform.y + platform.height) - player.y;
-      const minOverlap = Math.min(overlapLeft, overlapRight, overlapTop, overlapBottom);
-
-      if (minOverlap === overlapTop && player.velocityY >= 0) {
-        player.y = platform.y - player.height;
-        player.velocityY = 0;
-        player.isOnGround = true;
-      } else if (minOverlap === overlapBottom && player.velocityY < 0) {
-        player.y = platform.y + platform.height;
-        player.velocityY = 0;
-      } else if (minOverlap === overlapLeft && player.velocityX >= 0) {
-        player.x = platform.x - player.width;
-        player.velocityX = 0;
-      } else if (minOverlap === overlapRight && player.velocityX <= 0) {
-        player.x = platform.x + platform.width;
-        player.velocityX = 0;
-      }
-    }
-  }
+  moveAndResolveAxis('y', level.platforms);
 
   // --- landing dust: a puff sized to how hard the landing was ---
   if (!player.wasOnGround && player.isOnGround) {
@@ -186,9 +260,9 @@ export function updatePlayer(inputLocked) {
 
   // --- running dust: puffs kicked up behind the player while running on
   // the ground. Gated on the run input itself, not just speed — walking
-  // already clears the old 0.6 speed threshold on its own now that walk
-  // is slower but still >0.6, so speed alone doesn't distinguish them. ---
-  if (player.isOnGround && running && Math.abs(player.velocityX) > 0.6) {
+  // alone can also clear minWalkSpeed, so speed alone doesn't distinguish
+  // the two. ---
+  if (player.isOnGround && running && Math.abs(player.velocityX) > P.minWalkSpeed) {
     dustTimer--;
     if (dustTimer <= 0) {
       dustTimer = 3;
@@ -214,7 +288,7 @@ export function updatePlayer(inputLocked) {
 export function drawPlayer(frameCount) {
   if (player.invincible > 0 && Math.floor(frameCount / 4) % 2 === 0) return;
 
-  const moving = player.isOnGround && Math.abs(player.velocityX) > 0.6;
+  const moving = player.isOnGround && Math.abs(player.velocityX) > P.minWalkSpeed;
   const legSwing = moving ? Math.sin(frameCount * 0.5) * 14 : 4;
   const hw = player.width / 2;
   const hh = player.height / 2;

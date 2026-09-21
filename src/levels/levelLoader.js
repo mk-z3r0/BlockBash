@@ -11,6 +11,16 @@ export function loadLevel(data) {
     name: data.name,
     worldWidth: data.worldWidth,
     groundY,
+    // Where the solid ground actually stops — the literal edge of this cube
+    // face (see scenes/playingScene.js's edge-transition state machine and
+    // levels/levelRenderer.js's drawWorldEdge). Deliberately NOT the same
+    // thing as worldWidth: worldWidth is free to extend further, reserving
+    // empty space past the edge purely so the camera has room to pan into
+    // and reveal the edge-of-world visual before the player physically gets
+    // there (the camera never shows past worldWidth). Computed from the raw
+    // ground data rather than authored per level, so every level gets a
+    // correct edge automatically, including ones with a gap right at the end.
+    worldEdgeX: Math.max(...data.ground.map(g => g.x + g.width)),
     playerSpawn: { ...data.playerSpawn },
 
     // ground segments and floating platforms share one array — collision
@@ -33,7 +43,11 @@ export function loadLevel(data) {
       };
     }),
     checkpoints: (data.checkpoints || []).map(c => ({ ...c, activated: false })),
-    goal: { ...data.goal },
+    // No `goal` any more (2026-09-21): levels used to end at a flag placed
+    // short of the actual edge, which meant "level cleared" could fire
+    // without the player ever reaching — or even seeing — the edge it was
+    // standing in for. The edge itself is the goal now; see `worldEdgeX`
+    // above and the transition trigger in scenes/playingScene.js.
     boss: data.boss ? { ...data.boss } : null,
     house: data.house ? { ...data.house } : null,
 

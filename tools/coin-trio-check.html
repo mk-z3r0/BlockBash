@@ -23,7 +23,7 @@
     player.x = hazardX - 150; player.y = lv.groundY - player.height;
     player.velocityX = 0; player.velocityY = 0; player.invincible = 99999;
     player.isOnGround = true; player.wasOnGround = true;
-    player.coyoteTimer = 0; player.jumpBuffer = 0; player.jumpCut = true;
+    player.coyoteTimer = 0; player.jumpBuffer = 0;
     state.enemies.forEach(e => e.alive = false);
     coinXs.forEach(x => { const c = coins.find(c => c.x === x); if (c) c.collected = false; });
     if (runSpeed) key('keydown', 'Shift');
@@ -43,12 +43,12 @@
 
   setTimeout(() => {
     for (const lead of [-15, -10, -5, 0, 5, 10, 15]) {
-      const r1 = jumpOver(3980, false, [3985, 4011, 4043], lead);
+      const r1 = jumpOver(3980, false, [4006, 4038, 4070], lead);
       out.push(`3980-4028 (WALK) lead=${lead}: ` + JSON.stringify(r1));
     }
     for (const lead of [-15, -10, -5, 0, 5, 10, 15]) {
-      const r2 = jumpOver(4320, true, [4338, 4385, 4442], lead);
-      out.push(`4320-4410 (RUN) lead=${lead}: ` + JSON.stringify(r2));
+      const r2 = jumpOver(4320, true, [4372, 4422, 4472], lead);
+      out.push(`4320-4480 (RUN) lead=${lead}: ` + JSON.stringify(r2));
     }
 
     out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));

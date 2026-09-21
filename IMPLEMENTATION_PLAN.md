@@ -12,16 +12,27 @@ http (Live Server) — not `file://`.
 
 ```
 src/
-  engine/     game loop, physics constants, input, camera, renderer
-  entities/   player, enemy, npc, coins, particles
+  main.js     fixed-timestep loop (accumulator, see Architecture constraints)
+  state.js    run state (lives, score, enemies, …)
+  save.js     versioned localStorage progress
+  engine/     physics constants (SMB3-derived), input, gamepad, camera, renderer
+  entities/   player, enemy, npc, coins, particles, weaponPickup
   weapons/    pickaxe (melee, earned — see the Level 1 retrofit),
               bazooka, chainsaw (both parked, not wired into any scene — for later levels)
-  levels/     levelLoader, levelRenderer, trickPlatforms (parked), data/level1.js, data/testLevel.js (sandbox dupe, see below)
-  scenes/     sceneManager + title, playing, win, gameOver
+  levels/     levelLoader, levelRenderer, registry, trickPlatforms (parked),
+              data/level1.js, data/testLevel.js (sandbox dupe, see below)
+  scenes/     sceneManager + title, intro, playing, win, gameOver; blockHouse (shared drawing)
   ui/         hud, overlays
   audio/      audio (synth), sfx
-tools/        gap-probe, cutscene-probe, weapon-probe, shot  (dev tools, need the server running)
+tools/        ~35 single-purpose probe pages (gap-probe, climb-probe, progression-probe,
+              save-probe, physics-lab, …) — dev-only, need the server running
 ```
+
+`tools/` is append-only by habit: each probe is a throwaway page written to
+answer one question, kept afterwards so the answer can be re-checked when a
+constant changes. `tools/physics-lab.html` is the exception — it's a real
+live-tuning harness, not a one-shot probe, and it's how the current physics
+values were arrived at.
 
 `data/testLevel.js` is a straight duplicate of `data/level1.js`, loaded instead
 of it when the game is opened with `?test` in the URL (see `levels/registry.js`)
@@ -34,11 +45,23 @@ the real level 1. It diverges freely once created; nothing keeps it in sync.
 | 1 — data-driven levels, loader, transitions | steps 1–4 done — loader, renderer, spikes, level 1 extended |
 | **Milestone: Level 1 complete** | **not yet reached** — progression + versioned save are done; 4 of 5 retrofit items done (intro cutscene, coin thresholds, skybox, weapon gating resolved); carved platform damage remains |
 | 2+ (level tool, chamfers, enemies, weapons, octagons, world manipulation, polish) | not started, re-scoped by the design doc, blocked on the milestone |
+| *out of band* — SMB3 physics rewrite + tuning lab, level-1 retune, level-edge transition | done on `physics-lab`, unmerged. None of these were in the numbered order; they came up because the game needed to *feel* right and needed a way to leave a level before level 2 was worth building |
 
-Level 1 runs 0–7200px: pits and passive spheres, then a spike half, then an
-unwinnable boss (50% larger than a normal sphere, wielding a pickaxe)
-resolved by a rescue NPC that stomps it and leaves the pickaxe behind — the
-player's first and only weapon this level. Three checkpoints.
+Level 1 runs 0–7200px: pits and passive spheres, a staircase and a tall wall,
+then a spike half, then an unwinnable boss (50% larger than a normal sphere,
+wielding a pickaxe) resolved by a rescue NPC that stomps it and leaves the
+pickaxe behind — the player's first and only weapon this level. Three
+checkpoints. It ends at the world's edge, not a flag: the player leaps off,
+the cube rotates under them, and they land on the next face (see
+[Level-edge transition](#level-edge-transition-2026-09-20-physics-lab-branch)).
+
+Level 1 is face 1 of 6, then a descent, then the hollow centre — GAME_DESIGN.md's
+"Story Arc — surface to core" is the shape the rest of the build order is
+aimed at. Only level 1 exists today; the registry has one real entry.
+
+The `physics-lab` branch carries the SMB3-derived physics rewrite, the tuning
+lab, the level-1 retune, and the edge transition. It hasn't been merged to
+`main` — deliberately, at the user's instruction.
 
 See [Milestone: Level 1 complete](#milestone-level-1-complete) — nothing
 below it starts until that's checked off.
@@ -98,6 +121,82 @@ constants survive; the trigger model gets replaced.
 **Non-gameplay modes are scenes.** The opening cutscene (cube planet, descending
 spheres, corner exploding) renders nothing like a side-scroller. That's a scene,
 and the scene manager already handles the swap.
+
+**Weapon sound identities are part of the weapon, not polish.** `audio/sfx.js`
+is procedural, so a new sound is a function rather than an asset — cheap to add,
+which is exactly why it keeps getting deferred. The design doc now specifies an
+audio signature per weapon (sustained drill buzz, dynamite's fuse-pause-boom,
+the restoration weapon's crystalline chime). Write the sound with the weapon in
+the same piece of work; the list is going to grow past a dozen entries and
+retrofitting identity onto a weapon that already ships feeling generic is much
+harder than it sounds.
+
+### Scaling concerns (2026-09-21 review)
+
+Observed by reading the current codebase against what levels 2–7 and the story
+arc actually need. None of these are broken today — they're all things that get
+expensive in direct proportion to how long they're left.
+
+**Level data files will outgrow single files.** `src/levels/data/level1.js` is
+already 223 lines and most of that is the comments that make it maintainable at
+all. Add evolving enemy behaviours, the trick platforms coming back, and runtime
+terrain-damage state, and level 3–4 files balloon well past readable. Split per
+level into sub-modules — `level1/geometry.js`, `level1/enemies.js`,
+`level1/events.js` — with a barrel file assembling them. Side benefit that
+matters more than it looks: two people can then edit different parts of the same
+level without a merge conflict.
+
+**The cutscene state machine in `playingScene.js` is already straining.** The
+boss cutscene is 100+ lines of state machine sharing a file with the entire
+gameplay update/draw loop, and the edge transition added a second one beside it.
+Still coming: octagon corruption reveals, the NPC handoff beat, and a boss
+encounter per level. This file becomes the dumping ground for every scripted
+moment in the game. Phase 5 already nominally owns "cutscene engine earns its
+own home" — **the edge transition and the NPC arc make that urgent enough to
+move earlier in the build order** (see step 4b below). A lightweight
+`cutsceneRunner.js` taking a sequence of timed beats (freeze, animate, callback)
+would empty most of `playingScene.js`'s state-machine weight and make every
+future scripted moment cheap instead of structural.
+
+**The weapon system needs its entity-agnostic refactor *before* level 2, not
+during it.** The existing note above covers `updateWeaponInput`. The additional
+piece: `entities/weaponPickup.js` also assumes a single drop type (the pickaxe).
+The moment level 2 introduces a second weapon, pickups need a `type` field
+mapping to different swing/fire/draw/sound behaviours — and the naive version of
+that is an if/else chain that grows with every weapon. Build a **weapon registry**
+(register a weapon by name; look up behaviour, drawing, and sound by type) as
+part of the same piece of work as the entity-agnostic refactor. One job, done
+once, rather than two half-migrations.
+
+**~~Camera only tracks X~~ — done (2026-09-21).** `engine/camera.js` now has
+`camera.y` alongside `camera.x`, added for the edge transition's look-down beat.
+It's 0 for all normal play and `updateCamera` still only drives X, but the axis
+exists and `drawWorldAndHUD` honours it. When a face is oriented so the player
+traverses vertically, or level 7's hollow interior needs vertical descent, the
+remaining work is giving Y the same easing and clamping X already has — not
+threading a new axis through the renderer.
+
+**NPC persistence across levels is state that doesn't exist yet.** The rescue
+NPC's arc — progressive damage, reappearances, the handoff, the corruption —
+needs state that survives a level load, and nothing in the current architecture
+does that. `state.js` holds run-level counters, `loadLevel()` clones level data
+fresh every time, and the NPC itself is a local variable in `playingScene.js`
+that gets nulled between levels. This needs deciding deliberately: either a
+`narrativeState` object in `state.js` (NPC damage level, which cutscenes have
+played, story-gate flags) or a separate `story.js` module. `save.js` would need
+to persist it too, or quitting mid-game loses the story position while keeping
+the level progress — which would read as a bug. **Design this before building
+the NPC's level 2+ appearances**, not alongside them.
+
+**`playingScene.js` is becoming a god module.** At 362 lines it already owns:
+level loading, the gameplay update loop, every collision response, the boss
+cutscene, the edge transition, pause, life/death/respawn, the level-end check,
+drawing the entire world, and input routing. Every system listed above wants to
+add more to it. Worth a deliberate decomposition: extract collision response,
+extract the cutscene runner, and turn the update loop into a sequence of named
+subsystem calls instead of an inline block. **The target: adding a new system
+means adding a module and one line to the update sequence — not weaving 40 lines
+into the middle of an existing function.**
 
 ---
 
@@ -163,20 +262,64 @@ De-risks the foundation without needing enemy AI to exist. Comes after the
 level tool so the tool only has to support one terrain format, not two.
 *Expect jump tuning to shift slightly near cut edges — re-run the gap probe.*
 
+Chamfers also carry the design doc's **visual degradation** arc — minor chips
+early, sanded-smooth sections mid-game, barely-square architecture by level 6.
+That's authored terrain, not a system, so it costs nothing extra at runtime,
+but it does mean the level tool (step 3) should make cut depth easy to vary.
+
+**4b. Cutscene runner — pulled forward from Phase 5** *(added 2026-09-21)*
+A lightweight `cutsceneRunner.js` that takes a sequence of timed beats
+(freeze, animate, callback) and runs them, so scripted moments stop living
+inside `playingScene.js`. Originally filed under step 9's "cutscenes"; moved
+here because two state machines already share that file (boss + edge
+transition) and everything queued behind this step adds more: octagon
+corruption reveals, the NPC handoff and corruption beat, a boss per level.
+Doing it before the content lands means each of those is a data-shaped beat
+list instead of another 100 lines welded into the update loop. See the
+scaling notes in Architecture constraints.
+
+Pairs with the first slice of the **`playingScene.js` decomposition** — the
+update loop becoming a sequence of named subsystem calls. The cutscene runner
+is the piece that makes the rest of that decomposition possible.
+
 **5. Enemies**
 Base class and the passive → pursuing → aggressive tiers. Enemies hold weapons.
+Also where the **spheres' ranged attack** lands (mid-to-late tiers) — the design
+doc flags *what* they fire as an open question, with the hard constraint that it
+can't be the player's triangle projectile and has to read as sphere-shaped.
 
-**6. Weapons**
+**6. Weapons + weapon registry**
 Entity-agnostic (see constraints). Player starts unarmed, weapons drop from
 defeated enemies — level 1's melee pickaxe (`weapons/pickaxe.js`) is a
 narrow, single-level version of this already; this step generalizes it
 across enemy tiers and adds the ranged triangle shooter with limited ammo.
 
-**7. Octagons**
+Build the **weapon registry in the same piece of work**, not after it:
+`entities/weaponPickup.js` currently assumes one drop type, and the second
+weapon turns both the pickup and the input/hit paths into if/else chains that
+grow per weapon. Register by name, look up behaviour/drawing/sound by type.
+Target roster is 3–5 weapons; only the pickaxe and the restoration weapon are
+decided, so the registry has to tolerate the middle tier changing shape.
+
+**7. Octagons + the NPC arc**
 Needs 5 and 6 — they're enemies, and restoring them needs the triangle weapon.
 Introduced by a corruption cutscene. A restored one turns back into a square
 and runs off-screen; that's the rescue NPC's existing `exit` state, so the
 behavior is mostly already written.
+
+This is also where the **rescue NPC's story arc** lands (progressive damage
+across levels, the weapon handoff, the NPC's own corruption immediately after,
+and the player being forced to restore them). Two prerequisites that aren't
+obvious from the story side:
+
+- **Narrative state has to exist first.** Nothing currently survives a level
+  load — see the scaling note on NPC persistence. Decide `narrativeState` vs a
+  `story.js` module, and whether `save.js` persists it, *before* building the
+  level 2+ appearances rather than discovering it halfway through.
+- **The handoff/corruption beat is the payoff for the cutscene runner** (4b).
+  It's the single most sequenced moment in the game — give weapon, corrupt NPC,
+  force the player to use it on them — and it's exactly the kind of thing that
+  becomes unmaintainable as another inline state machine.
 
 *The real tension here is the ammo.* Triangles are scarce and the same weapon
 is the player's main gun, so every rescue costs offence — and the square you
@@ -197,6 +340,24 @@ since it's the player's first impression and motivates everything. **Touch
 controls belong here too** — parked for now (2026-09-18), see note below.
 "Polish" here means procedural refinement (particles, screen shake, animation
 curves, juice) — not a sprite pipeline; see the art-direction decision above.
+
+The generic cutscene machinery has moved out of this step to **4b**; what's
+left here is the per-level boss content itself. The design doc now carries a
+boss-per-level framework (Foreman → Excavator → Sculptor → Demolition Crew →
+Terraformer → General → the Core), of which only level 1 is built and only
+level 7 is decided. Worth noting the intended shape before any of it is built:
+it escalates through **mechanic variety** rather than health bars, and two of
+the candidates (the Sculptor, the Core) are won by *restoration* rather than
+damage — so the triangle weapon needs to work against a boss-sized target, not
+just field octagons.
+
+**Level 7 — the core** is its own thing and the one boss that's decided: a
+corrupted dodecahedron at the centre of the hollowed planet, attacked by
+restoring it face by face while it reshapes the arena (shockwaves, floor
+sections rounding off and collapsing, gravity distortion). Two systems it
+leans on that nothing else does: an arena the player **orbits on platforms**,
+and terrain that deforms *as an attack* rather than as sphere set-dressing —
+which is step 8's carving system pointed at the player instead of the scenery.
 
 Chamfers sit at #4 — right after the level tool, before any of the systems
 that depend on the damage language (octagons, carving) — because retrofitting
@@ -310,6 +471,261 @@ Benchmark: an autoplayer with a fixed-lookahead policy clears level 1 without
 dying. That proves nothing is impossible or unfair — it says nothing about
 whether it's fun.
 
+### 2026-09-20 retune: SMB3-accurate physics rewrite (physics-lab branch)
+
+The whole model above — flat ACCEL/FRICTION, single GRAVITY_UP/DOWN split,
+the ~93.5px/~168px walk/run carry numbers — was replaced wholesale by an
+SMB3-accurate physics core (see physics.js and the physics-lab task doc),
+then hand-tuned off the ROM-accurate defaults after playtesting felt too
+slow. **Every number above this heading describes the old model and is no
+longer live** — kept for the reasoning, not the values. New landmarks:
+
+- **New carry figures: walk ~132.5px, run (no P-meter) ~245.8px**, both
+  measured with a full/generous hold via the same trace methodology as
+  before (tools/jump-trajectory-probe.html). There's now also a **third
+  tier, P-speed**, that unlocks automatically after ~1.2s of sustained
+  running (accel-to-cap + the P-meter's own fill time) — a long enough
+  straightaway lets a "run-required" gap get cleared with even more margin
+  than the run figure above, which is fine (more margin never breaks
+  anything) but means carry distance is no longer just two clean numbers.
+- **The walk/run carry gap grew enough that most of level 1's original gap
+  widths stopped requiring run at all** (new walk-carry alone clears
+  everything up to ~130px). Restored the "requires run" role specifically
+  for the 3500 gap (70px -> 160px, by shrinking the ground segment after
+  it) and the 4320 spike bed (90px -> 160px, by widening the hazard in
+  place) — the two gaps/hazards whose own comments explicitly documented
+  that as their purpose. Left the rest alone rather than rescaling
+  everything on principle; not-technically-broken gaps that just got a
+  bit easier aren't a problem worth manufacturing work over.
+- **Widening a gap by shrinking the ground segment on either side of it
+  doesn't require moving anything else in the level.** Ground segments and
+  everything else (platforms/hazards/coins/enemies) are all positioned by
+  absolute world coordinates, not relative to their segment's start — so
+  resizing one segment's extent is a fully local edit, verified safe by
+  checking nothing else's coordinates fall inside the span being eaten.
+  Much simpler than the cascading-shift relayout this looked like it would
+  need at first.
+- **A single fixed-pixel autoplay lookahead can get permanently stuck at
+  one specific spot for reasons that have nothing to do with that spot's
+  actual difficulty.** The 5700 spike bed's autoplay run died repeatedly at
+  the same x regardless of hazard width (60px, 45px, 35px all identical) or
+  lookahead/hold tuning (18-22 / 16-24 all identical) — traced directly and
+  confirmed the hazard clears fine both via the isolated jumpTest() harness
+  and a clean restart at the same position with the same bot parameters.
+  The actual cause is state carried over from landing the *previous* jump
+  (the 5590 gap) sometimes leaving the bot grounded past its own
+  once-per-grounded-frame trigger check's window before it reacts — a bot
+  precision gap, not a level design flaw. Confirmed separately (a real
+  playthrough via tools/save-probe.html reaches the win screen). Don't
+  trust one autoplay bot's specific stuck point as proof of an unfair
+  obstacle without checking whether a fresh, isolated attempt at the same
+  spot also fails.
+- **A perfectly symmetric 3-coin trio (equal y on both outer coins) isn't
+  always achievable for 100% of realistic jump timings, because
+  gravityFall is heavier than gravityRise** — the rise and fall halves of a
+  real jump arc sit at different heights for the same x-offset from the
+  apex. Swept the outer coins' shared y across the full timing range
+  (tools/coin-trio-check.html) rather than picking one side's value or
+  averaging blind: found no y that collects all 3 across every timing, and
+  picked the one that works from the canonical "jump right at the edge"
+  timing through early jumps, sacrificing only late-jump collection (the
+  riskier technique anyway, not the one worth optimizing for).
+- **Enemy patrol speeds and the boss's chargeSpeed need to move in lockstep
+  with player speed changes, same as before** — flagged as already-drifted
+  in the physics rewrite's own report (the boss's charge had fallen slower
+  than the player's plain walk) and rescaled by the same ~1.79x the new
+  walkMax grew over the old one, preserving every enemy's relative speed
+  to the player exactly.
+- **The boss's mining cutscene now actually carves a gap out of the ground
+  it's standing on**, not just a particle effect over solid ground (see
+  carveMiningGap in playingScene.js) — triggered on the third of ~5 mining
+  swings during 'freeze', small enough (2 blocks, comfortably walk-clearable)
+  to read as "look what it did" on the way to the goal rather than a hazard
+  sprung on the player. Reverses itself on a mid-level retry
+  (resetBossAndCutscene splices the original ground segment back by object
+  reference) but persists once the boss is actually beaten — the world
+  stays reshaped after a real clear.
+
+### 2026-09-20 later: climb obstacles, and where the boss digs
+
+- **Ground-flush solid blocks are a third obstacle shape**, alongside pits
+  and hazards: a staircase (2990-3222, four treads a tile apart) and one
+  tall wall (6300, 3 tiles). Unlike every floating platform in the level
+  these sit *on* the ground line, so they're climbed/jumped-onto rather
+  than jumped-across, and crucially **they can't kill you** — failing one
+  means stalling against its side, not dying. No death counter catches
+  that, which is why they get their own probe (tools/climb-probe.html)
+  rather than relying on gap-probe's autoplay death count.
+- **Adding them broke the autoplay bot in a way that looked like nothing at
+  all.** Its jump trigger was `!solidAt(ahead) || spikeAt(ahead) ||
+  enemyAhead`, and `solidAt()` only ever looked at *ground* segments — a
+  solid block ahead reads as perfectly solid ground, so the bot walked
+  into the first tread and stood there pushing right forever, with zero
+  deaths logged. Fixed by adding a `wallAhead` test (a non-ground platform
+  whose vertical span overlaps the player's — floating platforms overhead
+  correctly don't trigger it) to both gap-probe.html and
+  autoplay-lookahead-sweep.html. Worth remembering that "no deaths" and
+  "made progress" are different assertions.
+- **Sizing: a 16-frame hold clears 82px, a full hold 117px** (both speed
+  tiers are tier 2 at the current caps, so walk and run jump the same
+  height). 3 tiles (66px) leaves real margin — 10/13 approach timings land
+  on top of the wall — while still being the tallest thing in the level.
+- **The boss digs to the side it's facing, never underneath itself.**
+  Enemies have no ground collision at all (updateEnemies only moves x
+  between minX/maxX), so a pit opening under the boss left it visibly
+  hanging in mid-air over its own hole. It now faces right for the whole
+  mining beat and the gap opens immediately to its right, then a new
+  'turn' beat flips it to face left, pops its "!" and holds a moment
+  before the charge — previously the turn and the charge happened on the
+  same frame, which read as the boss having known you were there all along.
+- **That dig position then constrained the boss's patrol range.** Digging
+  to the right meant the dig point tracked the boss's right edge, and the
+  boss patrolled to 7100 — right up against the goal flag at 7100 — so
+  carveMiningGap's goal-clearance clamp silently squeezed the gap to zero
+  width whenever the boss woke on the right half of its patrol, and the
+  dig just… didn't happen. Pulled maxX back to 7010. A cutscene beat that
+  depends on an entity's *runtime* position needs that position's whole
+  range checked, not just its spawn point.
+
+---
+
+## Level-edge transition (2026-09-20, physics-lab branch)
+
+> **Built and playable**, not planned — commit `613d363`, reworked in
+> `7c90e0b`. What it should *feel* like, and what it means in the story
+> (each level is one face of the cube; the edge is the seam between faces)
+> lives in GAME_DESIGN.md → "Level Transitions — the cube edge". This
+> section is the mechanism only: the state machine, the frame counts, the
+> drawing approach. If the two ever disagree about intent, the design doc
+> wins; if they disagree about what the code does, this one does.
+>
+> Read the **2026-09-21 revision** subsection below before trusting the
+> beat names in the next few paragraphs — the original
+> `approach/pause/rotate/hold` machine was largely rebuilt after
+> playtesting, and the beats are now `approach/brink/leap/land`.
+
+Not part of the original numbered build order — the design doc's "7 levels,
+one per cube face" premise didn't have a mechanic for actually *arriving* at
+the next face until now. Built ahead of level 2 existing at all (the
+registry still only has one real entry), so it's exercised today by
+`tools/progression-probe.html` forcing a second registry entry, same trick
+already used to test level-advance-vs-win.
+
+**What happens:** reaching the goal, once the boss cutscene has resolved
+(`bossActive()` false — same gate the old immediate-advance code used),
+starts a state machine scoped to `scenes/playingScene.js` (same shape as the
+boss cutscene, for the same reason: it needs that scene's own live
+platforms/player/camera, not a fresh scene's isolated state):
+`null -> 'approach' -> 'pause' -> 'rotate' -> 'hold' ->` (advance to the next
+level, or win if this was the last one). `'approach'` walks the player the
+rest of the way to the *actual* edge of the ground data — the goal marker
+sits a little short of it on purpose, same as it always has, which turns out
+to double as exactly the runway this needed. `'rotate'` pivots the whole
+scene -PI/2 around that edge point over ~90 eased frames; `'rotate'`/`'hold'`
+skip player/enemy/particle physics entirely (there's no meaningful "up" to
+apply gravity toward mid-spin), everything else still runs normally.
+Skippable any time with a keypress, same convention as the opening cutscene.
+
+- **`worldWidth` and "the edge" are now two different things, on purpose.**
+  The camera's clamp is `worldWidth - VIEW_WIDTH`, so if the edge-of-world
+  wall visual (`levelRenderer.js`'s `drawWorldEdge`) were drawn starting
+  exactly at `worldWidth`, the camera could never pan far enough to reveal
+  any of it before the player was already standing on top of it — the whole
+  point of foreshadowing "you're approaching the edge" would be invisible
+  until it was too late to see coming. `worldEdgeX` (new, computed in
+  `levelLoader.js` from where the ground data actually stops, not authored)
+  is the real edge; `worldWidth` got 300px of headroom added past it purely
+  so the camera has room to reveal the wall in advance. Nothing solid exists
+  in that 300px — it's camera runway, not playable space.
+- **The rotation direction has a real, checked-not-assumed consequence for
+  which way "old ground" and "new ground" end up**, and the two things the
+  task asked for (angle = exactly -PI/2, AND old ground reading as "rising up
+  and away") turned out to be in tension. Verified empirically (headless
+  screenshots through the actual rotation, not hand-derived trig) rather
+  than trusting either claim blind: at -PI/2, the wall's near face rotates
+  to become flat new ground extending *forward* in the same direction the
+  player was already walking — the more important outcome, gameplay-wise —
+  while old ground rotates to end up receding *below*, not literally
+  "rising." The other sign (+PI/2) gets old-ground genuinely rising, but at
+  the cost of new-ground extending *backward* behind the player instead,
+  which reads worse. Kept the specified -PI/2. Flagged, not silently
+  resolved — worth another look if the direction ever feels wrong in person,
+  since screenshots aren't the same as playing it.
+- **`drawBackground` is deliberately exempted from the rotation**, even
+  though the task described background as one of the things that rotates
+  together with everything else. It fills the entire canvas every frame
+  (`fillRect(0,0,VIEW_WIDTH,VIEW_HEIGHT)`); rotated around an off-center
+  pivot that fill stops covering the canvas corners, which is a real visual
+  bug (flashing gaps), not a subtle deviation. It also doesn't make physical
+  sense for a starfield light-years away to visibly spin from one small
+  patch of planet surface tilting 90°. Everything that's actually *part* of
+  the world (ground, platforms, the edge wall, player, enemies, particles)
+  still rotates together.
+- **Any probe that teleports the player to the end of a level and expects an
+  immediate advance/win from a single `update()` call now needs a skip
+  keypress in between** (`save-probe.html`, `progression-probe.html`) —
+  reaching the end now only *starts* the transition. Caught this the boring
+  way: ran the regression sweep, watched `progression-probe.html`'s "reach
+  goal at level 1 (last)" line come back `state=playing` instead of
+  `state=win`. Worth remembering for level 2's own probes later: a key press
+  without a matching `keyup` is a held-key repeat on the *second* call, not a
+  second fresh press — `input.js`'s `alreadyDown` tracking (correctly)
+  ignores it, which is exactly what silently broke the first pass at this fix.
+
+### 2026-09-21 revision: playtested, and largely rebuilt
+
+Seeing it in motion changed most of it. What the first pass got wrong:
+
+- **Don't draw anything past the edge.** The first pass filled the space
+  beyond the edge with a ground-coloured slab standing in for "the next
+  face seen side-on". It read as more ground with no outline — the one
+  place the player most needs to read "this stops HERE" was the least
+  legible thing on screen. Past the edge is now empty: the parallax grid
+  shows straight through, and the drop is obvious. The only things drawn
+  are the bright corner seam and a translucent band for the cube's
+  *interior* (behind the cut face, never past it).
+- **A glow that rises above the ground surface reads as a doorway, not a
+  cliff.** The seam used to extend 60px above `groundY`. It now starts
+  exactly at the top surface and fades downward.
+- **The camera has to actually look down, or the depth isn't there.**
+  Added `camera.y` (0 for all normal play) and a 'brink' beat that eases
+  the player to the centre of the screen on *both* axes before the jump.
+  Centring x matters as much as y: it puts the empty space past the edge
+  across the whole right half of the frame instead of crammed against it.
+- **The player jumps; the world rotates under them.** Much better than the
+  original "player stands still and rotates with the scenery" — the player
+  is now drawn OUTSIDE the rotation transform, stays upright through a
+  scripted arc, and lands on whichever face has swung into place. The arc
+  is scripted rather than physics-driven because "down" is precisely what's
+  changing during that beat; gravity would have to pick one of the two
+  floors and looks wrong against either. Rotation finishes at ~82% of the
+  arc so they come down on ground that's already settled.
+  Convenient geometry: the new face's surface ends up at exactly the same
+  screen height as the old one, so a flat arc from edge to landing works
+  without any vertical fudging.
+- **The goal flag is gone entirely, and that fixes a real bug.** It sat
+  100px short of the actual edge and touching it cleared the level, so a
+  clear could fire without the player reaching — or even seeing — the edge
+  it stood for. The edge itself is the trigger now
+  (`EDGE_TRIGGER_MARGIN`), `goal` is off the level-data shape, and
+  `carveMiningGap`'s old "don't dig away the flag" guard became "don't dig
+  into the walk-up corridor" (which matters more: that walk runs with real
+  physics, so a hole there would drop the player mid-cutscene).
+- **"Skippable with any key" was wrong for this one.** The intro can take
+  any key because the player isn't playing when it runs. This fires
+  mid-stride with movement and jump very likely being pressed, so an
+  ordinary jump input during the walk-up instantly cleared the level with
+  none of the ending seen — almost certainly the "clear without reaching
+  the edge" bug as experienced. Skip is Escape only now.
+- **A third bot had the same silent-stall bug and nobody noticed.**
+  `walk-only-autoplay.html` never got the `wallAhead` fix the other two
+  bots got when the staircase landed, so it had been stopping dead at the
+  first tread — reported as "likely a wall only run can cross", which read
+  as a finding rather than a broken bot. Fixed; it now climbs the stairs
+  and stops at the 3500 gap instead, which is genuinely run-only by
+  design. When one bot gets a fix for a whole class of obstacle, check
+  every bot.
+
 ---
 
 ## Level 1 retrofit
@@ -345,17 +761,55 @@ To add:
 
 ## Open questions
 
+GAME_DESIGN.md is the register of record for open *design* questions — this
+list is only the subset that changes what gets built, and in what order.
+
 **Blocking:** none right now.
+
+**Decided since this list was last written** (2026-09-21 — full reasoning in
+GAME_DESIGN.md, repeated here only where it constrains the build):
+- **The arc is 6 surface faces → descent → hollow centre → dodecahedron
+  core.** Level 7 is not a seventh face; it's a different kind of space, and
+  step 9 now carries notes about that.
+- **The cube-edge transition is the level-to-level connector.** No goal flag
+  any more. Anything that assumed "touch the goal → advance" is gone.
+- **Weapon roster targets 3–5, not an open-ended set.** Pickaxe and the
+  restoration weapon are decided; the rest are candidates. This is why step 6
+  now folds in a weapon registry rather than adding weapons ad hoc.
+- **The rescue NPC has a four-beat arc** (protector → deterioration →
+  handoff → corruption). That's what forces cross-level narrative state, and
+  it's why step 7 now has an NPC-persistence line item and the Scaling
+  concerns section has a `narrativeState` vs. `story.js` note.
+- **Cutscenes get a data-driven runner** — pulled forward from step 5 to
+  step 4b, because the boss cutscene and the edge transition are already two
+  hand-rolled state machines in one scene file and a third would be the
+  point of no return.
 
 **Worth deciding when step 7 gets close:**
 - Can a *different* weapon kill an octagon outright? If so, killing one means
   killing a victim who could have been saved — a possible moral beat, or an
   unfair trap, depending on how clearly the game signals it.
+- **How the NPC arc ends.** GAME_DESIGN.md lists the candidate endings and
+  deliberately doesn't pick one. It matters here because "the NPC can be
+  saved" and "the NPC cannot be saved" imply different amounts of state to
+  persist, and different level-7 content.
+
+**Newly open, and cheap to defer:**
+- **Do spheres shoot back?** Step 5 now carries a ranged-attack note as
+  tentative. If the answer is no, that note comes back out; if yes, it
+  changes enemy-projectile collision and probably the camera's comfort zone.
+- **Does the coin economy buy anything beyond lives?** Candidate only. The
+  thresholds in level 1 are already tuned for lives-only, so adding a second
+  sink means re-tuning, not just adding a menu.
+- **How much visual degradation is authored vs. procedural?** The
+  environmental-storytelling section assumes later faces look more chewed-up.
+  Authoring that per level multiplies level-data size — see Scaling concerns.
 
 **Not blocking yet** (from the design doc — they land in steps 6–9):
-NPC roles and dialogue, boss frequency, weapon inventory vs. one-at-a-time,
-whether octagon restoration is required or optional, cutscene style,
-multiplayer, sound direction.
+boss frequency, weapon inventory vs. one-at-a-time, whether octagon
+restoration is required or optional, multiplayer. Sound direction is no
+longer on this list — GAME_DESIGN.md has a Sound Design section now, and the
+per-weapon sound-identity constraint moved into Architecture constraints.
 
 ---
 
@@ -409,3 +863,64 @@ input work, in `engine/input.js` + `index.html`. Open question for whenever
 it's picked up: show the buttons always, or only on detected touch devices
 (leaning touch-only, to keep the keyboard experience uncluttered) — not yet
 decided.
+
+---
+
+## Parked: debug mode
+
+Wish-list item (2026-09-20), not started. The idea: the instrumentation
+that already exists in `tools/physics-lab.html`, but layered over the
+*real* level instead of a synthetic benchmark course. Most of the pieces
+below already exist there in some form — the work is mostly extraction
+into something like `src/engine/debugOverlay.js` that both can share,
+plus the bits that only make sense against real level data.
+
+Gate it the same way the sandbox level already is: a `?debug` URL param
+(matching the existing `?test`), with a hotkey to toggle the overlay once
+on. Keyboard-driven, so it stays usable while a controller is doing the
+playing.
+
+Asked for directly:
+
+- **Quick traversal.** Warp to any checkpoint/hazard/boss by name (the
+  physics-lab's marker dropdown is exactly this), plus click-to-teleport
+  and a "skip to next checkpoint" key. A free/detached camera that pans
+  independently of the player is worth having alongside it.
+- **God mode.** Note this needs *two* things, not one: invincibility
+  covers enemy and hazard contact, but the fall-into-a-pit check is
+  deliberately independent of `player.invincible` (see the
+  RESPAWN_FREEZE_FRAMES note in physics.js — this exact asymmetry is why
+  the respawn freeze had to exist). So god mode has to bypass the pit
+  death separately or it'll still drop you.
+- **Hitboxes.** Player/enemy/coin AABBs, but the highest-value one is
+  **hazards**: their kill box is deliberately inset from the art
+  (`x+4, y-12, width-8, height 12` — see levelLoader.js), so what kills
+  you is visibly smaller than what's drawn and there's currently no way to
+  see it. Also worth drawing: the weapon swing reach, and the checkpoint /
+  edge-transition trigger boxes (the latter is a margin off `worldEdgeX`,
+  invisible today, and easy to misjudge while authoring a level's ending).
+
+Other things that would earn their place:
+
+- **Enemy patrol bounds drawn in-world.** `minX`/`maxX` are pure data and
+  completely invisible today; drawing them as a line under each sphere
+  would make "this one walks off its platform" a glance instead of a
+  playthrough.
+- **World coordinate readout + tile grid,** with click-to-copy. Level data
+  is authored in absolute world pixels by hand — this would take a lot of
+  the arithmetic out of placing anything.
+- **Physics state HUD** — vx/vy, grounded, coyote timer, jump buffer,
+  P-meter fill, speed tier, gravity state. Already built in physics-lab;
+  the value is seeing it during actual play.
+- **Pause / frame-step / slow-mo,** and a **trajectory trace** of the last
+  jump overlaid on the level. Both exist in physics-lab; both are most
+  useful when you're standing in front of the jump you're arguing with.
+- **System toggles** — enemies off, hazards off, cutscene off (there's
+  already a shift-K cutscene skip to build on).
+- **Grant the pickaxe on demand.** It's boss-gated, so testing the weapon
+  currently means either playing the whole level or switching to `?test`.
+- **Cutscene state readout** (`freeze`/`turn`/`charge`/`rescue`/`done` plus
+  its timer) — that state machine is module-private and has grown enough
+  beats to be worth seeing.
+- **Step count / real fps,** to catch the class of problem the fixed
+  timestep was added for in the first place.

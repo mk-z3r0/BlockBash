@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<!-- README screenshot helper. Needs the local server running.
+     tools/readme-shot.html?x=3000&run=40&jump=1
+       x    - park the player here, then let the camera settle
+       run  - hold Right for N frames after settling (so the pose isn't a
+              standstill and the spheres have moved)
+       jump - press Jump at the start of that run
+
+     Deliberately NOT tools/shot.html: that one sets player.invincible=9999
+     to keep itself alive, and drawPlayer() flickers the player while
+     invincible, so roughly half its frames come out with no player in them.
+     Here the player stays visible and lives are topped up instead. -->
+<html><body style="margin:0;overflow:hidden;background:#0a0d1c;"><canvas id="game" width="800" height="450"></canvas>
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true }));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update } from '../src/scenes/sceneManager.js';
+  import { getLevel } from '../src/levels/levelLoader.js';
+  const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+  const q = new URLSearchParams(location.search);
+
+  setTimeout(() => {
+    key('keydown', ' '); key('keyup', ' ');   // title -> playing
+    const lv = getLevel();
+    state.lives = 3;   // 99 would paper the HUD in life icons
+    player.x = Number(q.get('x') || 100);
+    player.y = lv.groundY - player.height - 2;
+    player.velocityX = 0; player.velocityY = 0;
+    player.invincible = 0;
+    player.respawnFreeze = 0;                  // else the first 30 frames are dead time
+
+    // Teleporting the player in can drop them straight on top of a
+    // patrolling sphere, which kills them and warps the shot back to the
+    // checkpoint. Clear only the ones we landed in the lap of; everything
+    // further along stays alive and in frame.
+    state.enemies.forEach(e => {
+      if (!e.boss && Math.abs(e.x - player.x) < 140) e.alive = false;
+    });
+
+    for (let i = 0; i < 90; i++) update();     // settle the camera
+
+    const run = Number(q.get('run') || 0);
+    if (run > 0) {
+      key('keydown', 'ArrowRight');
+      if (q.has('jump')) key('keydown', ' ');
+      for (let i = 0; i < run; i++) {
+        if (q.has('jump') && i === 8) key('keyup', ' ');
+        update();
+      }
+      key('keyup', 'ArrowRight');
+    }
+  }, 200);
+</script></body></html>
