@@ -38,11 +38,11 @@ export const P = {
   // by tier, not the ramp-up rate. ROM-accurate native value is 14/256 px/
   // frame^2 (0.0752 scaled), confirmed via velipso/smb3-physics (ported
   // directly from the real disassembly) — the task spec's guess of 0.0625
-  // (16/256) was close but not the ROM value. Hand-tuned to 0.15 (2026-09-20
-  // playtesting via tools/physics-lab.html: the ROM-accurate ramp felt too
-  // slow to get moving) — roughly 2x the ROM rate, still well under the old
-  // ad-hoc model's 0.35.
-  accel: 0.15,
+  // (16/256) was close but not the ROM value. Hand-tuned upward twice since
+  // via tools/physics-lab.html playtesting (2026-09-20: 0.0752 -> 0.15,
+  // still felt slow to get moving -> 0.203) — now ~2.7x the ROM rate,
+  // still under the old ad-hoc model's 0.35.
+  accel: 0.203,
   // Ground-only: friction to a stop with no input held, AND easing back
   // down to the cap on landing above it. In the real game this shares the
   // ROM-accurate accel constant (true for "big" Mario) — kept at the ROM
@@ -51,18 +51,25 @@ export const P = {
   groundFriction: 14 / 256 * SCALE, // 0.0751953125
   // Separate, steeper deceleration when the held direction opposes current
   // velocity (skidding to a stop or reversal). ROM-accurate native value is
-  // 32/256 (0.1719 scaled); hand-tuned to 0.19 alongside the accel bump
-  // (2026-09-20 playtesting).
-  skidDecel: 0.19,
+  // 32/256 (0.1719 scaled); hand-tuned alongside accel, now matching it
+  // exactly (0.19 -> 0.203, 2026-09-20 playtesting) — not a rule, just
+  // where two rounds of "feels a bit slow" landed both at once.
+  skidDecel: 0.203,
   // Speed caps. ROM-accurate values (native -> scaled) confirmed via
   // datacrystal's SMB3 RAM notes (walk/run/run+P) and the disassembly's
   // Player_XVel comment ("max value is $38" = 56 subpixels = 3.5 native,
-  // matching run+P below): walkMax 1.5->2.0625, runMax 2.5->3.4375. Both
-  // hand-tuned up (2026-09-20 playtesting) alongside the accel bump above —
-  // pSpeedMax (the P-meter-gated top tier) is untouched, still ROM-accurate.
-  walkMax: 2.29,
-  runMax: 3.68,
-  pSpeedMax: 3.5 * SCALE,    // 4.8125 — run held, P-meter full
+  // matching run+P's original ROM value): walkMax 1.5->2.0625, runMax
+  // 2.5->3.4375. Both hand-tuned up across two playtesting rounds
+  // (2026-09-20: 2.0625->2.29->3.21, 3.4375->3.68->4) — walkMax has grown
+  // enough that it's now closer to runMax than to its own ROM value.
+  // pSpeedMax was untouched through the first round but came down slightly
+  // in the second (4.8125 -> 4.5) — with walkMax/runMax both up this much,
+  // the ROM-accurate P-speed cap left less headroom above runMax than it
+  // used to; narrowed the gap back down on purpose rather than leaving
+  // P-speed a smaller relative jump than it read as originally.
+  walkMax: 3.21,
+  runMax: 4,
+  pSpeedMax: 4.5,
   // Slide cap only matters on sloped terrain (Player_Slide in the real
   // game), which this flat-ground game doesn't have yet — exposed for lab
   // completeness/future slope support, not currently reachable in play.
@@ -70,7 +77,9 @@ export const P = {
   // Below this, treat horizontal speed as "not moving" for animation/dust
   // purposes — not an SMB3 concept, this project's own tuned threshold
   // (was a hardcoded 0.6 scattered across player.js; centralized here).
-  minWalkSpeed: 0.6,
+  // Nudged 0.6 -> 0.7 alongside the second accel/speed-cap round so the
+  // "moving" animation threshold keeps the same rough fraction of walkMax.
+  minWalkSpeed: 0.7,
   // AIR: accel/skidDecel apply at full strength in the air in the real
   // game (multiplier 1.0) — NOT halved, despite the original physics-lab
   // task spec's belief that SMB3 halves air control. velipso/smb3-physics
@@ -97,12 +106,16 @@ export const P = {
   // P-meter: fills while |vx| >= runMax, drains otherwise. Native timings
   // from datacrystal's SMB3 notes ($515 countdown: reset to 7 while
   // running, to 23 while not) — these are frame counts, not distances, so
-  // SCALE doesn't apply. pMeterSegments is the real game's step count (the
-  // status-bar meter has 7 arrows); full from empty while running
-  // continuously takes pMeterSegments * pMeterFillFrames frames.
+  // SCALE doesn't apply. pMeterSegments was the real game's step count (7,
+  // matching its 7-arrow status-bar meter) until the second hand-tuning
+  // round bumped it to 10 (2026-09-20) — with accel/runMax both higher now,
+  // reaching runMax itself takes fewer frames, so 7 segments filled too
+  // fast for P-speed to feel like a distinct, earned state; 10 stretches it
+  // back out. Full from empty while running continuously still takes
+  // pMeterSegments * pMeterFillFrames frames, just more of them now.
   pMeterFillFrames: 7,
   pMeterDrainFrames: 23,
-  pMeterSegments: 7,
+  pMeterSegments: 10,
 
   // --- Vertical ---
   // Three gravity states, re-evaluated every frame (see the switch logic
