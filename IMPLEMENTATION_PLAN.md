@@ -12,16 +12,27 @@ http (Live Server) — not `file://`.
 
 ```
 src/
-  engine/     game loop, physics constants, input, camera, renderer
-  entities/   player, enemy, npc, coins, particles
+  main.js     fixed-timestep loop (accumulator, see Architecture constraints)
+  state.js    run state (lives, score, enemies, …)
+  save.js     versioned localStorage progress
+  engine/     physics constants (SMB3-derived), input, gamepad, camera, renderer
+  entities/   player, enemy, npc, coins, particles, weaponPickup
   weapons/    pickaxe (melee, earned — see the Level 1 retrofit),
               bazooka, chainsaw (both parked, not wired into any scene — for later levels)
-  levels/     levelLoader, levelRenderer, trickPlatforms (parked), data/level1.js, data/testLevel.js (sandbox dupe, see below)
-  scenes/     sceneManager + title, playing, win, gameOver
+  levels/     levelLoader, levelRenderer, registry, trickPlatforms (parked),
+              data/level1.js, data/testLevel.js (sandbox dupe, see below)
+  scenes/     sceneManager + title, intro, playing, win, gameOver; blockHouse (shared drawing)
   ui/         hud, overlays
   audio/      audio (synth), sfx
-tools/        gap-probe, cutscene-probe, weapon-probe, shot  (dev tools, need the server running)
+tools/        ~35 single-purpose probe pages (gap-probe, climb-probe, progression-probe,
+              save-probe, physics-lab, …) — dev-only, need the server running
 ```
+
+`tools/` is append-only by habit: each probe is a throwaway page written to
+answer one question, kept afterwards so the answer can be re-checked when a
+constant changes. `tools/physics-lab.html` is the exception — it's a real
+live-tuning harness, not a one-shot probe, and it's how the current physics
+values were arrived at.
 
 `data/testLevel.js` is a straight duplicate of `data/level1.js`, loaded instead
 of it when the game is opened with `?test` in the URL (see `levels/registry.js`)
@@ -34,11 +45,23 @@ the real level 1. It diverges freely once created; nothing keeps it in sync.
 | 1 — data-driven levels, loader, transitions | steps 1–4 done — loader, renderer, spikes, level 1 extended |
 | **Milestone: Level 1 complete** | **not yet reached** — progression + versioned save are done; 4 of 5 retrofit items done (intro cutscene, coin thresholds, skybox, weapon gating resolved); carved platform damage remains |
 | 2+ (level tool, chamfers, enemies, weapons, octagons, world manipulation, polish) | not started, re-scoped by the design doc, blocked on the milestone |
+| *out of band* — SMB3 physics rewrite + tuning lab, level-1 retune, level-edge transition | done on `physics-lab`, unmerged. None of these were in the numbered order; they came up because the game needed to *feel* right and needed a way to leave a level before level 2 was worth building |
 
-Level 1 runs 0–7200px: pits and passive spheres, then a spike half, then an
-unwinnable boss (50% larger than a normal sphere, wielding a pickaxe)
-resolved by a rescue NPC that stomps it and leaves the pickaxe behind — the
-player's first and only weapon this level. Three checkpoints.
+Level 1 runs 0–7200px: pits and passive spheres, a staircase and a tall wall,
+then a spike half, then an unwinnable boss (50% larger than a normal sphere,
+wielding a pickaxe) resolved by a rescue NPC that stomps it and leaves the
+pickaxe behind — the player's first and only weapon this level. Three
+checkpoints. It ends at the world's edge, not a flag: the player leaps off,
+the cube rotates under them, and they land on the next face (see
+[Level-edge transition](#level-edge-transition-2026-09-20-physics-lab-branch)).
+
+Level 1 is face 1 of 6, then a descent, then the hollow centre — GAME_DESIGN.md's
+"Story Arc — surface to core" is the shape the rest of the build order is
+aimed at. Only level 1 exists today; the registry has one real entry.
+
+The `physics-lab` branch carries the SMB3-derived physics rewrite, the tuning
+lab, the level-1 retune, and the edge transition. It hasn't been merged to
+`main` — deliberately, at the user's instruction.
 
 See [Milestone: Level 1 complete](#milestone-level-1-complete) — nothing
 below it starts until that's checked off.
@@ -98,6 +121,82 @@ constants survive; the trigger model gets replaced.
 **Non-gameplay modes are scenes.** The opening cutscene (cube planet, descending
 spheres, corner exploding) renders nothing like a side-scroller. That's a scene,
 and the scene manager already handles the swap.
+
+**Weapon sound identities are part of the weapon, not polish.** `audio/sfx.js`
+is procedural, so a new sound is a function rather than an asset — cheap to add,
+which is exactly why it keeps getting deferred. The design doc now specifies an
+audio signature per weapon (sustained drill buzz, dynamite's fuse-pause-boom,
+the restoration weapon's crystalline chime). Write the sound with the weapon in
+the same piece of work; the list is going to grow past a dozen entries and
+retrofitting identity onto a weapon that already ships feeling generic is much
+harder than it sounds.
+
+### Scaling concerns (2026-09-21 review)
+
+Observed by reading the current codebase against what levels 2–7 and the story
+arc actually need. None of these are broken today — they're all things that get
+expensive in direct proportion to how long they're left.
+
+**Level data files will outgrow single files.** `src/levels/data/level1.js` is
+already 223 lines and most of that is the comments that make it maintainable at
+all. Add evolving enemy behaviours, the trick platforms coming back, and runtime
+terrain-damage state, and level 3–4 files balloon well past readable. Split per
+level into sub-modules — `level1/geometry.js`, `level1/enemies.js`,
+`level1/events.js` — with a barrel file assembling them. Side benefit that
+matters more than it looks: two people can then edit different parts of the same
+level without a merge conflict.
+
+**The cutscene state machine in `playingScene.js` is already straining.** The
+boss cutscene is 100+ lines of state machine sharing a file with the entire
+gameplay update/draw loop, and the edge transition added a second one beside it.
+Still coming: octagon corruption reveals, the NPC handoff beat, and a boss
+encounter per level. This file becomes the dumping ground for every scripted
+moment in the game. Phase 5 already nominally owns "cutscene engine earns its
+own home" — **the edge transition and the NPC arc make that urgent enough to
+move earlier in the build order** (see step 4b below). A lightweight
+`cutsceneRunner.js` taking a sequence of timed beats (freeze, animate, callback)
+would empty most of `playingScene.js`'s state-machine weight and make every
+future scripted moment cheap instead of structural.
+
+**The weapon system needs its entity-agnostic refactor *before* level 2, not
+during it.** The existing note above covers `updateWeaponInput`. The additional
+piece: `entities/weaponPickup.js` also assumes a single drop type (the pickaxe).
+The moment level 2 introduces a second weapon, pickups need a `type` field
+mapping to different swing/fire/draw/sound behaviours — and the naive version of
+that is an if/else chain that grows with every weapon. Build a **weapon registry**
+(register a weapon by name; look up behaviour, drawing, and sound by type) as
+part of the same piece of work as the entity-agnostic refactor. One job, done
+once, rather than two half-migrations.
+
+**~~Camera only tracks X~~ — done (2026-09-21).** `engine/camera.js` now has
+`camera.y` alongside `camera.x`, added for the edge transition's look-down beat.
+It's 0 for all normal play and `updateCamera` still only drives X, but the axis
+exists and `drawWorldAndHUD` honours it. When a face is oriented so the player
+traverses vertically, or level 7's hollow interior needs vertical descent, the
+remaining work is giving Y the same easing and clamping X already has — not
+threading a new axis through the renderer.
+
+**NPC persistence across levels is state that doesn't exist yet.** The rescue
+NPC's arc — progressive damage, reappearances, the handoff, the corruption —
+needs state that survives a level load, and nothing in the current architecture
+does that. `state.js` holds run-level counters, `loadLevel()` clones level data
+fresh every time, and the NPC itself is a local variable in `playingScene.js`
+that gets nulled between levels. This needs deciding deliberately: either a
+`narrativeState` object in `state.js` (NPC damage level, which cutscenes have
+played, story-gate flags) or a separate `story.js` module. `save.js` would need
+to persist it too, or quitting mid-game loses the story position while keeping
+the level progress — which would read as a bug. **Design this before building
+the NPC's level 2+ appearances**, not alongside them.
+
+**`playingScene.js` is becoming a god module.** At 362 lines it already owns:
+level loading, the gameplay update loop, every collision response, the boss
+cutscene, the edge transition, pause, life/death/respawn, the level-end check,
+drawing the entire world, and input routing. Every system listed above wants to
+add more to it. Worth a deliberate decomposition: extract collision response,
+extract the cutscene runner, and turn the update loop into a sequence of named
+subsystem calls instead of an inline block. **The target: adding a new system
+means adding a module and one line to the update sequence — not weaving 40 lines
+into the middle of an existing function.**
 
 ---
 
@@ -163,20 +262,64 @@ De-risks the foundation without needing enemy AI to exist. Comes after the
 level tool so the tool only has to support one terrain format, not two.
 *Expect jump tuning to shift slightly near cut edges — re-run the gap probe.*
 
+Chamfers also carry the design doc's **visual degradation** arc — minor chips
+early, sanded-smooth sections mid-game, barely-square architecture by level 6.
+That's authored terrain, not a system, so it costs nothing extra at runtime,
+but it does mean the level tool (step 3) should make cut depth easy to vary.
+
+**4b. Cutscene runner — pulled forward from Phase 5** *(added 2026-09-21)*
+A lightweight `cutsceneRunner.js` that takes a sequence of timed beats
+(freeze, animate, callback) and runs them, so scripted moments stop living
+inside `playingScene.js`. Originally filed under step 9's "cutscenes"; moved
+here because two state machines already share that file (boss + edge
+transition) and everything queued behind this step adds more: octagon
+corruption reveals, the NPC handoff and corruption beat, a boss per level.
+Doing it before the content lands means each of those is a data-shaped beat
+list instead of another 100 lines welded into the update loop. See the
+scaling notes in Architecture constraints.
+
+Pairs with the first slice of the **`playingScene.js` decomposition** — the
+update loop becoming a sequence of named subsystem calls. The cutscene runner
+is the piece that makes the rest of that decomposition possible.
+
 **5. Enemies**
 Base class and the passive → pursuing → aggressive tiers. Enemies hold weapons.
+Also where the **spheres' ranged attack** lands (mid-to-late tiers) — the design
+doc flags *what* they fire as an open question, with the hard constraint that it
+can't be the player's triangle projectile and has to read as sphere-shaped.
 
-**6. Weapons**
+**6. Weapons + weapon registry**
 Entity-agnostic (see constraints). Player starts unarmed, weapons drop from
 defeated enemies — level 1's melee pickaxe (`weapons/pickaxe.js`) is a
 narrow, single-level version of this already; this step generalizes it
 across enemy tiers and adds the ranged triangle shooter with limited ammo.
 
-**7. Octagons**
+Build the **weapon registry in the same piece of work**, not after it:
+`entities/weaponPickup.js` currently assumes one drop type, and the second
+weapon turns both the pickup and the input/hit paths into if/else chains that
+grow per weapon. Register by name, look up behaviour/drawing/sound by type.
+Target roster is 3–5 weapons; only the pickaxe and the restoration weapon are
+decided, so the registry has to tolerate the middle tier changing shape.
+
+**7. Octagons + the NPC arc**
 Needs 5 and 6 — they're enemies, and restoring them needs the triangle weapon.
 Introduced by a corruption cutscene. A restored one turns back into a square
 and runs off-screen; that's the rescue NPC's existing `exit` state, so the
 behavior is mostly already written.
+
+This is also where the **rescue NPC's story arc** lands (progressive damage
+across levels, the weapon handoff, the NPC's own corruption immediately after,
+and the player being forced to restore them). Two prerequisites that aren't
+obvious from the story side:
+
+- **Narrative state has to exist first.** Nothing currently survives a level
+  load — see the scaling note on NPC persistence. Decide `narrativeState` vs a
+  `story.js` module, and whether `save.js` persists it, *before* building the
+  level 2+ appearances rather than discovering it halfway through.
+- **The handoff/corruption beat is the payoff for the cutscene runner** (4b).
+  It's the single most sequenced moment in the game — give weapon, corrupt NPC,
+  force the player to use it on them — and it's exactly the kind of thing that
+  becomes unmaintainable as another inline state machine.
 
 *The real tension here is the ammo.* Triangles are scarce and the same weapon
 is the player's main gun, so every rescue costs offence — and the square you
@@ -197,6 +340,24 @@ since it's the player's first impression and motivates everything. **Touch
 controls belong here too** — parked for now (2026-09-18), see note below.
 "Polish" here means procedural refinement (particles, screen shake, animation
 curves, juice) — not a sprite pipeline; see the art-direction decision above.
+
+The generic cutscene machinery has moved out of this step to **4b**; what's
+left here is the per-level boss content itself. The design doc now carries a
+boss-per-level framework (Foreman → Excavator → Sculptor → Demolition Crew →
+Terraformer → General → the Core), of which only level 1 is built and only
+level 7 is decided. Worth noting the intended shape before any of it is built:
+it escalates through **mechanic variety** rather than health bars, and two of
+the candidates (the Sculptor, the Core) are won by *restoration* rather than
+damage — so the triangle weapon needs to work against a boss-sized target, not
+just field octagons.
+
+**Level 7 — the core** is its own thing and the one boss that's decided: a
+corrupted dodecahedron at the centre of the hollowed planet, attacked by
+restoring it face by face while it reshapes the arena (shockwaves, floor
+sections rounding off and collapsing, gravity distortion). Two systems it
+leans on that nothing else does: an arena the player **orbits on platforms**,
+and terrain that deforms *as an attack* rather than as sphere set-dressing —
+which is step 8's carving system pointed at the player instead of the scenery.
 
 Chamfers sit at #4 — right after the level tool, before any of the systems
 that depend on the damage language (octagons, carving) — because retrofitting
@@ -430,6 +591,19 @@ longer live** — kept for the reasoning, not the values. New landmarks:
 
 ## Level-edge transition (2026-09-20, physics-lab branch)
 
+> **Built and playable**, not planned — commit `613d363`, reworked in
+> `7c90e0b`. What it should *feel* like, and what it means in the story
+> (each level is one face of the cube; the edge is the seam between faces)
+> lives in GAME_DESIGN.md → "Level Transitions — the cube edge". This
+> section is the mechanism only: the state machine, the frame counts, the
+> drawing approach. If the two ever disagree about intent, the design doc
+> wins; if they disagree about what the code does, this one does.
+>
+> Read the **2026-09-21 revision** subsection below before trusting the
+> beat names in the next few paragraphs — the original
+> `approach/pause/rotate/hold` machine was largely rebuilt after
+> playtesting, and the beats are now `approach/brink/leap/land`.
+
 Not part of the original numbered build order — the design doc's "7 levels,
 one per cube face" premise didn't have a mechanic for actually *arriving* at
 the next face until now. Built ahead of level 2 existing at all (the
@@ -587,17 +761,55 @@ To add:
 
 ## Open questions
 
+GAME_DESIGN.md is the register of record for open *design* questions — this
+list is only the subset that changes what gets built, and in what order.
+
 **Blocking:** none right now.
+
+**Decided since this list was last written** (2026-09-21 — full reasoning in
+GAME_DESIGN.md, repeated here only where it constrains the build):
+- **The arc is 6 surface faces → descent → hollow centre → dodecahedron
+  core.** Level 7 is not a seventh face; it's a different kind of space, and
+  step 9 now carries notes about that.
+- **The cube-edge transition is the level-to-level connector.** No goal flag
+  any more. Anything that assumed "touch the goal → advance" is gone.
+- **Weapon roster targets 3–5, not an open-ended set.** Pickaxe and the
+  restoration weapon are decided; the rest are candidates. This is why step 6
+  now folds in a weapon registry rather than adding weapons ad hoc.
+- **The rescue NPC has a four-beat arc** (protector → deterioration →
+  handoff → corruption). That's what forces cross-level narrative state, and
+  it's why step 7 now has an NPC-persistence line item and the Scaling
+  concerns section has a `narrativeState` vs. `story.js` note.
+- **Cutscenes get a data-driven runner** — pulled forward from step 5 to
+  step 4b, because the boss cutscene and the edge transition are already two
+  hand-rolled state machines in one scene file and a third would be the
+  point of no return.
 
 **Worth deciding when step 7 gets close:**
 - Can a *different* weapon kill an octagon outright? If so, killing one means
   killing a victim who could have been saved — a possible moral beat, or an
   unfair trap, depending on how clearly the game signals it.
+- **How the NPC arc ends.** GAME_DESIGN.md lists the candidate endings and
+  deliberately doesn't pick one. It matters here because "the NPC can be
+  saved" and "the NPC cannot be saved" imply different amounts of state to
+  persist, and different level-7 content.
+
+**Newly open, and cheap to defer:**
+- **Do spheres shoot back?** Step 5 now carries a ranged-attack note as
+  tentative. If the answer is no, that note comes back out; if yes, it
+  changes enemy-projectile collision and probably the camera's comfort zone.
+- **Does the coin economy buy anything beyond lives?** Candidate only. The
+  thresholds in level 1 are already tuned for lives-only, so adding a second
+  sink means re-tuning, not just adding a menu.
+- **How much visual degradation is authored vs. procedural?** The
+  environmental-storytelling section assumes later faces look more chewed-up.
+  Authoring that per level multiplies level-data size — see Scaling concerns.
 
 **Not blocking yet** (from the design doc — they land in steps 6–9):
-NPC roles and dialogue, boss frequency, weapon inventory vs. one-at-a-time,
-whether octagon restoration is required or optional, cutscene style,
-multiplayer, sound direction.
+boss frequency, weapon inventory vs. one-at-a-time, whether octagon
+restoration is required or optional, multiplayer. Sound direction is no
+longer on this list — GAME_DESIGN.md has a Sound Design section now, and the
+per-weapon sound-identity constraint moved into Architecture constraints.
 
 ---
 
@@ -684,8 +896,9 @@ Asked for directly:
   **hazards**: their kill box is deliberately inset from the art
   (`x+4, y-12, width-8, height 12` — see levelLoader.js), so what kills
   you is visibly smaller than what's drawn and there's currently no way to
-  see it. Also worth drawing: the weapon swing reach, and the goal /
-  checkpoint trigger boxes.
+  see it. Also worth drawing: the weapon swing reach, and the checkpoint /
+  edge-transition trigger boxes (the latter is a margin off `worldEdgeX`,
+  invisible today, and easy to misjudge while authoring a level's ending).
 
 Other things that would earn their place:
 
