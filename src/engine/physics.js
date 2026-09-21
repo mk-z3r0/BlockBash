@@ -60,14 +60,15 @@ export const P = {
   // Player_XVel comment ("max value is $38" = 56 subpixels = 3.5 native,
   // matching run+P's original ROM value): walkMax 1.5->2.0625, runMax
   // 2.5->3.4375. Both hand-tuned up across two playtesting rounds
-  // (2026-09-20: 2.0625->2.29->3.21, 3.4375->3.68->4) — walkMax has grown
-  // enough that it's now closer to runMax than to its own ROM value.
+  // (2026-09-20: runMax 3.4375->3.68->4; walkMax 2.0625->2.29->3.21, then
+  // corrected down to 2.8 — 3.21 was an overshoot from the second round,
+  // not an intentional "walk and run should feel close" call).
   // pSpeedMax was untouched through the first round but came down slightly
-  // in the second (4.8125 -> 4.5) — with walkMax/runMax both up this much,
-  // the ROM-accurate P-speed cap left less headroom above runMax than it
-  // used to; narrowed the gap back down on purpose rather than leaving
-  // P-speed a smaller relative jump than it read as originally.
-  walkMax: 3.21,
+  // in the second (4.8125 -> 4.5) — with runMax up this much, the
+  // ROM-accurate P-speed cap left less headroom above runMax than it used
+  // to; narrowed the gap back down on purpose rather than leaving P-speed a
+  // smaller relative jump than it read as originally.
+  walkMax: 2.8,
   runMax: 4,
   pSpeedMax: 4.5,
   // Slide cap only matters on sloped terrain (Player_Slide in the real
