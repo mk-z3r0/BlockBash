@@ -525,3 +525,63 @@ input work, in `engine/input.js` + `index.html`. Open question for whenever
 it's picked up: show the buttons always, or only on detected touch devices
 (leaning touch-only, to keep the keyboard experience uncluttered) — not yet
 decided.
+
+---
+
+## Parked: debug mode
+
+Wish-list item (2026-09-20), not started. The idea: the instrumentation
+that already exists in `tools/physics-lab.html`, but layered over the
+*real* level instead of a synthetic benchmark course. Most of the pieces
+below already exist there in some form — the work is mostly extraction
+into something like `src/engine/debugOverlay.js` that both can share,
+plus the bits that only make sense against real level data.
+
+Gate it the same way the sandbox level already is: a `?debug` URL param
+(matching the existing `?test`), with a hotkey to toggle the overlay once
+on. Keyboard-driven, so it stays usable while a controller is doing the
+playing.
+
+Asked for directly:
+
+- **Quick traversal.** Warp to any checkpoint/hazard/boss by name (the
+  physics-lab's marker dropdown is exactly this), plus click-to-teleport
+  and a "skip to next checkpoint" key. A free/detached camera that pans
+  independently of the player is worth having alongside it.
+- **God mode.** Note this needs *two* things, not one: invincibility
+  covers enemy and hazard contact, but the fall-into-a-pit check is
+  deliberately independent of `player.invincible` (see the
+  RESPAWN_FREEZE_FRAMES note in physics.js — this exact asymmetry is why
+  the respawn freeze had to exist). So god mode has to bypass the pit
+  death separately or it'll still drop you.
+- **Hitboxes.** Player/enemy/coin AABBs, but the highest-value one is
+  **hazards**: their kill box is deliberately inset from the art
+  (`x+4, y-12, width-8, height 12` — see levelLoader.js), so what kills
+  you is visibly smaller than what's drawn and there's currently no way to
+  see it. Also worth drawing: the weapon swing reach, and the goal /
+  checkpoint trigger boxes.
+
+Other things that would earn their place:
+
+- **Enemy patrol bounds drawn in-world.** `minX`/`maxX` are pure data and
+  completely invisible today; drawing them as a line under each sphere
+  would make "this one walks off its platform" a glance instead of a
+  playthrough.
+- **World coordinate readout + tile grid,** with click-to-copy. Level data
+  is authored in absolute world pixels by hand — this would take a lot of
+  the arithmetic out of placing anything.
+- **Physics state HUD** — vx/vy, grounded, coyote timer, jump buffer,
+  P-meter fill, speed tier, gravity state. Already built in physics-lab;
+  the value is seeing it during actual play.
+- **Pause / frame-step / slow-mo,** and a **trajectory trace** of the last
+  jump overlaid on the level. Both exist in physics-lab; both are most
+  useful when you're standing in front of the jump you're arguing with.
+- **System toggles** — enemies off, hazards off, cutscene off (there's
+  already a shift-K cutscene skip to build on).
+- **Grant the pickaxe on demand.** It's boss-gated, so testing the weapon
+  currently means either playing the whole level or switching to `?test`.
+- **Cutscene state readout** (`freeze`/`turn`/`charge`/`rescue`/`done` plus
+  its timer) — that state machine is module-private and has grown enough
+  beats to be worth seeing.
+- **Step count / real fps,** to catch the class of problem the fixed
+  timestep was added for in the first place.
