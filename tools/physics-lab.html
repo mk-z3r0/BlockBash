@@ -77,6 +77,7 @@
   <header>
     <h1>⚙ BLOCKBASH PHYSICS LAB</h1>
     <span class="hint" style="color:var(--dim)">SMB3-accurate core · drives the real entities/player.js</span>
+    <span id="gamepadStatus" class="hint" style="color:var(--dim)">🎮 no controller</span>
     <span style="flex:1"></span>
     <label class="hint">Preset:
       <select id="presetSelect"></select>
@@ -114,7 +115,7 @@
       </label>
       <span style="width:1px;background:var(--line);align-self:stretch"></span>
       <button id="btnHoldSweep">HOLD SWEEP (1-40f)</button>
-      <span class="hint">Move: ←/→, Shift=run, Space/↑=jump. Grid toggles with G.</span>
+      <span class="hint">Move: ←/→, Shift=run, Space/↑=jump, Esc=pause. Grid toggles with G. Xbox pad: stick/D-pad=move, A=run, B=jump, Start=pause.</span>
     </div>
   </div>
 
@@ -139,6 +140,7 @@
 
 <script type="module">
 import { keys, initInput } from '../src/engine/input.js';
+import { pollGamepad } from '../src/engine/gamepad.js';
 import { P, isColliding } from '../src/engine/physics.js';
 import { canvas, ctx, VIEW_WIDTH, VIEW_HEIGHT } from '../src/engine/renderer.js';
 import { player, resetPlayer, updatePlayer, drawPlayer, bufferJump, setRespawnPoint } from '../src/entities/player.js';
@@ -270,6 +272,9 @@ initInput({
     initAudio(); resumeAudioIfSuspended(); // stomp/hit sfx need a gesture to unlock, same as main.js
     if ((e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w') && !alreadyDown) bufferJump();
     if (e.key === 'g' || e.key === 'G') showGrid = !showGrid;
+    // Escape is what gamepad.js's Start button maps to (same as the real
+    // game's pause) — gives the controller a working pause here too.
+    if (e.key === 'Escape' && !alreadyDown) togglePause();
   }
 });
 document.addEventListener('pointerdown', () => { initAudio(); resumeAudioIfSuspended(); });
@@ -432,6 +437,10 @@ function loop(now) {
   const frameMs = Math.min(now - lastTime, MAX_FRAME_MS);
   lastTime = now;
 
+  pollGamepad(); // Xbox/standard-mapping support — dispatches the same synthetic
+  // keydown/keyup events main.js relies on, so it flows through this page's
+  // existing `keys` state and bufferJump() wiring with no separate path.
+
   if (!paused || stepOnce) {
     accumulator += frameMs * slowMo;
     const stepMs = 1000 / P.fixedTimestepHz;
@@ -453,7 +462,16 @@ function loop(now) {
 // Reuses drawPlayer() from the real player.js; everything else is this
 // page's own lightweight canvas drawing (not part of "physics").
 // ============================================================================
+function updateGamepadStatus() {
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  const pad = pads && Array.prototype.find.call(pads, p => p && p.connected);
+  const el = document.getElementById('gamepadStatus');
+  el.textContent = pad ? `🎮 ${pad.id.slice(0, 28)}` : '🎮 no controller';
+  el.style.color = pad ? 'var(--good)' : 'var(--dim)';
+}
+
 function render() {
+  updateGamepadStatus();
   const level = getLevel();
   cameraX = Math.max(0, Math.min(player.x - VIEW_WIDTH / 2, level.worldWidth - VIEW_WIDTH));
 
@@ -813,11 +831,13 @@ function formatAsPhysicsBlock() {
 // ============================================================================
 // Controls: pause / step / slow-mo, teleport, record+replay, A/B, hold sweep
 // ============================================================================
-document.getElementById('btnPause').addEventListener('click', (e) => {
+function togglePause() {
   paused = !paused;
-  e.target.textContent = paused ? '▶ Resume' : '⏸ Pause';
-  e.target.classList.toggle('active', paused);
-});
+  const btn = document.getElementById('btnPause');
+  btn.textContent = paused ? '▶ Resume' : '⏸ Pause';
+  btn.classList.toggle('active', paused);
+}
+document.getElementById('btnPause').addEventListener('click', togglePause);
 document.getElementById('btnStep').addEventListener('click', () => { paused = true; stepOnce = true; document.getElementById('btnPause').textContent = '▶ Resume'; document.getElementById('btnPause').classList.add('active'); });
 function setSlow(mult, btnId) {
   slowMo = mult;
