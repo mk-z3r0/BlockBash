@@ -1,0 +1,62 @@
+# Block Bash isn't taking pull requests yet (see CONTRIBUTING.md). GitHub
+# has no setting that disables PRs on a public repo, so this closes them
+# politely instead, and leaves a comment pointing at the policy.
+#
+# PRs from people who can actually push here (the repo owner, collaborators)
+# are left alone — that's how the game itself gets worked on.
+#
+# Delete this file when the project opens up to contributions.
+#
+# pull_request_target (not pull_request) so the token has permission to
+# comment and close on PRs from forks. Nothing from the PR is checked out or
+# executed here, which is what makes that safe.
+
+name: Close external pull requests
+
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  close:
+    runs-on: ubuntu-latest
+    if: >-
+      github.event.pull_request.author_association != 'OWNER' &&
+      github.event.pull_request.author_association != 'MEMBER' &&
+      github.event.pull_request.author_association != 'COLLABORATOR'
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const body = [
+              "Thanks for taking the time to work on this — genuinely.",
+              "",
+              "Block Bash isn't accepting pull requests yet. The design is still",
+              "changing week to week, and reviewing outside changes against a moving",
+              "target isn't fair to the time you put in. This is the policy for every",
+              "PR right now, not a judgement on this one.",
+              "",
+              "If you found a real problem, please [open an issue](../../issues) —",
+              "bug reports and \"this felt bad to play\" notes are very welcome, and",
+              "they do get acted on. See [CONTRIBUTING.md](../../blob/main/CONTRIBUTING.md).",
+              "",
+              "The repo will open up to contributions as the game gets closer to",
+              "finished."
+            ].join("\n");
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body,
+            });
+
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              state: 'closed',
+            });
