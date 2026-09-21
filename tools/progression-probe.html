@@ -28,9 +28,13 @@
     state.score = 42;
 
     // --- reach the goal at level 0: should ADVANCE, not win, score persists ---
+    // (2026-09-20: reaching the goal now starts the edge-of-world transition
+    // rather than advancing/winning on the spot — skip it with a keypress,
+    // same as the intro, to get to the payoff this test actually cares about)
     const lv0 = getLevel();
     player.x = lv0.goal.x; player.y = lv0.goal.y + 5; player.velocityX = 0; player.velocityY = 0;
     update();
+    key('keydown', 'x'); key('keyup', 'x');
     out.push('after reaching goal at level 0: ' + snap());
 
     // --- reach the goal at level 1 (now the last level): should WIN ---
@@ -38,6 +42,7 @@
     const lv1 = getLevel();
     player.x = lv1.goal.x; player.y = lv1.goal.y + 5; player.velocityX = 0; player.velocityY = 0;
     update();
+    key('keydown', 'x'); key('keyup', 'x');
     out.push('after reaching goal at level 1 (last): ' + snap());
 
     // --- from win, restart: should go back to level 0 (a fresh run) ---
@@ -50,6 +55,7 @@
     const lvA = getLevel();
     player.x = lvA.goal.x; player.y = lvA.goal.y + 5; player.velocityX = 0; player.velocityY = 0;
     update();
+    key('keydown', 'x'); key('keyup', 'x');
     out.push('advanced to level 1 again: ' + snap());
 
     state.lives = 1;

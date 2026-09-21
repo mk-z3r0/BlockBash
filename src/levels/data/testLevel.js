@@ -9,7 +9,7 @@ const GROUND_Y = 410;
 export default {
   id: 'test-sandbox',
   name: 'Test Sandbox',
-  worldWidth: 7200,
+  worldWidth: 7500, // camera headroom past the actual edge (7200) — see level1.js
   groundY: GROUND_Y,
   playerSpawn: { x: 100, y: 300 },
 

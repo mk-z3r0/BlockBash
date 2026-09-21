@@ -130,6 +130,57 @@ export function drawHazards() {
   }
 }
 
+// The literal edge of this cube face: past `worldEdgeX` (where the ground
+// data actually stops — see levelLoader.js), the world falls away into a
+// sheer vertical face belonging to the adjacent face of the cube, with a
+// glowing seam marking the 90° corner and a few decorative ledges hinting
+// at what's over there. Nothing here collides with anything — it's backdrop
+// for scenes/playingScene.js's edge-transition state machine, which is what
+// actually walks the player up to this point and (eventually) rotates the
+// world around it. Computed from level data rather than authored per level,
+// so it appears at the end of every level for free.
+const EDGE_WALL_WIDTH = 500;  // wider than worldWidth's camera headroom (300px) — see level1.js's worldWidth comment
+const EDGE_WALL_HEIGHT = 900; // deep enough to fill the screen at any camera angle once the player's this close
+const EDGE_LEDGES = [
+  // {depth, width}: distance below groundY, and how far the ledge juts out
+  // from the wall face — decorative previews of "the next face", rotated
+  // 90° from how a normal platform would sit (they read as ledges on a
+  // cliff, not floating platforms, since nothing here is standable)
+  { depth: 70,  width: 70 },
+  { depth: 200, width: 95 },
+  { depth: 360, width: 60 }
+];
+
+export function drawWorldEdge(frameCount) {
+  const { worldEdgeX, groundY } = getLevel();
+
+  // the face itself — same fill as ground, so it visibly reads as the same
+  // material continuing around a corner rather than a different substance
+  ctx.fillStyle = '#1c2547';
+  ctx.fillRect(worldEdgeX, groundY, EDGE_WALL_WIDTH, EDGE_WALL_HEIGHT);
+
+  // hint ledges jutting out of the face
+  ctx.fillStyle = '#232f5c';
+  ctx.strokeStyle = '#3a4a82';
+  ctx.lineWidth = 2;
+  for (const l of EDGE_LEDGES) {
+    const ly = groundY + l.depth;
+    ctx.fillRect(worldEdgeX, ly, l.width, 16);
+    ctx.strokeRect(worldEdgeX + 1, ly + 1, l.width - 2, 14);
+  }
+
+  // the glowing seam marking the actual 90° corner — a soft vertical bar
+  // straddling worldEdgeX, pulsing gently so it reads as live energy at the
+  // join rather than a painted line
+  const pulse = 0.55 + Math.sin(frameCount * 0.05) * 0.25;
+  const grad = ctx.createLinearGradient(worldEdgeX - 10, 0, worldEdgeX + 10, 0);
+  grad.addColorStop(0, 'rgba(94, 231, 255, 0)');
+  grad.addColorStop(0.5, `rgba(94, 231, 255, ${pulse})`);
+  grad.addColorStop(1, 'rgba(94, 231, 255, 0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(worldEdgeX - 10, groundY - 60, 20, 260);
+}
+
 export function drawGoal() {
   const { goal } = getLevel();
   ctx.fillStyle = '#5ee7ff';

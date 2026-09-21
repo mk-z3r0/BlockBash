@@ -32,7 +32,15 @@ const GROUND_Y = 410;
 export default {
   id: 'level1',
   name: 'The First Stand',
-  worldWidth: 7200,
+  // Bumped from 7200 (2026-09-20, edge-of-world transition): ground itself
+  // still ends at 7200 (unchanged — see the last `ground` entry below), but
+  // the camera's own clamp is `worldWidth - VIEW_WIDTH`, so worldWidth needs
+  // real headroom past the actual edge or the camera can never pan far
+  // enough to reveal the edge-of-world wall (levelRenderer.js's
+  // drawWorldEdge) before the player is already standing on top of it. This
+  // 300px of "extra" width is never walkable — nothing solid exists out
+  // there — it exists purely so the camera can see the wall coming.
+  worldWidth: 7500,
   groundY: GROUND_Y,
   playerSpawn: { x: 100, y: 300 },
 

@@ -428,6 +428,78 @@ longer live** — kept for the reasoning, not the values. New landmarks:
 
 ---
 
+## Level-edge transition (2026-09-20, physics-lab branch)
+
+Not part of the original numbered build order — the design doc's "7 levels,
+one per cube face" premise didn't have a mechanic for actually *arriving* at
+the next face until now. Built ahead of level 2 existing at all (the
+registry still only has one real entry), so it's exercised today by
+`tools/progression-probe.html` forcing a second registry entry, same trick
+already used to test level-advance-vs-win.
+
+**What happens:** reaching the goal, once the boss cutscene has resolved
+(`bossActive()` false — same gate the old immediate-advance code used),
+starts a state machine scoped to `scenes/playingScene.js` (same shape as the
+boss cutscene, for the same reason: it needs that scene's own live
+platforms/player/camera, not a fresh scene's isolated state):
+`null -> 'approach' -> 'pause' -> 'rotate' -> 'hold' ->` (advance to the next
+level, or win if this was the last one). `'approach'` walks the player the
+rest of the way to the *actual* edge of the ground data — the goal marker
+sits a little short of it on purpose, same as it always has, which turns out
+to double as exactly the runway this needed. `'rotate'` pivots the whole
+scene -PI/2 around that edge point over ~90 eased frames; `'rotate'`/`'hold'`
+skip player/enemy/particle physics entirely (there's no meaningful "up" to
+apply gravity toward mid-spin), everything else still runs normally.
+Skippable any time with a keypress, same convention as the opening cutscene.
+
+- **`worldWidth` and "the edge" are now two different things, on purpose.**
+  The camera's clamp is `worldWidth - VIEW_WIDTH`, so if the edge-of-world
+  wall visual (`levelRenderer.js`'s `drawWorldEdge`) were drawn starting
+  exactly at `worldWidth`, the camera could never pan far enough to reveal
+  any of it before the player was already standing on top of it — the whole
+  point of foreshadowing "you're approaching the edge" would be invisible
+  until it was too late to see coming. `worldEdgeX` (new, computed in
+  `levelLoader.js` from where the ground data actually stops, not authored)
+  is the real edge; `worldWidth` got 300px of headroom added past it purely
+  so the camera has room to reveal the wall in advance. Nothing solid exists
+  in that 300px — it's camera runway, not playable space.
+- **The rotation direction has a real, checked-not-assumed consequence for
+  which way "old ground" and "new ground" end up**, and the two things the
+  task asked for (angle = exactly -PI/2, AND old ground reading as "rising up
+  and away") turned out to be in tension. Verified empirically (headless
+  screenshots through the actual rotation, not hand-derived trig) rather
+  than trusting either claim blind: at -PI/2, the wall's near face rotates
+  to become flat new ground extending *forward* in the same direction the
+  player was already walking — the more important outcome, gameplay-wise —
+  while old ground rotates to end up receding *below*, not literally
+  "rising." The other sign (+PI/2) gets old-ground genuinely rising, but at
+  the cost of new-ground extending *backward* behind the player instead,
+  which reads worse. Kept the specified -PI/2. Flagged, not silently
+  resolved — worth another look if the direction ever feels wrong in person,
+  since screenshots aren't the same as playing it.
+- **`drawBackground` is deliberately exempted from the rotation**, even
+  though the task described background as one of the things that rotates
+  together with everything else. It fills the entire canvas every frame
+  (`fillRect(0,0,VIEW_WIDTH,VIEW_HEIGHT)`); rotated around an off-center
+  pivot that fill stops covering the canvas corners, which is a real visual
+  bug (flashing gaps), not a subtle deviation. It also doesn't make physical
+  sense for a starfield light-years away to visibly spin from one small
+  patch of planet surface tilting 90°. Everything that's actually *part* of
+  the world (ground, platforms, the edge wall, player, enemies, particles)
+  still rotates together.
+- **Any probe that teleports the player onto the goal and expects an
+  immediate advance/win from a single `update()` call now needs a skip
+  keypress in between** (`save-probe.html`, `progression-probe.html`) — the
+  goal touch now only *starts* the transition. Caught this the boring way:
+  ran the regression sweep, watched `progression-probe.html`'s "reach goal
+  at level 1 (last)" line come back `state=playing` instead of `state=win`.
+  Worth remembering for level 2's own probes later: a key press without a
+  matching `keyup` is a held-key repeat on the *second* call, not a second
+  fresh press — `input.js`'s `alreadyDown` tracking (correctly) ignores it,
+  which is exactly what silently broke the first pass at this fix.
+
+---
+
 ## Level 1 retrofit
 
 Already fits: passive patrolling spheres, the unwinnable pickaxe-armed boss
