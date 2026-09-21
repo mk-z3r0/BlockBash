@@ -107,6 +107,12 @@
       <button id="btnFreezeA">Freeze A</button>
       <button id="btnRunB">Compare vs A (run B)</button>
       <span style="width:1px;background:var(--line);align-self:stretch"></span>
+      <button id="btnEnemies">🐾 Add patrol enemies</button>
+      <label class="hint">speed
+        <input id="enemySpeedSlider" type="range" min="0.3" max="5" step="0.05" value="1.5" style="width:70px;vertical-align:middle">
+        <input id="enemySpeedNumber" type="number" step="0.05" value="1.5" style="width:52px">
+      </label>
+      <span style="width:1px;background:var(--line);align-self:stretch"></span>
       <button id="btnHoldSweep">HOLD SWEEP (1-40f)</button>
       <span class="hint">Move: ←/→, Shift=run, Space/↑=jump. Grid toggles with G.</span>
     </div>
@@ -138,6 +144,9 @@ import { canvas, ctx, VIEW_WIDTH, VIEW_HEIGHT } from '../src/engine/renderer.js'
 import { player, resetPlayer, updatePlayer, drawPlayer, bufferJump, setRespawnPoint } from '../src/entities/player.js';
 import { loadLevel, getLevel } from '../src/levels/levelLoader.js';
 import { updateParticles, drawParticles, resetParticles } from '../src/entities/particles.js';
+import { state } from '../src/state.js';
+import { spawnEnemies, updateEnemies, drawEnemies } from '../src/entities/enemy.js';
+import { initAudio, resumeAudioIfSuspended } from '../src/audio/audio.js';
 
 // ============================================================================
 // Step 7 — benchmark course, in tile units, baked to pixels at load time.
@@ -258,10 +267,12 @@ let replayIndex = 0;
 
 initInput({
   onKeyDown(e, alreadyDown) {
+    initAudio(); resumeAudioIfSuspended(); // stomp/hit sfx need a gesture to unlock, same as main.js
     if ((e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w') && !alreadyDown) bufferJump();
     if (e.key === 'g' || e.key === 'G') showGrid = !showGrid;
   }
 });
+document.addEventListener('pointerdown', () => { initAudio(); resumeAudioIfSuspended(); });
 
 function setKey(key, held) {
   const was = !!keys[key];
@@ -283,6 +294,29 @@ let frameCount = 0;
 
 let showGrid = true;
 let cameraX = 0;
+
+// ============================================================================
+// Patrol enemies — a couple of real entities/enemy.js spheres on the
+// runway, toggleable, so landing a stomp on a moving target is part of
+// feeling out a parameter set (not just clean solo jumps). Same "zero
+// duplicated physics" rule as the rest of the lab: this drives the real
+// updateEnemies()/drawEnemies(), not a reimplementation.
+// ============================================================================
+let enemiesEnabled = false;
+function enemySpawnData(speed) {
+  const start = course.markers.find(m => m.name === 'runway-start').x;
+  return [
+    { x: start + 8 * T, y: GROUND_Y - 22, w: 22, minX: start + 4 * T, maxX: start + 14 * T, speed },
+    { x: start + 22 * T, y: GROUND_Y - 22, w: 22, minX: start + 18 * T, maxX: start + 30 * T, speed }
+  ];
+}
+function setEnemiesEnabled(on) {
+  enemiesEnabled = on;
+  state.enemies = on ? spawnEnemies(enemySpawnData(parseFloat(document.getElementById('enemySpeedSlider').value))) : [];
+}
+function setEnemySpeed(speed) {
+  for (const e of state.enemies) e.speed = e.speed < 0 ? -Math.abs(speed) : Math.abs(speed);
+}
 
 // --- per-jump tracking (feeds the log + live HUD) ---
 let jumpInProgress = null;
@@ -319,6 +353,13 @@ function doStep() {
   }
 
   updatePlayer(false);
+  if (enemiesEnabled) {
+    const { hitPlayer } = updateEnemies(player, false);
+    // No lives/game-over concept in the lab — a hit just gives a beat of
+    // invincibility (matching the real game's post-hit window) so it
+    // doesn't spam every frame of contact, not a real consequence.
+    if (hitPlayer && player.invincible <= 0) player.invincible = 45;
+  }
   updateParticles();
   frameCount++;
 
@@ -446,6 +487,7 @@ function render() {
   // hold-sweep family
   for (const t of sweepTrails) drawTrail(t, 'rgba(180,220,255,0.35)', 1, null);
 
+  if (enemiesEnabled) drawEnemies(frameCount, true);
   drawPlayer(frameCount);
   drawParticles();
 
@@ -503,6 +545,7 @@ function renderHud(level) {
     <div>x <b>${player.x.toFixed(0)}</b>px (${(player.x / P.tileSize).toFixed(1)} t)</div>
     <div>frames→walk/run/P <b>${capTimers.walk ?? '-'}/${capTimers.run ?? '-'}/${capTimers.pSpeed ?? '-'}</b></div>
     <div>${paused ? '⏸ PAUSED' : (slowMo < 1 ? `slow-mo ${slowMo}x` : 'running')}</div>
+    ${enemiesEnabled ? `<div>stomps <b>${Math.floor(state.score / 100)}</b></div>` : ''}
   `;
 }
 
@@ -784,7 +827,20 @@ document.getElementById('btnSlow1').addEventListener('click', () => setSlow(1, '
 document.getElementById('btnSlow2').addEventListener('click', () => setSlow(0.5, 'btnSlow2'));
 document.getElementById('btnSlow4').addEventListener('click', () => setSlow(0.25, 'btnSlow4'));
 
-document.getElementById('btnResetPos').addEventListener('click', () => { resetPlayer(); jumpInProgress = null; capTimers = { walk: null, run: null, pSpeed: null }; accelStartFromZero = false; });
+document.getElementById('btnResetPos').addEventListener('click', () => {
+  resetPlayer(); jumpInProgress = null; capTimers = { walk: null, run: null, pSpeed: null }; accelStartFromZero = false;
+  if (enemiesEnabled) setEnemiesEnabled(true); // fresh patrol positions/alive-state too
+});
+
+document.getElementById('btnEnemies').addEventListener('click', (e) => {
+  setEnemiesEnabled(!enemiesEnabled);
+  e.target.textContent = enemiesEnabled ? '🐾 Remove patrol enemies' : '🐾 Add patrol enemies';
+  e.target.classList.toggle('active', enemiesEnabled);
+});
+const enemySpeedSlider = document.getElementById('enemySpeedSlider');
+const enemySpeedNumber = document.getElementById('enemySpeedNumber');
+enemySpeedSlider.addEventListener('input', () => { enemySpeedNumber.value = enemySpeedSlider.value; setEnemySpeed(parseFloat(enemySpeedSlider.value)); });
+enemySpeedNumber.addEventListener('change', () => { enemySpeedSlider.value = enemySpeedNumber.value; setEnemySpeed(parseFloat(enemySpeedNumber.value)); });
 
 const markerSelect = document.getElementById('markerSelect');
 for (const m of course.markers) {
