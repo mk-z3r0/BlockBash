@@ -66,6 +66,11 @@ export function spawnEnemies(spawns) {
     // octagons only
     restoreTotal: e.restoreHits == null ? 2 : e.restoreHits,
     restoreHits: e.restoreHits == null ? 2 : e.restoreHits,
+    // What to come back to when a fight restarts — see resetBossAndCutscene
+    // in scenes/playingScene.js. Captured here because the spawn data is the
+    // only place the original numbers still exist once play has started.
+    baseHp: e.hp == null ? 1 : e.hp,
+    baseRestoreHits: e.restoreHits == null ? 2 : e.restoreHits,
     cornersLost: 4,
     restoreFlash: 0,
     restored: false,

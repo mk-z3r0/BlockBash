@@ -325,7 +325,15 @@ Music direction is still open.
 **Still open — genuinely, not for lack of time:**
 
 - [ ] **Coins beyond lives** — the between-levels shop idea. See [Economy](#should-coins-buy-more-than-lives--candidate). Deliberately not built: the thresholds across all seven levels are tuned for lives-only, and adding a second sink means re-tuning every level rather than adding a menu.
-- [ ] **Music direction.** Every weapon and enemy now has a sound identity (see [Sound Design](#sound-design)); there is still no music.
+- [ ] **Music direction.** There IS music — one procedurally scheduled loop
+  (bass, arpeggio, hat) in `audio/audio.js`, started at the first level and
+  deliberately never restarted across level transitions so it doesn't stutter
+  at a seam. What's open is whether it should stay one loop for the whole
+  game. Seven levels that escalate from a tutorial to the middle of a hollow
+  planet arguably shouldn't share a single track, and the descent especially
+  wants something to change. Every weapon and enemy already has its own sound
+  identity (see [Sound Design](#sound-design)); the score is the part that
+  hasn't been designed.
 - [ ] **A second NPC.** Quarrick carries the entire cast. `state.rescueNPC` is a single slot and a scene with two characters in it would need a list first.
 - [ ] Multiplayer / co-op potential?
 

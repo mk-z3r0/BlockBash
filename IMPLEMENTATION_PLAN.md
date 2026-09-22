@@ -1083,8 +1083,10 @@ the build-order step it belongs to:
   it; the audit probe answered the need it was really for. Step 3.
 - **Ordinary spheres don't reshape the world.** Bosses do. The parked trick
   platforms are still parked. Step 8.
-- **No music.** Every weapon and enemy has a sound identity; there is no
-  score.
+- **Music is one loop for all seven levels.** It exists and it works
+  (`audio/audio.js`, started once and never restarted so transitions don't
+  stutter); what doesn't exist is any variation across a game that goes from
+  a tutorial to the centre of a hollow planet.
 - **No touch controls.** Still parked, see the note at the end of this file.
 - **Coins still only buy lives.** The shop idea is untouched, and all seven
   levels' thresholds are tuned for lives-only.

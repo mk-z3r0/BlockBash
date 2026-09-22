@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#000;">
+<canvas id="game" width="800" height="450"></canvas><pre id="out">running…</pre>
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true, narrative: { seenCutscenes: {}, npcStage: 0, flags: {} } })); window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERROR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  // What survives a death, and what must not.
+  //
+  // This is the class of bug that doesn't show up in a clean run and ruins a
+  // real one: the player dies somewhere in the middle of a level and comes
+  // back to a world that's quietly worse than the one they left. Two real
+  // bugs found by writing it:
+  //
+  //   - dying cleared EVERY uncollected pickup in the level, not just the
+  //     boss's drop. Harmless when the only pickup in the game was level 1's
+  //     pickaxe; in level 7 it could leave a player unable to finish the core
+  //     with no way to get more triangles.
+  //   - a boss killed just before the player died came back alive with hp
+  //     already at zero, its drop marked as handled, and its phase machine
+  //     mid-swing.
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update, switchTo } from '../src/scenes/sceneManager.js';
+  import { getLevel } from '../src/levels/levelLoader.js';
+
+  const out = [];
+  let fails = 0;
+  const check = (ok, label) => { if (!ok) fails++; out.push(`  ${ok ? 'ok  ' : 'FAIL'} ${label}`); };
+  const tick = n => { for (let i = 0; i < n; i++) update(); };
+
+  // Fall out of the world. A pit fall is the one death check that isn't
+  // gated on invincibility, so it works regardless of what else is set.
+  function die() {
+    const lives = state.lives;
+    player.invincible = 0;
+    for (let i = 0; i < 200 && state.lives === lives; i++) {
+      player.y = 5000;
+      player.velocityY = 40;
+      update();
+    }
+    tick(4);
+    return state.lives < lives;
+  }
+
+  function startLevel(i) {
+    state.currentLevelIndex = i;
+    switchTo('playing', { retry: true });
+    getLevel().cutscenes.length = 0;
+    state.lives = 99;
+  }
+
+  setTimeout(() => {
+    // --- the level's own pickups survive a death ---
+    startLevel(6);   // level 7: the one where running dry actually matters
+    const before = state.weaponPickups.filter(p => !p.collected).length;
+    check(before > 0, `level 7 places ${before} pickups`);
+    check(die(), 'the player can die');
+    const after = state.weaponPickups.filter(p => !p.collected).length;
+    check(after === before, `they are all still there afterwards (${before} -> ${after})`);
+
+    // --- the player keeps what they earned ---
+    startLevel(2);   // level 3, arrives with the sledgehammer
+    const weapon = player.weapon;
+    player.ammo = 7;
+    die();
+    check(player.weapon === weapon, `dying doesn't take the weapon (${player.weapon})`);
+    check(player.ammo === 7, `or the ammo (${player.ammo})`);
+
+    // --- a boss fight restarts from the top ---
+    startLevel(1);   // level 2: the Excavator
+    const boss = state.enemies.find(e => e.boss && e.mode === 'fight');
+    check(!!boss, 'the Excavator is there');
+    if (boss) {
+      const fullHp = boss.hp;
+      boss.hp = 1;
+      boss.phase = 'jammed';
+      boss.alive = false;      // as if it had just been beaten
+      tick(4);                 // let onBossDefeated fire and drop its weapon
+      const dropped = state.weaponPickups.some(p => p.fromBoss && !p.collected);
+      check(dropped, 'beating it leaves a drop on the ground');
+
+      die();
+      check(boss.alive, 'dying brings the fight back');
+      check(boss.hp === fullHp, `at full health again (${boss.hp}/${fullHp})`);
+      check(boss.defeatHandled === false, 'and able to pay out a second time');
+      const stranded = state.weaponPickups.some(p => p.fromBoss && !p.collected);
+      check(!stranded, 'with no drop from the last attempt left lying around');
+
+      // prove it really can pay out again
+      boss.hp = 0;
+      boss.alive = false;
+      tick(4);
+      check(state.weaponPickups.some(p => p.fromBoss && !p.collected),
+        'and it does drop again when beaten a second time');
+    }
+
+    out.push(fails ? `*** ${fails} FAILURE(S)` : 'PASS a death costs a life and nothing else');
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 250);
+</script></body></html>

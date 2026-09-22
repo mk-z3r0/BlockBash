@@ -6,6 +6,7 @@ import {
   setRespawnPoint, resetDustTimer
 } from '../entities/player.js';
 import { updateEnemies, drawEnemies, spawnEnemies } from '../entities/enemy.js';
+import { initBoss } from '../entities/bosses.js';
 import { updateRescueNPC, drawRescueNPC } from '../entities/npc.js';
 import { updateParticles, drawParticles, resetParticles, spawnExplosion, spawnDust } from '../entities/particles.js';
 import { resetCoins, updateCoins, drawCoins } from '../entities/coins.js';
@@ -124,11 +125,32 @@ function resetBossAndCutscene() {
     boss.hopVY = 0;
     boss.speed = Math.abs(boss.speed) || 0.96;
     boss.mining = false;
+    // A fight restarts from the top, which means the numbers as well as the
+    // position. Without this a boss killed just before the player died came
+    // back with hp already at zero, its drop already marked as handled, and
+    // its phase machine mid-swing — beatable in one hit and paying out
+    // nothing. `baseHp`/`baseRestoreHits` are captured at spawn precisely so
+    // there is something true to come back to.
+    boss.hp = boss.baseHp;
+    boss.restoreHits = boss.baseRestoreHits;
+    boss.restored = false;
+    boss.fleeing = false;
+    boss.fleeDir = 0;
+    boss.cornersLost = 4;
+    boss.hitFlash = 0;
+    boss.knockback = 0;
+    if (boss.mode === 'fight') initBoss(boss);
   });
-  // the fight is restarting — any drop from a previous attempt that never
-  // got picked up (the player died between the boss dying and reaching it)
-  // would otherwise sit stranded next to a boss that's alive again
-  state.weaponPickups = state.weaponPickups.filter(p => p.collected);
+  // The fight is restarting, so a drop from a previous attempt that was never
+  // picked up would sit stranded next to a boss that's alive again.
+  //
+  // Only BOSS drops, though. This used to drop every uncollected pickup in
+  // the level, which was harmless when the only pickup in the game was the
+  // Foreman's pickaxe and actively dangerous once levels started placing
+  // their own ammo: dying once anywhere made every remaining triangle in the
+  // level vanish, and in level 7 that could leave a player unable to finish
+  // the core with no way to get more.
+  state.weaponPickups = state.weaponPickups.filter(p => p.collected || !p.fromBoss);
   // and put back whatever ground the boss mined out
   restoreCarvedGaps(getLevel());
 }
