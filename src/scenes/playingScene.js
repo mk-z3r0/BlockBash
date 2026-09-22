@@ -30,6 +30,7 @@ import { markCutsceneSeen, resetNarrative } from '../narrative.js';
 import { drawOverlay } from '../ui/overlays.js';
 import { updatePopups, drawPopups, resetPopups } from '../ui/popups.js';
 import { hitHazard, checkCheckpoints } from './playing/collisions.js';
+import { DEBUG } from '../engine/devflags.js';
 import {
   startCutscene, updateCutscene, drawCutsceneWorld, drawCutsceneScreen,
   skipCutscene, isCutsceneActive, activeCutsceneId, currentLocks,
@@ -250,6 +251,20 @@ function retryCurrentLevel() {
   startLevel(state.currentLevelIndex);
 }
 
+// A run that begins somewhere other than the beginning — the title screen's
+// level select, or `?level=N`. Same as a new run in every other respect:
+// score, lives and the story position all start clean, and the level's own
+// `startsWith` hands over whatever weapon the player is supposed to arrive
+// holding, which is why dropping into the middle of the game works at all.
+function startRunAt(index) {
+  resetNarrative();
+  state.currentLevelIndex = Math.max(0, Math.min(index, levels.length - 1));
+  state.score = 0;
+  state.lives = 3;
+  state.coinsCollected = 0;
+  startLevel(state.currentLevelIndex);
+}
+
 // A brand new playthrough — what the title screen starts.
 function startNewRun() {
   // Wipe the story position, so the whole story plays again.
@@ -335,6 +350,7 @@ export const playingScene = {
   // Anything else (title screen, or no data at all): a brand new run.
   enter(data) {
     if (data && data.retry) retryCurrentLevel();
+    else if (data && data.startAt != null) startRunAt(data.startAt);
     else startNewRun();
   },
 
@@ -485,6 +501,45 @@ export const playingScene = {
       return;
     }
     if (paused) return; // no other input does anything while paused
+
+    // --- ?debug traversal (see engine/devflags.js) ---
+    //
+    // Behind the flag on purpose: these are the keys that would otherwise
+    // let a seven-year-old skip the game by leaning on the keyboard. The
+    // plan's debug-mode note asks for exactly this pair — "warp to any
+    // checkpoint... plus a skip to next checkpoint key".
+    if (DEBUG && !alreadyDown) {
+      const level = getLevel();
+      if (e.key === ']' || e.key === '[') {
+        // Next/previous checkpoint in this level. Activating it as we go
+        // means dying after a warp puts the player back where they warped
+        // to, rather than at the start of the level.
+        const stops = [level.playerSpawn.x, ...(level.checkpoints || []).map(c => c.x)]
+          .sort((a, b) => a - b);
+        const forward = e.key === ']';
+        const target = forward
+          ? stops.find(x => x > player.x + 8)
+          : [...stops].reverse().find(x => x < player.x - 8);
+        if (target != null) {
+          player.x = target;
+          player.y = surfaceYAt(target) - player.height;
+          player.velocityX = 0;
+          player.velocityY = 0;
+          (level.checkpoints || []).forEach(c => { if (c.x <= target) c.activated = true; });
+          setRespawnPoint(target, player.y);
+          showToast(`WARP x${Math.round(target)}`, 60);
+        }
+        return;
+      }
+      if (e.key === 'n' || e.key === 'N') {
+        startRunAt(state.currentLevelIndex + 1);
+        return;
+      }
+      if (e.key === 'p' || e.key === 'P') {
+        startRunAt(state.currentLevelIndex - 1);
+        return;
+      }
+    }
 
     // secret unlock (parents only): Shift+K calls the sphere off so the
     // way clears, or skips the showdown if it's playing

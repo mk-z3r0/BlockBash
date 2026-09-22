@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#000;">
+<canvas id="game" width="800" height="450"></canvas><pre id="out">running…</pre>
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true, narrative: { seenCutscenes: {}, npcStage: 0, flags: {} } })); window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERROR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  // Starting anywhere other than level 1 has to leave the player able to
+  // finish that level.
+  //
+  // It works at all because levels are self-sufficient by design — each one
+  // declares `startsWith` for the weapon the player is supposed to arrive
+  // holding, and `startsWithAmmo` for the triangles. That was built so a
+  // death-and-retry mid-game wasn't a dead end; dropping in from a level
+  // select is the same problem. This is the probe that says so out loud, so
+  // a future level that forgets `startsWith` fails here instead of stranding
+  // someone with bare hands in front of the Sculptor.
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update, switchTo, getCurrentName } from '../src/scenes/sceneManager.js';
+  import { getLevel } from '../src/levels/levelLoader.js';
+  import { levels } from '../src/levels/registry.js';
+  import { getWeapon } from '../src/weapons/registry.js';
+  import { hasSeenCutscene, markCutsceneSeen } from '../src/narrative.js';
+
+  const out = [];
+  let fails = 0;
+  const check = (ok, label) => { if (!ok) fails++; out.push(`  ${ok ? 'ok  ' : 'FAIL'} ${label}`); };
+  const tick = n => { for (let i = 0; i < n; i++) update(); };
+
+  setTimeout(() => {
+   try {
+    out.push(`registry has ${levels.length} levels`);
+
+    for (let i = 0; i < levels.length; i++) {
+      switchTo('playing', { startAt: i });
+      tick(3);
+      const lv = getLevel();
+      const ok = state.currentLevelIndex === i;
+      check(ok, `startAt ${i} lands on level ${i + 1} (${ok ? lv.name : 'level ' + (state.currentLevelIndex + 1)})`);
+      // Armed as that level expects — level 1 is the only one that starts
+      // the player with nothing, on purpose.
+      const expected = lv.startsWith;
+      check(player.weapon === (expected || null),
+        `  arrives with ${expected || 'nothing'} (has: ${player.weapon || 'nothing'})`);
+      if (expected && getWeapon(expected).ammo != null) {
+        check(player.ammo >= lv.startsWithAmmo,
+          `  and ${player.ammo} triangles (needs ${lv.startsWithAmmo})`);
+      }
+      check(state.score === 0 && state.lives === 3, `  fresh score and lives`);
+    }
+
+    // Dropping in must clear the story position too, or the level's own
+    // opening scene is skipped because a previous run saw it.
+    markCutsceneSeen('l2-arrival');
+    switchTo('playing', { startAt: 1 });
+    check(!hasSeenCutscene('l2-arrival'), 'starting at a level replays that level\'s opening');
+
+    out.push(fails ? `*** ${fails} FAILURE(S)` : 'PASS every level can be started from cold');
+   } catch (err) {
+    out.push('*** THREW: ' + (err && err.stack ? err.stack.split('\n').slice(0, 3).join(' | ') : err));
+   }
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 250);
+</script></body></html>

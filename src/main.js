@@ -10,6 +10,7 @@ import { winScene } from './scenes/winScene.js';
 import { gameOverScene } from './scenes/gameOverScene.js';
 import { P } from './engine/physics.js';
 import { initNarrative } from './narrative.js';
+import { START_LEVEL } from './engine/devflags.js';
 
 // Story position comes back from the save before any scene runs, so a
 // cutscene marked `once` knows on the very first frame whether it has
@@ -48,7 +49,12 @@ initInput({
   }
 });
 
-switchTo('title');
+// `?level=N` boots straight into that level, skipping the title and the
+// opening cutscene entirely — the fastest way to look at one thing. Any
+// other boot goes to the title, which has its own level select.
+// See engine/devflags.js.
+if (START_LEVEL != null) switchTo('playing', { startAt: START_LEVEL });
+else switchTo('title');
 
 // Fixed-timestep accumulator (2026-09-20): the loop used to call update()
 // once per requestAnimationFrame, which ties simulation speed to display

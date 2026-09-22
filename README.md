@@ -108,6 +108,30 @@ Jumping on a sphere always works, and never runs out.
 A gamepad is picked up automatically once you press a button on it; there's
 nothing to configure.
 
+### Starting somewhere other than the beginning
+
+Once you've reached a face, you can start from it. The title screen shows a
+**level picker** — `←` and `→` to choose, `SPACE` to go — listing every level
+you've got to. It's the `Best: level N` line on that screen made useful.
+
+For poking at one thing without playing to it:
+
+| | |
+|---|---|
+| `?level=2` | boot straight into level 2, skipping the title entirely |
+| `?debug` | unlock every level in the picker, and turn on the traversal keys below |
+| `?test` | load the sandbox copy of level 1 instead of the real game |
+
+With `?debug` running, in-game:
+
+| Key | Does |
+|---|---|
+| `]` / `[` | warp to the next / previous checkpoint in this level |
+| `N` / `P` | jump to the next / previous level |
+
+Those keys are behind the flag on purpose — they're exactly what a child
+leaning on the keyboard would use to skip the game by accident.
+
 ### What's playable right now
 
 **All seven levels, start to finish.** Six faces of a cube planet, then a

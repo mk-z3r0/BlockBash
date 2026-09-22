@@ -1236,7 +1236,36 @@ decided.
 
 ---
 
-## Parked: debug mode
+## Debug mode — the traversal slice is built
+
+**Built 2026-09-22**, in the shape this section asked for: URL flags matching
+the existing `?test`, in `engine/devflags.js`.
+
+- `?level=N` boots straight into that level (1-based, the way a person
+  counts). Note the probe pages under `tools/` take their OWN `?level=`
+  and it's 0-based, so devflags ignores the param on any page under
+  `/tools/` — otherwise main.js would boot into the wrong level and fight
+  the probe for the scene.
+- `?debug` unlocks every level in the title picker and turns on `]` / `[`
+  (warp to next/previous checkpoint, activating them on the way so a death
+  after a warp doesn't send you back to the level start) and `N` / `P`
+  (next/previous level).
+- The title screen also has a **level picker** with no flag at all, limited
+  to `furthestLevelIndex`. That's a continue feature rather than a debug
+  one — the save already recorded how far the player got and already showed
+  it on that screen.
+
+Starting mid-game works because levels are self-sufficient by design:
+`startsWith` and `startsWithAmmo` exist so a death-and-retry wasn't a dead
+end, and dropping in from a picker is the same problem.
+`tools/level-select-probe.html` asserts every level can be started cold with
+the weapon it expects, so a future level that forgets `startsWith` fails
+there rather than stranding someone bare-handed in front of the Sculptor.
+
+**The rest of the list below is still parked.** The wish-list as originally
+written (2026-09-20), kept whole because the reasoning in it is still right:
+
+---
 
 Wish-list item (2026-09-20), not started. The idea: the instrumentation
 that already exists in `tools/physics-lab.html`, but layered over the
