@@ -230,3 +230,61 @@ export function drawRestoreTriangle(size, alpha = 1) {
   ctx.fill();
   ctx.stroke();
 }
+
+// A drilling rig, to the same contract as the other weapon icons: grip end
+// at the transform origin, everything extending toward +x/-y.
+//
+// The Excavator is "a sphere operating a drilling rig" (GAME_DESIGN's boss
+// table) and spent a while holding a pickaxe instead, which made it read as
+// a slightly bigger Foreman. A rig is a different silhouette on purpose:
+// blocky motor housing, a shaft, and a long fluted bit that turns. Nothing
+// else in the game has a straight horizontal line that long.
+//
+// `spin` advances the flutes. Passing the frame count makes it turn.
+export function drawDrillIcon(spin = 0) {
+  // motor housing
+  ctx.fillStyle = '#3f4a5c';
+  ctx.strokeStyle = '#222933';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.rect(0, -8, 15, 16);
+  ctx.fill();
+  ctx.stroke();
+
+  // a vent stripe, so the housing reads as machinery rather than a box
+  ctx.fillStyle = '#5b6b82';
+  ctx.fillRect(3, -5, 9, 2.5);
+  ctx.fillRect(3, 1, 9, 2.5);
+
+  // collar
+  ctx.fillStyle = '#8f9ab0';
+  ctx.beginPath();
+  ctx.rect(15, -5, 5, 10);
+  ctx.fill();
+  ctx.stroke();
+
+  // the bit: a long taper to a point
+  ctx.fillStyle = '#9aa6bb';
+  ctx.beginPath();
+  ctx.moveTo(20, -4.5);
+  ctx.lineTo(40, -1.2);
+  ctx.lineTo(40, 1.2);
+  ctx.lineTo(20, 4.5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // helical flutes, travelling along the bit — this is the whole reason it
+  // reads as turning rather than as a spike
+  ctx.strokeStyle = 'rgba(232, 238, 248, 0.75)';
+  ctx.lineWidth = 1.4;
+  const travel = (spin * 0.9) % 6;
+  for (let x = 21 + travel; x < 39; x += 6) {
+    const t = (x - 20) / 20;
+    const halfH = 4.5 - 3.3 * t;
+    ctx.beginPath();
+    ctx.moveTo(x, -halfH);
+    ctx.lineTo(x + 2.5, halfH);
+    ctx.stroke();
+  }
+}

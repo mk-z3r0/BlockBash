@@ -28,6 +28,7 @@ import { pickaxeAngleAt, pickaxeFistAt, drawHeldPickaxeAt, SWING_COOLDOWN, SWING
 import { sledgeAngleAt, sledgeFistAt, drawHeldSledgehammer } from './sledgehammer.js';
 import { cornerstoneAngleAt, cornerstoneFistAt, drawHeldCornerstone } from './cornerstone.js';
 import { chainsawAngleAt, chainsawFistAt, drawHeldChainsaw, drawChainsawIcon } from './chainsaw.js';
+import { drillAngleAt, drillFistAt, drawHeldDrill, drawDrillPickup } from './drill.js';
 import { drawPickaxeIcon, drawSledgehammerIcon, drawCornerstoneIcon } from '../engine/renderer.js';
 import { playPickaxeSwing, playSledgeSwing, playCornerstoneFire, playChainsawStart } from '../audio/sfx.js';
 
@@ -42,6 +43,9 @@ const WEAPONS = {
     cooldown: SWING_COOLDOWN,
     duration: SWING_DURATION,
     reach: 51,
+    // The chop travels from over the shoulder to level with the ground, so
+    // the head is only out front for the back two thirds of it.
+    activeFrom: 0.34,
     damage: 1,
     knockback: 0,
     score: 150,
@@ -62,7 +66,16 @@ const WEAPONS = {
     // costs you, which is the point of a power trade.
     cooldown: 54,
     duration: 22,
-    reach: 62,
+    // 56, not 62. Its strike is an overhead smash that finishes BELOW the
+    // player's feet, so its reach at torso height — where the hitbox is —
+    // is shorter than a level chop's, and 62 left the box noticeably longer
+    // than anywhere the head actually goes. Still longer than the pickaxe's
+    // 51, which is the weapon's whole selling point.
+    reach: 56,
+    // An overhead smash spends its first HALF going up. This is the weapon
+    // that made the old always-on hitbox obvious, because there was so much
+    // visible wind-up to land a hit during.
+    activeFrom: 0.5,
     damage: 2,
     knockback: 11,
     score: 200,
@@ -72,6 +85,26 @@ const WEAPONS = {
     fistAt: sledgeFistAt,
     drawHeld: drawHeldSledgehammer,
     drawIcon: drawSledgehammerIcon
+  },
+
+  // The Excavator's rig. Enemy kit; nothing swings it at anyone.
+  drill: {
+    id: 'drill',
+    label: 'DRILL',
+    kind: 'melee',
+    cooldown: 60,
+    duration: 30,
+    reach: 60,
+    activeFrom: 0.2,
+    damage: 1,
+    knockback: 6,
+    score: 150,
+    ammo: null,
+    sound: playChainsawStart,
+    angleAt: drillAngleAt,
+    fistAt: drillFistAt,
+    drawHeld: drawHeldDrill,
+    drawIcon: drawDrillPickup
   },
 
   // Enemy kit, not the player's. Nothing drops one — it's here because a
@@ -87,6 +120,9 @@ const WEAPONS = {
     cooldown: 40,
     duration: 26,
     reach: 56,
+    // A thrust, not a swing: out fast and then held, so it's live early and
+    // stays live. That long active window is the point of the weapon.
+    activeFrom: 0.15,
     damage: 1,
     knockback: 4,
     score: 150,

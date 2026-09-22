@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#12172b;"><canvas id="game" width="800" height="450"></canvas>
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true, narrative: { seenCutscenes: {}, npcStage: 0, flags: {} } }));</script>
+<script type="module">
+  // Every weapon, every frame of its swing, side by side.
+  //
+  // Weapon poses are the one thing in this game with no probe and no way to
+  // check by playing — a swing is 16-30 frames and you can't pause inside it.
+  // This draws each weapon across its whole animation, with the ACTIVE part
+  // of the hitbox marked, so "the sledgehammer looks odd" and "the hit lands
+  // before the weapon does" are questions you can look at instead of feel.
+  // Deliberately does NOT import main.js. That starts the game loop, which
+  // repaints the title screen over this every frame.
+  import { ctx } from '../src/engine/renderer.js';
+  import { drawMuscleArm } from '../src/engine/renderer.js';
+
+  const ids = ['pickaxe', 'sledgehammer', 'chainsaw', 'drill', 'cornerstone'];
+
+  setTimeout(async () => {
+    const { getWeapon } = await import('../src/weapons/registry.js');
+    const STEPS = 6;
+    const cellW = 800 / (STEPS + 1);
+    const cellH = 450 / ids.length;
+
+    ctx.fillStyle = '#12172b';
+    ctx.fillRect(0, 0, 800, 450);
+
+    ids.forEach((id, row) => {
+      const w = getWeapon(id);
+      const cy = row * cellH + cellH / 2 + 6;
+
+      ctx.fillStyle = '#7a84a8';
+      ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(`${id}  ${w.duration}f  from ${w.activeFrom ?? 0.35}`, 6, row * cellH + 14);
+
+      for (let i = 0; i < STEPS; i++) {
+        const progress = i / (STEPS - 1);
+        const cx = cellW * (i + 1) + 20;
+        const from = w.activeFrom == null ? 0.35 : w.activeFrom;
+        const live = progress >= from;
+
+        ctx.save();
+        ctx.translate(cx, cy);
+
+        // the hitbox, where it is on this frame
+        if (w.kind === 'melee') {
+          const out = Math.min(1, (progress - from) / (1 - from));
+          const reach = live ? w.reach * (0.55 + 0.45 * out) : 0;
+          if (reach > 0) {
+            ctx.fillStyle = 'rgba(94, 231, 255, 0.16)';
+            ctx.fillRect(11, -11, reach, 22);
+            ctx.strokeStyle = 'rgba(94, 231, 255, 0.5)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(11.5, -10.5, reach - 1, 21);
+          }
+        }
+
+        // the player's body, at the same 22px it is in game
+        ctx.fillStyle = live ? '#f2c14e' : '#8a6f2e';
+        ctx.fillRect(-11, -11, 22, 22);
+
+        const fist = w.fistAt(11, 11, 1, progress);
+        const hand = drawMuscleArm(0, -1.1, fist.x, fist.y);
+        w.drawHeld(hand, 1, progress);
+        ctx.restore();
+
+        ctx.fillStyle = live ? '#8effc0' : '#5b6678';
+        ctx.font = '9px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(progress.toFixed(2), cx, cy + cellH / 2 - 6);
+      }
+    });
+    document.title = 'poses drawn';
+  }, 250);
+</script></body></html>

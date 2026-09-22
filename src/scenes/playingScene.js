@@ -26,7 +26,7 @@ import { playHit, playWin, playGameOver } from '../audio/sfx.js';
 import { startMusic, setMusicMood } from '../audio/audio.js';
 import { switchTo } from './sceneManager.js';
 import { recordProgress } from '../save.js';
-import { markCutsceneSeen } from '../narrative.js';
+import { markCutsceneSeen, resetNarrative } from '../narrative.js';
 import { drawOverlay } from '../ui/overlays.js';
 import { updatePopups, drawPopups, resetPopups } from '../ui/popups.js';
 import { hitHazard, checkCheckpoints } from './playing/collisions.js';
@@ -252,6 +252,19 @@ function retryCurrentLevel() {
 
 // A brand new playthrough — what the title screen starts.
 function startNewRun() {
+  // Wipe the story position, so the whole story plays again.
+  //
+  // narrative.js has had resetNarrative() since the day it was written,
+  // documented as "a brand new playthrough from the title screen" — and
+  // nothing ever called it. Every `once: true` scene was therefore
+  // once-ever-per-BROWSER rather than once-per-playthrough: play level 2,
+  // start a new game, and Quarrick simply never speaks again. The most
+  // visible symptom was the game's first conversation silently not
+  // happening on a second run.
+  //
+  // Deliberately here and not in retryCurrentLevel(), which is also the
+  // game-over path: dying should not un-see a cutscene.
+  resetNarrative();
   state.currentLevelIndex = 0;
   retryCurrentLevel();
 }

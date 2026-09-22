@@ -83,19 +83,46 @@ export function startAttack(owner) {
   return true;
 }
 
-function meleeHitbox(owner, weapon) {
+// How far through the swing the hitbox is, and how far out it reaches.
+//
+// This used to be "full reach, every frame the animation is playing", which
+// meant the hit landed while the weapon was still cocked behind the owner's
+// shoulder. Reported from play: "looks like I can hit enemies before the
+// pick contacts them", and much worse with the sledgehammer, whose 22-frame
+// overhead smash spends its first half going UP.
+//
+// So the box now follows the swing. It stays shut through the wind-up
+// (`activeFrom`, a fraction of the duration, per weapon) and then extends
+// from about half reach to full as the weapon travels.
+//
+// What it deliberately does NOT go back to is a single-frame check on the
+// button press. That was the original design and it whiffed at run speed —
+// press a hair early, miss the empty box that frame, and run into the enemy
+// on the next one. A window that opens late and stays open to the end of the
+// animation keeps that fixed while still looking like the hit it draws.
+function swingReach(owner, weapon) {
+  const progress = weapon.duration ? 1 - owner.weaponTimer / weapon.duration : 1;
+  const from = weapon.activeFrom == null ? 0.35 : weapon.activeFrom;
+  if (progress < from) return 0;                       // still winding up
+  const out = from >= 1 ? 1 : Math.min(1, (progress - from) / (1 - from));
+  return weapon.reach * (0.55 + 0.45 * out);
+}
+
+function meleeHitbox(owner, weapon, reach) {
   const b = boxOf(owner);
   const dir = owner.facing >= 0 ? 1 : -1;
   return {
-    x: dir > 0 ? b.x + b.width : b.x - weapon.reach,
+    x: dir > 0 ? b.x + b.width : b.x - reach,
     y: b.y,
-    width: weapon.reach,
+    width: reach,
     height: b.height
   };
 }
 
 function applyMeleeHits(owner, weapon) {
-  const hitbox = meleeHitbox(owner, weapon);
+  const reach = swingReach(owner, weapon);
+  if (reach <= 0) return;
+  const hitbox = meleeHitbox(owner, weapon, reach);
   const dir = owner.facing >= 0 ? 1 : -1;
 
   if (owner === player) {

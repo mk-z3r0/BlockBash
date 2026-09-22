@@ -18,6 +18,7 @@
   import { getLevel, surfaceYAt } from '../src/levels/levelLoader.js';
   import { startAttack } from '../src/weapons/combat.js';
   import { levels } from '../src/levels/registry.js';
+  import { markCutsceneSeen, hasSeenCutscene, resetNarrative } from '../src/narrative.js';
   import { isCutsceneActive, activeCutsceneId, skipCutscene } from '../src/cutscenes/runner.js';
 
   const out = [];
@@ -184,6 +185,26 @@
       check(state.gameState === 'win', `and the ending wins the game (gameState: ${state.gameState})`);
     }
 
+    // --- a new run tells the story again ---
+    //
+    // `once: true` means once per playthrough, not once per browser. Nothing
+    // called resetNarrative() for a long time, so a player who had seen
+    // level 2's opening once never saw it again on any later run — reported
+    // from play as "the dialogue with Quarrick is gone".
+    out.push('== a new run replays the story ==');
+    {
+      markCutsceneSeen('l2-arrival');
+      check(hasSeenCutscene('l2-arrival'), 'a scene can be marked seen');
+      // The title-screen path: switchTo with no data is a brand new run.
+      switchTo('playing');
+      check(!hasSeenCutscene('l2-arrival'), 'starting a new run clears it again');
+
+      // ...and a game-over retry must NOT, because dying shouldn't un-see one.
+      markCutsceneSeen('l2-arrival');
+      switchTo('playing', { retry: true });
+      check(hasSeenCutscene('l2-arrival'), 'a retry after dying leaves it seen');
+    }
+
     // --- nobody is standing inside the scenery ---
     //
     // Every scene that puts a character on the ground used to pass
@@ -193,6 +214,9 @@
     // by any probe, which is why this one exists.
     out.push('== characters stand on the ground ==');
     for (let i = 0; i < levels.length; i++) {
+      // Fresh story position per level, or the `once: true` openings won't
+      // play at all — the test above deliberately leaves one marked seen.
+      resetNarrative();
       state.currentLevelIndex = i;
       switchTo('playing', { retry: true });
       const lv = getLevel();

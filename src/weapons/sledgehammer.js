@@ -12,9 +12,19 @@
 
 import { ctx, drawSledgehammerIcon } from '../engine/renderer.js';
 
-// Carried high and back, like something too heavy to hold out in front.
-const IDLE_FIST = (hw, hh, facing) => ({ x: -facing * hw * 0.15, y: -hh * 1.0 });
-const IDLE_ANGLE = -2.35;
+// Shouldered: head up, handle vertical, resting against the body.
+//
+// The first version put the fist BEHIND the body and the angle at -2.35,
+// which laid the handle almost horizontal pointing backwards — so the player
+// walked around with a hammer sticking out behind them like a tail. That's
+// the pose you see 95% of the time, since a weapon is drawn every frame it's
+// carried and only swung for 22 of them.
+//
+// drawSledgehammerIcon's handle runs (0,0) to (20,-15), i.e. about -37°
+// before rotation, so -1.05 puts the total near -94°: straight up, head on
+// top, which is how anyone actually carries a sledgehammer.
+const IDLE_FIST = (hw, hh, facing) => ({ x: facing * hw * 0.15, y: -hh * 0.8 });
+const IDLE_ANGLE = -1.05;
 
 // Ends buried in the ground ahead — an overhead smash, not a level swipe.
 // That's what sells the knockback the registry gives it.
