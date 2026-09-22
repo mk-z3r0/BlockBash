@@ -49,6 +49,14 @@
     const lv = getLevel();
     lv.cutscenes.length = 0;   // a dialogue beat would wait for a keypress
     const ground = lv.platforms.filter(p => p.ground).sort((a, b) => a.x - b.x);
+    // Ground is no longer one flat line: segments can sit above the level's
+    // base. Every test has to stand the player on the surface that's
+    // actually there, or it drops them through a terrace and calls the
+    // level broken.
+    const groundYAt = x => {
+      const seg = ground.find(p => x >= p.x && x <= p.x + p.width);
+      return seg ? seg.y : lv.groundY;
+    };
     const floating = lv.platforms.filter(p => !p.ground && p.width > 1);
 
     function place(x, y) {
@@ -89,7 +97,13 @@
       // that is perfectly clearable. Walk the runway forward past anything
       // solid it starts inside of.
       for (const p of floating) {
-        const standsOnGround = p.y + p.height >= lv.groundY - 2;
+        // Against the LOCAL ground, not the level's base line. A block
+        // standing on a raised shelf has its bottom at the shelf, nowhere
+        // near groundY — comparing to groundY meant every cover block on
+        // level 4's shelf went unrecognised, so runways started inside them
+        // and the player spent the whole test pressed against a wall. That
+        // reported a perfectly ordinary 150px gap as impossible.
+        const standsOnGround = p.y + p.height >= groundYAt(p.x) - 2;
         if (standsOnGround && start >= p.x - player.width && start <= p.x + p.width) {
           start = p.x + p.width + 4;
         }
@@ -104,9 +118,40 @@
       return Math.max(prevHazardEnd, Math.min(start, triggerX - 60));
     }
 
-    function jumpTest(triggerX, fromX, targetX, lead, hold, run) {
-      primedSpeed = run ? P.runMax : P.walkMax;
-      place(runwayStart(triggerX, fromX), lv.groundY - player.height);
+    // Where a player could plausibly be standing when they commit to this
+    // obstacle. Running along the ground is one answer; in a level built out
+    // of columns it is very often NOT the answer, because there is no runway
+    // between the pillar and the bed and the whole point is to jump off the
+    // pillar.
+    //
+    // This was the single biggest blind spot in the audit. Level 3 is a
+    // forest of standing blocks, and testing only the ground runway reported
+    // all twelve of its spike beds as uncrossable when every one of them is
+    // cleared comfortably from the stump in front of it.
+    function launchPoints(triggerX, fromX) {
+      const runX = runwayStart(triggerX, fromX);
+      const points = [{ x: runX, y: groundYAt(runX), label: 'ground' }];
+      // A solid block standing ON the ground whose top the player could be
+      // on when they jump — near enough to the obstacle to be the obvious
+      // launch pad, and high enough to be worth climbing.
+      for (const p of floating) {
+        const standsOnGround = p.y + p.height >= groundYAt(p.x) - 2;
+        const endsBefore = p.x + p.width;
+        if (!standsOnGround) continue;
+        if (endsBefore > triggerX + 2 || endsBefore < triggerX - 170) continue;
+        points.push({ x: p.x + p.width - player.width - 2, y: p.y, label: `off the block at ${p.x}` });
+      }
+      return points;
+    }
+
+    function jumpTest(triggerX, fromX, targetX, lead, hold, run, from) {
+      // A launch off a narrow pillar top can't be at full run — there's no
+      // room on it to accelerate. Ground runways get whatever speed is asked
+      // for; block launches are capped at walk, which is the conservative
+      // reading and the one that can't flatter a level.
+      primedSpeed = (run && from.label === 'ground') ? P.runMax : P.walkMax;
+      const startX = from.x;
+      place(startX, from.y - player.height);
       clearEnemies();
       const lives0 = state.lives;
       key('keydown', 'ArrowRight');
@@ -141,9 +186,18 @@
     }
     const anyOk = results => results.some(r => r.startsWith('ok'));
     // Only the timings that worked, so a passing line stays readable.
-    const summarise = results => {
-      const ok = STYLES.map(([n], i) => [n, results[i]]).filter(([, r]) => r.startsWith('ok'));
-      return ok.length ? ok.map(([n, r]) => `${n}:${r}`).join('  ') : 'NOTHING CLEARS IT';
+    // Results come back as launch points x timings, flattened. Only the ones
+    // that worked are printed, so a passing line stays readable.
+    const summarise = (results, froms) => {
+      const ok = [];
+      results.forEach((r, i) => {
+        if (!r.startsWith('ok')) return;
+        const from = froms[Math.floor(i / STYLES.length)];
+        const style = STYLES[i % STYLES.length][0];
+        ok.push(`${from.label === 'ground' ? '' : from.label + ' '}${style}:${r}`);
+      });
+      return ok.length ? ok.slice(0, 6).join('  ') + (ok.length > 6 ? `  (+${ok.length - 6} more)` : '')
+                       : 'NOTHING CLEARS IT';
     };
 
     out.push(`== LEVEL ${levelIndex}: ${lv.name} ==`);
@@ -153,12 +207,24 @@
     ground.forEach((s, i) => {
       if (i === 0) return;
       const prev = ground[i - 1], edge = prev.x + prev.width;
-      if (s.x - edge > 2) gaps.push({ edge, landing: s.x, size: s.x - edge, from: prev.x });
+      if (s.x - edge > 2) {
+        gaps.push({
+          edge, landing: s.x, size: s.x - edge, from: prev.x,
+          // Positive = the far side is HIGHER. A gap that also climbs costs
+          // part of the jump's carry, so it's worth seeing in the report.
+          rise: prev.y - s.y
+        });
+      }
     });
     out.push(`== GAPS (${gaps.length}) ==`);
     gaps.forEach(g => {
-      const results = STYLES.map(([, l, h, run]) => jumpTest(g.edge, g.from, g.landing, l, h, run));
-      out.push(`  ${g.edge}-${g.landing} (${g.size}px)  ${summarise(results)}`);
+      const froms = launchPoints(g.edge, g.from);
+      const results = [];
+      for (const from of froms) {
+        for (const [, l, h, run] of STYLES) results.push(jumpTest(g.edge, g.from, g.landing, l, h, run, from));
+      }
+      const climb = g.rise ? `  ${g.rise > 0 ? '+' : ''}${g.rise}px step` : '';
+      out.push(`  ${g.edge}-${g.landing} (${g.size}px)${climb}  ${summarise(results, froms)}`);
       if (!anyOk(results)) fail(`gap ${g.edge}-${g.landing} (${g.size}px) is not clearable at any tested speed or timing`);
     });
 
@@ -173,11 +239,24 @@
       if (hz.width > 200) {
         const stones = floating.filter(p => p.x + p.width > hz.x && p.x < hz.x + hz.width);
         out.push(`  ${hz.x}-${hz.x + hz.width} (${hz.width}px): crossed on ${stones.length} platform(s)`);
-        if (stones.length === 0) fail(`spike bed ${hz.x}-${hz.x + hz.width} is ${hz.width}px wide (> 200) with no platform over it to cross on`);
+        if (stones.length === 0) {
+          fail(`spike bed ${hz.x}-${hz.x + hz.width} is ${hz.width}px wide (> 200) with no platform over it to cross on`);
+        } else if (stones.length === 1) {
+          // Level 1 crosses its 340px bed on TWO stones, and that's the
+          // shape to copy. One platform in the middle of a wide bed means
+          // two long committed jumps with spikes under both and nowhere to
+          // stop and re-time between them — survivable, but a different
+          // and much meaner obstacle than it looks.
+          warn(`spike bed ${hz.x}-${hz.x + hz.width} (${hz.width}px) is crossed on a single platform — two stones is the fair shape`);
+        }
         return;
       }
-      const results = STYLES.map(([, l, h, run]) => jumpTest(hz.x, seg.x, hz.x + hz.width, l, h, run));
-      out.push(`  ${hz.x}-${hz.x + hz.width} (${hz.width}px)  ${summarise(results)}`);
+      const froms = launchPoints(hz.x, seg.x);
+      const results = [];
+      for (const from of froms) {
+        for (const [, l, h, run] of STYLES) results.push(jumpTest(hz.x, seg.x, hz.x + hz.width, l, h, run, from));
+      }
+      out.push(`  ${hz.x}-${hz.x + hz.width} (${hz.width}px)  ${summarise(results, froms)}`);
       if (!anyOk(results)) fail(`spike bed ${hz.x}-${hz.x + hz.width} (${hz.width}px) is not clearable at any tested speed or timing`);
     });
 
@@ -187,6 +266,7 @@
     // the worst bug in level 1."
     out.push('== STRUCTURE ==');
     const JUMP_RISE = 225;      // measured, see the level design rules
+    const surfaceAt = x => groundYAt(x);
     const LIP = 40;             // how much of the take-off lip counts as the jump-off point
     // Only gaps that actually demand a committed jump. Level 1 has a 25px
     // gap directly under a wide platform and is completely fine, because a
@@ -204,8 +284,18 @@
     let overhead = 0;
     lips.forEach(lip => {
       floating.forEach(p => {
-        const overLip = p.x < lip.x + 4 && p.x + p.width > lip.x - LIP;
-        const withinRise = p.y + p.height > lv.groundY - JUMP_RISE && p.y < lv.groundY - player.height;
+        // Authored position, not wherever it has drifted to: a moving
+        // platform is somewhere different every frame, and a structural rule
+        // that reports "platform 2901.563332790057" is measuring the clock.
+        const px = p.baseX == null ? p.x : p.baseX;
+        const py = p.baseY == null ? p.y : p.baseY;
+        const overLip = px < lip.x + 4 && px + p.width > lip.x - LIP;
+        const floor = surfaceAt(lip.x);
+        // A solid block standing on the ground can't be "overhead" — there
+        // is no under it to rise into. It's terrain to climb, and in a
+        // pillar level it's usually the intended launch pad.
+        if (py + p.height >= groundYAt(px) - 2) return;
+        const withinRise = py + p.height > floor - JUMP_RISE && py < floor - player.height;
         if (overLip && withinRise) {
           overhead++;
           // Advisory, because this rule cannot see horizontal travel and
@@ -215,7 +305,7 @@
           // is authoritative — a genuine bonk shows up there as DIED or as
           // NOTHING CLEARS IT, which is how level 2's bed at 2400 was
           // caught. This is the pointer at geometry worth a second look.
-          warn(`platform ${p.x}-${p.x + p.width} @y${p.y} is close over the take-off for ${lip.what} — the jump tests above are the verdict`);
+          warn(`platform ${px}-${px + p.width} @y${py} is close over the take-off for ${lip.what} — the jump tests above are the verdict`);
         }
       });
     });

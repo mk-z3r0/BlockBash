@@ -1,176 +1,199 @@
-// Level 3 — the third face, and the turn the whole game is built around.
+// Level 3 — What the Sanders Left. The turn the whole game is built around.
 //
-// Structurally this level is in three parts:
+// IDENTITY: this level stands up. Where the quarry went down in terraces,
+// this face has been sanded into COLUMNS — the spheres took everything
+// between them and left pillars of block standing. So it's climbed rather
+// than crossed: far fewer pits than any other level, and instead a forest of
+// solid stacks that have to be jumped onto, stepped up, and dropped off.
 //
-//   0-3400     ordinary play with the sledgehammer, and the first corrupted
-//              square. Swinging at it does nothing. That lesson has to land
-//              BEFORE the weapon that answers it exists, or the Cornerstone
-//              is just another gun.
-//   3400       Quarrick hands over the Cornerstone and immediately corrupts.
-//              The player's first shot with it is at him.
-//   3400-7100  the verb, practised. Corrupted squares to restore, triangles
-//              to find, and the Sculptor at the end — a boss that cannot be
-//              hurt and has to be put back together.
-//
-// The degradation is worse here than level 2 (GAME_DESIGN's environmental
-// storytelling arc: "sections visibly sanded smooth, corners going
-// missing"), which is what `chewed` is doing on half the platforms.
+// Structurally it's in three parts:
+//   0-3250     the pillars, with the sledgehammer. And the first corrupted
+//              square, which the hammer does nothing to. That lesson has to
+//              land BEFORE the weapon that answers it exists.
+//   3250       Quarrick hands over the Cornerstone and immediately corrupts.
+//              The clearing here is deliberately the flattest, emptiest
+//              ground in the level — the scene is the obstacle.
+//   3250-7300  the verb, practised. Squares to restore, triangles to find,
+//              and the Sculptor, which cannot be hurt.
 
 const GROUND_Y = 410;
+// A pillar is authored by its height so the stacks read as stacks in the
+// data too, rather than as a column of y values to check by hand.
+const pillar = (x, w, h, opts = {}) => ({ x, y: GROUND_Y - h, width: w, height: h, ...opts });
 
 export default {
   id: 'level3',
   name: 'What the Sanders Left',
-  worldWidth: 7400,
+  worldWidth: 7600,
   groundY: GROUND_Y,
-  playerSpawn: { x: 90, y: 300 },
+  playerSpawn: { x: 80, y: 300 },
 
-  // Arrives holding what the Excavator dropped.
   startsWith: 'sledgehammer',
-  // Worse than level 2. He is running out.
   quarrickDamage: 3,
 
+  // Six gaps, not seven, and wider ground between them. The vertical work is
+  // the point here; pits would just be noise on top of it.
   ground: [
-    { x: 0,    width: 800 },
-    { x: 870,  width: 530 },    // 70
-    { x: 1490, width: 510 },    // 90
-    { x: 2060, width: 640 },    // 60
-    { x: 2850, width: 750 },    // 150 — run only
-    { x: 3655, width: 645 },    // 55
-    { x: 4390, width: 610 },    // 90
-    { x: 5160, width: 1940 }    // 160 — run only, then the long run in
+    { x: 0,    width: 900 },
+    { x: 970,  width: 630 },    // 70
+    { x: 1690, width: 710 },    // 90
+    { x: 2460, width: 1240 },   // 60 — the long stretch holding the clearing
+    { x: 3850, width: 750 },    // 150 — run only
+    { x: 4655, width: 645 },    // 55
+    { x: 5460, width: 1840 }    // 160 — run only, then the Sculptor
   ],
 
   platforms: [
-    { x: 150,  y: 330, width: 120, height: 18 },
-    { x: 420,  y: 280, width: 120, height: 18 },
-    { x: 880,  y: 320, width: 100, height: 18 },
-    { x: 1180, y: 270, width: 110, height: 18, chewed: true },
-    { x: 1520, y: 310, width: 110, height: 18 },
-    { x: 1820, y: 240, width: 100, height: 18, chewed: true },
-    { x: 2100, y: 320, width: 110, height: 18 },
-    { x: 2450, y: 260, width: 100, height: 18, chewed: true },
-    { x: 2870, y: 310, width: 80,  height: 18 },
-    // the handoff clearing — flat, empty, nothing overhead. The one place
-    // in the level with no obstacle in it, because the scene is the obstacle.
-    { x: 3150, y: 300, width: 110, height: 18 },
-    // stepping stones over the 350px bed
-    { x: 3840, y: 340, width: 100, height: 18 },
-    { x: 3990, y: 340, width: 100, height: 18 },
-    { x: 4170, y: 250, width: 80,  height: 18, chewed: true },
-    { x: 4580, y: 250, width: 70,  height: 18 },
-    { x: 4850, y: 230, width: 100, height: 18, chewed: true },
-    { x: 5250, y: 300, width: 100, height: 18 },
-    { x: 5750, y: 270, width: 100, height: 18, chewed: true },
-    { x: 6000, y: 320, width: 100, height: 18 },
-    { x: 6400, y: 290, width: 100, height: 18, chewed: true }
+    // --- a stair of stumps out of the spawn, teaching the level's verb ---
+    pillar(300, 60, 44),
+    pillar(370, 60, 88),
+    pillar(440, 60, 132),
+    { x: 620, y: 200, width: 110, height: 18 },
+
+    // --- the first real columns ---
+    pillar(1060, 54, 110, { chewed: true }),
+    pillar(1250, 54, 176),
+    { x: 1360, y: 170, width: 100, height: 18, chewed: true },
+    pillar(1480, 54, 88),
+
+    pillar(1780, 60, 132, { chewed: true }),
+    pillar(1900, 60, 66),
+    { x: 2060, y: 210, width: 110, height: 18 },
+    pillar(2240, 54, 154, { chewed: true }),
+
+    // --- approaching the clearing: the stacks thin out ---
+    pillar(2560, 60, 88),
+    pillar(2700, 60, 44, { chewed: true }),
+    { x: 2900, y: 250, width: 110, height: 18 },
+    // 3100-3700 is the clearing. Nothing in it. Nothing over it.
+
+    // --- after the handoff, the columns come back taller ---
+    pillar(3900, 54, 110, { chewed: true }),
+    { x: 4050, y: 190, width: 100, height: 18 },
+    pillar(4230, 54, 176, { chewed: true }),
+    pillar(4400, 54, 88),
+
+    pillar(4720, 60, 132, { chewed: true }),
+    { x: 4900, y: 200, width: 100, height: 18, chewed: true },
+    // 5040 and taller. At 5120x66 this stump ended 26px before the bed at
+    // 5200 — too close to jump from the ground behind it and too low to
+    // carry off the top, so the bed had no solution at all.
+    pillar(5040, 54, 110),
+
+    pillar(5560, 60, 154, { chewed: true }),
+    { x: 5760, y: 220, width: 110, height: 18, chewed: true },
+    pillar(5980, 54, 110, { chewed: true }),
+    { x: 6200, y: 260, width: 100, height: 18 },
+    pillar(6420, 60, 88, { chewed: true })
+    // 6600 onward is the Sculptor's ground, left open.
   ],
 
   hazards: [
-    { type: 'spikes', x: 1050, width: 50 },
-    { type: 'spikes', x: 1700, width: 50 },
-    { type: 'spikes', x: 2300, width: 50 },
-    { type: 'spikes', x: 3000, width: 50 },
-    // crossed on the two stones, never jumped
-    { type: 'spikes', x: 3800, width: 350 },
-    { type: 'spikes', x: 4500, width: 50 },
-    { type: 'spikes', x: 4700, width: 60 },
-    { type: 'spikes', x: 5400, width: 50 },
-    { type: 'spikes', x: 5600, width: 50 }
-    // 6300 onward is the Sculptor's ground, kept clear
+    // Between the stumps — the reason to go up rather than through.
+    { type: 'spikes', x: 540,  width: 55 },
+    { type: 'spikes', x: 1130, width: 60 },
+    // 1380, not 1560: at 1560 this bed ran off the end of the ledge at 1600
+    // and hung over the pit, so the gap after it could not be jumped from
+    // anywhere. Caught by the audit, which reported the GAP as impossible
+    // rather than the bed, because that's where the player actually dies.
+    { type: 'spikes', x: 1380, width: 55 },
+    { type: 'spikes', x: 1980, width: 60 },
+    { type: 'spikes', x: 2320, width: 55 },
+    { type: 'spikes', x: 2800, width: 50 },
+    // clearing: no hazards 3000-3800
+    { type: 'spikes', x: 3980, width: 55 },
+    { type: 'spikes', x: 4310, width: 60 },
+    { type: 'spikes', x: 4800, width: 55 },
+    { type: 'spikes', x: 5200, width: 55 },
+    { type: 'spikes', x: 5660, width: 55 },
+    { type: 'spikes', x: 6060, width: 60 }
   ],
 
   ammo: [
-    // All of it after the handoff — before that the player has nothing to
-    // put triangles into. Enough across the level to restore every
-    // corrupted square AND still face the Sculptor with a full load, if the
-    // player picks it all up; not enough to be careless twice.
-    { x: 3700, y: GROUND_Y - 34, amount: 4 },
-    { x: 4900, y: 200,           amount: 4 },
-    { x: 6050, y: 290,           amount: 5 }
+    { x: 3820, y: GROUND_Y - 34, amount: 4 },
+    { x: 4950, y: 180,           amount: 4 },
+    { x: 6250, y: 240,           amount: 5 }
   ],
 
   cutscenes: [
-    // Neither is `once`. If the player dies after the handoff, they respawn
-    // holding the level's starting weapon again, and the scene that gives
-    // them the Cornerstone has to be able to run a second time — otherwise
-    // the Sculptor, which can only be beaten with it, is unbeatable.
-    // 3250, not 3400: the scene stands Quarrick 150px ahead of the player,
-    // and triggering at 3400 put him within 50px of the pit at 3600 — the
-    // most important conversation in the game, held on the lip of a hole.
+    // Neither is `once`. A player who dies after the handoff respawns holding
+    // the level's starting weapon, so a scene marked as seen and never re-run
+    // would leave the Sculptor — which can only be beaten with the
+    // Cornerstone — unbeatable.
     { id: 'l3-handoff',  when: { reachX: 3250 } },
     { id: 'l3-restored', when: { quarrickRestored: true } },
     { id: 'edge-transition', when: { nearWorldEdge: 100 } }
   ],
 
   enemies: [
-    { x: 350,  y: GROUND_Y - 22, w: 22, minX: 300,  maxX: 560,  speed: 1.7 },
-    { x: 930,  y: 300,           w: 20, minX: 880,  maxX: 980,  speed: 1.2 },
-    { x: 1600, y: GROUND_Y - 22, w: 22, minX: 1520, maxX: 1900, speed: 1.6,
+    { x: 200,  y: GROUND_Y - 22, w: 22, minX: 150,  maxX: 290,  speed: 1.7 },
+    { x: 660,  y: 180,           w: 20, minX: 620,  maxX: 730,  speed: 1.2 },
+    { x: 1000, y: GROUND_Y - 22, w: 22, minX: 975,  maxX: 1055, speed: 1.6 },
+    { x: 1400, y: 150,           w: 20, minX: 1360, maxX: 1460, speed: 1.2 },
+    { x: 1800, y: GROUND_Y - 22, w: 22, minX: 1760, maxX: 1870, speed: 1.8,
       tier: 'pursuer', weapon: 'pickaxe' },
-    { x: 1870, y: 220,           w: 20, minX: 1820, maxX: 1920, speed: 1.2 },
-    // The first corrupted square in the game, on open ground with room to
-    // back off. The sledgehammer bounces off it. That's the whole point of
-    // putting it here, 900px before anyone explains what it is.
-    { x: 2500, y: GROUND_Y - 26, w: 26, minX: 2200, maxX: 2680, speed: 0.8,
+    { x: 2100, y: 190,           w: 20, minX: 2060, maxX: 2170, speed: 1.2 },
+    // The first corrupted square in the game, on the open ground before the
+    // clearing. The sledgehammer bounces off it. That is the entire reason
+    // it is standing here, 700px before anyone explains what it is.
+    { x: 2850, y: GROUND_Y - 26, w: 26, minX: 2780, maxX: 3000, speed: 0.8,
       kind: 'octagon', restoreHits: 2 },
-    { x: 2900, y: GROUND_Y - 22, w: 22, minX: 2860, maxX: 2990, speed: 1.5,
+    // 3100-3700: the clearing. Empty.
+    { x: 4100, y: 170,           w: 20, minX: 4050, maxX: 4150, speed: 1.3 },
+    { x: 4480, y: GROUND_Y - 22, w: 22, minX: 4440, maxX: 4590, speed: 1.7,
       tier: 'pursuer', weapon: 'pickaxe' },
-    // 3100-3600 deliberately empty: the handoff happens here.
-    { x: 3880, y: 320,           w: 20, minX: 3840, maxX: 3940, speed: 1.1 },
-    { x: 4420, y: GROUND_Y - 26, w: 26, minX: 4400, maxX: 4690, speed: 0.8,
+    { x: 4940, y: 180,           w: 20, minX: 4900, maxX: 5000, speed: 1.3 },
+    { x: 5380, y: GROUND_Y - 26, w: 26, minX: 5330, maxX: 5450, speed: 0.8,
       kind: 'octagon', restoreHits: 2 },
-    { x: 4880, y: 210,           w: 20, minX: 4850, maxX: 4950, speed: 1.2 },
-    { x: 5300, y: GROUND_Y - 22, w: 22, minX: 5220, maxX: 5390, speed: 1.7,
-      tier: 'pursuer', weapon: 'pickaxe' },
-    { x: 5850, y: GROUND_Y - 26, w: 26, minX: 5700, maxX: 5990, speed: 0.8,
+    { x: 5820, y: 200,           w: 20, minX: 5760, maxX: 5870, speed: 1.3 },
+    { x: 6280, y: GROUND_Y - 26, w: 26, minX: 6180, maxX: 6380, speed: 0.8,
       kind: 'octagon', restoreHits: 2 },
-    { x: 6430, y: 270,           w: 20, minX: 6400, maxX: 6500, speed: 1.3 },
 
     // --- The Sculptor ---
-    // "First octagon boss — a large corrupted square. Defeated by
-    // restoration, not combat, which teaches the verb the endgame depends
-    // on." Nothing in the arsenal can hurt it. Six triangles put it back.
-    { x: 6800, y: GROUND_Y - 54, w: 54, minX: 6500, maxX: 7050, speed: 0.75,
-      kind: 'octagon', boss: true, restoreHits: 6 }
+    // Nothing in the arsenal can hurt it. Six triangles put it back.
+    { x: 6900, y: GROUND_Y - 54, w: 54, minX: 6650, maxX: 7180, speed: 0.75,
+      kind: 'octagon', boss: true, bossName: 'THE SCULPTOR', restoreHits: 6 }
   ],
 
   coins: [
-    [190, 316], [235, 316],
-    [460, 266], [505, 266],
-    [620, 396], [680, 396],
-    [915, 306],
-    [1215, 256], [1260, 256],
-    [1330, 396],
-    [1560, 296], [1605, 296],
-    [1860, 226],
-    [1960, 396],
-    [2140, 306], [2185, 306],
-    [2490, 246], [2530, 246],
-    [2620, 396],
-    [2900, 296],
-    [3100, 396], [3190, 286], [3235, 286],
-    [3450, 396], [3520, 396],
-    [3760, 330], [3880, 326], [4030, 326],
-    [4205, 236],
-    [4330, 396],
-    [4610, 236],
-    [4890, 216],
-    [4960, 396],
-    [5290, 286],
-    [5500, 396],
-    [5790, 256],
-    [6040, 306],
-    [6200, 396], [6260, 396],
-    [6440, 276]
+    [330, 352], [400, 308], [470, 264],
+    [660, 186], [700, 186],
+    [820, 396],
+    [1087, 286],
+    [1277, 220],
+    [1400, 156], [1440, 156],
+    [1507, 308], [1560, 396],
+    [1650, 396],
+    [1810, 264],
+    [1930, 330],
+    [2100, 196], [2145, 196],
+    [2267, 242],
+    [2420, 396],
+    [2590, 308],
+    [2730, 352],
+    [2940, 236], [2985, 236],
+    [3300, 396], [3400, 396], [3500, 396],
+    [3927, 286],
+    [4090, 176], [4130, 176],
+    [4257, 220],
+    [4427, 308],
+    [4747, 264],
+    [4940, 186],
+    [5067, 286],
+    [5340, 396],
+    [5587, 242],
+    [5800, 206], [5845, 206],
+    [6007, 286],
+    [6240, 246],
+    [6447, 308],
+    [6620, 396], [6680, 396]
   ],
 
   checkpoints: [
-    { x: 2040, y: GROUND_Y - 70, width: 8, height: 70 },
+    { x: 1700, y: GROUND_Y - 70, width: 8, height: 70 },
     // Just before the handoff trigger at 3250, so a death after it means a
-    // short walk back into the scene rather than it firing the instant the
-    // player reappears.
-    { x: 3140, y: GROUND_Y - 70, width: 8, height: 70 },
-    { x: 5180, y: GROUND_Y - 70, width: 8, height: 70 }
+    // short walk back into the scene rather than it firing on respawn.
+    { x: 3130, y: GROUND_Y - 70, width: 8, height: 70 },
+    { x: 5480, y: GROUND_Y - 70, width: 8, height: 70 }
   ]
 };

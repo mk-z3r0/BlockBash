@@ -27,18 +27,41 @@ export function loadLevel(data) {
     // treats them identically; only drawing and hazard stripes care which
     // is which, via the `ground` flag
     platforms: [
-      ...data.ground.map(g => ({ x: g.x, y: groundY, width: g.width, height: 40, ground: true })),
+      // Ground segments may sit ABOVE the level's base line by giving their
+      // own `y` — terraces, ledges, a quarry stepping down. Everything that
+      // reads ground already reads `seg.y` rather than `groundY` (collision,
+      // carving, hazard stripes, the outline pass), so this was a data
+      // change rather than a system one.
+      //
+      // A raised segment is thickened to the same base so there's never a
+      // visible gap under a terrace and nothing can be reached from beneath
+      // it. `groundY` stays the level's floor and its meaning elsewhere —
+      // notably the world edge, which is why every level's LAST segment
+      // should sit at groundY.
+      ...data.ground.map(g => {
+        const y = g.y == null ? groundY : g.y;
+        return { x: g.x, y, width: g.width, height: (groundY + 40) - y, ground: true };
+      }),
       // baseY is captured here so a platform the Terraformer lifts
       // (entities/bosses.js) always has an unmoved position to return to,
       // however many times the fight restarts.
-      ...data.platforms.map(p => ({ ...p, baseY: p.y }))
+      // baseX/baseY are captured here so anything that moves a platform —
+      // the Terraformer lifting its arena, a level's own oscillating movers
+      // (levels/movers.js) — always has an unmoved position to return to,
+      // however many times the fight or the level restarts.
+      ...data.platforms.map(p => ({ ...p, baseY: p.y, baseX: p.x }))
     ],
 
     // Spikes sit on a surface: y defaults to the ground line. The hitbox is
     // deliberately smaller than the art — inset at the sides and only the
     // lower part deadly — so clipping a tip doesn't kill you.
     hazards: (data.hazards || []).map(h => {
-      const baseY = h.y ?? groundY;
+      // Spikes sit on whatever surface is under them, which is no longer
+      // always the level's floor. Authoring y by hand for every bed on a
+      // terrace would be a transcription error waiting to happen, so the
+      // default is looked up from the ground beneath instead.
+      const under = data.ground.find(g => h.x >= g.x && h.x < g.x + g.width);
+      const baseY = h.y ?? (under && under.y != null ? under.y : groundY);
       return {
         ...h,
         y: baseY,

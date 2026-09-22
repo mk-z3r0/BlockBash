@@ -18,6 +18,7 @@ import {
 import { loadLevel, getLevel } from '../levels/levelLoader.js';
 import { drawPlatforms, drawCheckpoints, drawHazards, drawWorldEdge } from '../levels/levelRenderer.js';
 import { restoreCarvedGaps } from '../levels/terrain.js';
+import { updateMovers, resetMovers } from '../levels/movers.js';
 import { drawBlockHouse } from './blockHouse.js';
 import { levels } from '../levels/registry.js';
 import { showToast, updateToast, drawHUD, toast } from '../ui/hud.js';
@@ -36,6 +37,7 @@ import {
 import { pendingCutscene } from '../cutscenes/triggers.js';
 import { cutsceneLibrary } from '../cutscenes/library.js';
 import { advanceDialogue, isDialogueOpen } from '../ui/dialogue.js';
+import { updateImpact, isHitStopped, shakeOffset, resetImpact } from '../engine/impact.js';
 
 // How far the view lifts while someone is talking. Conversations happen at
 // ground level and the dialogue bar covers the bottom third of the screen,
@@ -153,6 +155,8 @@ function resetBossAndCutscene() {
   state.weaponPickups = state.weaponPickups.filter(p => p.collected || !p.fromBoss);
   // and put back whatever ground the boss mined out
   restoreCarvedGaps(getLevel());
+  // ...and put every moving platform back where the level author left it.
+  resetMovers(getLevel());
 }
 
 function loseLife() {
@@ -204,6 +208,7 @@ function startLevel(index) {
   state.restoredCount = 0;
   state.playerTouchedHazard = false;
   resetParticles();
+  resetImpact();
   resetDustTimer();
   resetBossAndCutscene();
   setRespawnPoint(level.playerSpawn.x, level.playerSpawn.y);
@@ -248,7 +253,12 @@ export function drawWorldAndHUD() {
   // spin from a local 90° tilt of one patch of planet surface.
   drawBackground(camera.x, camera.y);
   ctx.save();
-  ctx.translate(-camera.x, -camera.y);
+  // Screen shake moves the WORLD, not the backdrop — same reasoning as the
+  // edge transition's rotation, which is also applied here rather than to
+  // drawBackground: a starfield light-years away has no business lurching
+  // because something got hit on the ground.
+  const shake = shakeOffset();
+  ctx.translate(-camera.x + shake.x, -camera.y + shake.y);
 
   // The world — everything that tips when the level ends. Set by whichever
   // beat is rotating the level; null for every ordinary frame of play, so
@@ -316,7 +326,22 @@ export const playingScene = {
     // and the edge transition's frame timings are asserted by probes.
     const locks = currentLocks();
 
-    if (locks.physics === 'run') {
+    // Hit-stop: a few frames of frozen world on a landed hit, so the blow
+    // has weight. Deliberately suspended during cutscenes — a scripted beat
+    // is timed in frames and probes assert those timings, so nothing is
+    // allowed to steal ticks from one.
+    updateImpact();
+    const simulate = locks.physics === 'run' && !(isHitStopped() && !isCutsceneActive());
+
+    if (simulate) {
+      // Platforms move BEFORE the player does, so collision resolves against
+      // where they actually are this frame rather than where they were last
+      // frame. A platform that rises into a standing player carries them up
+      // for free that way; one that slides sideways has to hand back its
+      // delta, since nothing about its x is in the player's.
+      const carry = updateMovers(getLevel(), state.frameCount, player);
+      if (carry) player.x += carry;
+
       const { fellInPit } = updatePlayer(locks.input === 'locked');
       updatePlayerWeapon(locks.input === 'locked');
 
@@ -346,7 +371,7 @@ export const playingScene = {
     if (state.gameState !== 'playing') return; // a cutscene can end the level
     updateRescueNPCEntity();
 
-    if (locks.physics === 'run') {
+    if (simulate) {
       updateEnemies(player, isCutsceneActive());
       updateProjectiles();
       // One read, after everything that can hurt the player has run —

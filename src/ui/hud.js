@@ -3,6 +3,7 @@ import { muted } from '../audio/audio.js';
 import { state } from '../state.js';
 import { player } from '../entities/player.js';
 import { getWeapon } from '../weapons/registry.js';
+import { camera } from '../engine/camera.js';
 
 export const toast = { text: null, timer: 0 };
 
@@ -52,6 +53,90 @@ function drawAmmo() {
   }
 }
 
+// A boss bar, shown only while a boss is actually on screen.
+//
+// Bosses in this game are read rather than out-damaged — you wait for the
+// Excavator's drill to bind, you work out which of the Crew is reachable,
+// you ride the Terraformer's cycle — and none of that is legible if the
+// player can't tell whether they're making progress. This is the difference
+// between "hard" and "opaque", and it's the single cheapest fairness win
+// available.
+//
+// It also states the two kinds of boss in the game plainly, because they're
+// beaten by different verbs: red is health coming off, cyan is corners going
+// back on.
+const BOSS_LABELS = {
+  excavator: 'THE EXCAVATOR',
+  crew: 'THE DEMOLITION CREW',
+  terraformer: 'THE TERRAFORMER',
+  general: 'THE GENERAL',
+  core: 'THE CORE'
+};
+
+function activeBoss() {
+  let best = null;
+  for (const e of state.enemies) {
+    if (!e.boss || !e.alive || e.restored) continue;
+    // On screen, with a margin — a bar for something the player can't see
+    // yet is a spoiler, not information.
+    if (e.x + e.w < camera.x - 40 || e.x > camera.x + VIEW_WIDTH + 40) continue;
+    if (!best || e.x < best.x) best = e;
+  }
+  return best;
+}
+
+function drawBossBar() {
+  const boss = activeBoss();
+  if (!boss) return;
+
+  const restoring = boss.restoreTotal != null && (boss.kind === 'octagon' || boss.kind === 'core');
+  const total = restoring ? boss.restoreTotal : (boss.baseHp || 1);
+  const left = restoring ? boss.restoreHits : Math.max(0, boss.hp);
+  // A restoration bar FILLS as you work; a health bar empties. They're
+  // opposite jobs and should not look like the same thing running backwards.
+  const frac = restoring ? 1 - left / total : left / total;
+  if (!restoring && left >= total && boss.invulnerable) {
+    // untouched and currently closed — still worth naming, see below
+  }
+
+  const w = 260, h = 9;
+  const x = (VIEW_WIDTH - w) / 2, y = VIEW_HEIGHT - 26;
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = restoring ? '#5ee7ff' : '#ff9fc4';
+  ctx.font = 'bold 11px Trebuchet MS, Arial, sans-serif';
+  const label = boss.bossName || BOSS_LABELS[boss.bossKind] ||
+                (boss.kind === 'octagon' ? 'THE SCULPTOR' : 'BOSS');
+  ctx.fillText(label, VIEW_WIDTH / 2, y - 5);
+
+  ctx.fillStyle = 'rgba(10, 13, 28, 0.75)';
+  ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
+  ctx.fillStyle = restoring ? 'rgba(94, 231, 255, 0.18)' : 'rgba(255, 159, 196, 0.16)';
+  ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = restoring ? '#5ee7ff' : '#ff4d8d';
+  ctx.fillRect(x, y, w * Math.max(0, Math.min(1, frac)), h);
+
+  // Whether it can be hurt RIGHT NOW is the thing the player most needs and
+  // is least able to see, so the bar says it outright.
+  if (boss.invulnerable) {
+    ctx.strokeStyle = 'rgba(232, 236, 247, 0.5)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    ctx.fillStyle = '#7a84a8';
+    ctx.font = 'bold 9px Trebuchet MS, Arial, sans-serif';
+    ctx.fillText('ARMOURED', VIEW_WIDTH / 2, y + h + 11);
+  } else {
+    ctx.strokeStyle = restoring ? '#d7faff' : '#ffd9a0';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    ctx.fillStyle = restoring ? '#d7faff' : '#ffd9a0';
+    ctx.font = 'bold 9px Trebuchet MS, Arial, sans-serif';
+    ctx.fillText(restoring ? 'PUT IT BACK' : 'OPEN — HIT IT', VIEW_WIDTH / 2, y + h + 11);
+  }
+  ctx.restore();
+}
+
 export function drawHUD() {
   ctx.fillStyle = '#e8ecf7';
   ctx.font = 'bold 16px Trebuchet MS, Arial, sans-serif';
@@ -74,6 +159,7 @@ export function drawHUD() {
   }
 
   drawAmmo();
+  drawBossBar();
 
   if (toast.timer > 0) {
     ctx.save();

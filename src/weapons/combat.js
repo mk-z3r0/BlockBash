@@ -16,6 +16,7 @@
 // special case in the weapon logic.
 
 import { state } from '../state.js';
+import { getLevel } from '../levels/levelLoader.js';
 import { player } from '../entities/player.js';
 import { keys } from '../engine/input.js';
 import { isColliding } from '../engine/physics.js';
@@ -26,6 +27,7 @@ import {
   TRIANGLE_SPEED, TRIANGLE_SIZE, TRIANGLE_LIFE, drawRestoreProjectile
 } from './cornerstone.js';
 import { ctx } from '../engine/renderer.js';
+import { addShake, addHitStop } from '../engine/impact.js';
 
 // Enemies carry `w` (they're circles, one dimension); the player carries
 // width/height. One box shape for the hit tests either way.
@@ -161,6 +163,10 @@ export function damageEnemy(enemy, weapon, dir = 1) {
   if (weapon.knockback) enemy.knockback = dir * weapon.knockback;
 
   if (enemy.hp > 0) {
+    // It survived: a short jolt so the player knows the hit counted even
+    // though nothing died. This is the feedback a multi-hit boss lives on.
+    addShake(enemy.boss ? 4 : 2);
+    addHitStop(3);
     playOctagonThud();
     return false;
   }
@@ -169,6 +175,8 @@ export function damageEnemy(enemy, weapon, dir = 1) {
   enemy.squish = 14;
   state.score += weapon.score || 100;
   spawnExplosion(enemy.x + enemy.w / 2, enemy.y + enemy.w / 2, '#8effc0');
+  addShake(enemy.boss ? 9 : 3);
+  addHitStop(enemy.boss ? 8 : 4);
   playStomp();
   return true;
 }
@@ -184,6 +192,8 @@ export function restoreTarget(target) {
   if (target.restoreHits > 0) {
     // part-way: one corner back, and the shape knows it
     target.cornersLost = Math.max(0, Math.ceil(4 * target.restoreHits / (target.restoreTotal || 2)));
+    addShake(target.boss ? 3 : 1.5);
+    addHitStop(3);
     playOctagonThud();
     return false;
   }
@@ -192,6 +202,10 @@ export function restoreTarget(target) {
   target.restored = true;
   target.fleeing = true;
   state.score += 300;
+  // A restoration gets a bigger, softer beat than a kill: longer stop, less
+  // shake. It should land like relief rather than like an explosion.
+  addShake(target.boss ? 6 : 2);
+  addHitStop(target.boss ? 14 : 6);
   playRestore();
   return true;
 }
@@ -253,12 +267,34 @@ function projectileBox(p) {
   return { x: p.x - p.size, y: p.y - p.size, width: p.size * 2, height: p.size * 2 };
 }
 
+// Anything in flight stops at solid terrain.
+//
+// Without this, cover doesn't exist: a sphere's shot passes through a wall
+// and there is no such thing as getting behind something, which makes ranged
+// enemies a pure tax rather than a problem with a solution. It cuts both
+// ways on purpose — a triangle that hits a pillar is a triangle spent, which
+// is a real cost given how few of them there are.
+//
+// The shockwaves the core rolls along the floor are exempt. They ARE the
+// floor moving; stopping them at the first ledge would be stopping the
+// attack at the thing it travels through.
+function hitsTerrain(p) {
+  if (p.kind === 'wave') return false;
+  const box = projectileBox(p);
+  return getLevel().platforms.some(t => t.width > 1 && isColliding(box, t));
+}
+
 export function updateProjectiles() {
   for (const p of state.projectiles) {
     if (p.dead) continue;
     p.x += p.vx;
     p.y += p.vy;
     if (--p.life <= 0) { p.dead = true; continue; }
+    if (hitsTerrain(p)) {
+      p.dead = true;
+      spawnDust(p.x, p.y, 4, { spread: 2, size: 4, life: 14 });
+      continue;
+    }
 
     if (p.team === 'player') {
       for (const enemy of state.enemies) {

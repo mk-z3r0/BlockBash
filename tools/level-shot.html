@@ -29,7 +29,10 @@
     if (q.has('x')) {
       const x = parseFloat(q.get('x'));
       player.x = x;
-      player.y = lv.groundY - player.height;
+      // Stand on whatever surface is actually at this x — ground is terraced
+      // now, and groundY is only the level's base line.
+      const seg = lv.platforms.filter(p => p.ground).find(p => x >= p.x && x <= p.x + p.width);
+      player.y = (seg ? seg.y : lv.groundY) - player.height;
       player.velocityX = 0; player.velocityY = 0;
       camera.x = Math.max(0, Math.min(x - 800 / 2.6, lv.worldWidth - 800));
     }

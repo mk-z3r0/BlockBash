@@ -6,6 +6,7 @@ import { pickaxeAngleAt, pickaxeFistAt, miningAngleAt, miningFistAt } from '../w
 import { getWeapon } from '../weapons/registry.js';
 import { startAttack, tickWeapon, spawnSphereShot, boxOf } from '../weapons/combat.js';
 import { initBoss, updateBossBehaviour, onBossDefeated } from './bosses.js';
+import { addShake, addHitStop } from '../engine/impact.js';
 import { state } from '../state.js';
 
 // --- enemy tiers (GAME_DESIGN's "Enemies evolve across levels") ---------
@@ -236,8 +237,12 @@ export function updateEnemies(player, cutsceneActive) {
             enemy.alive = false;
             enemy.squish = 14;
             state.score += 100;
+            addShake(2.5);
+            addHitStop(3);
           } else {
             enemy.hitFlash = 10;
+            addShake(2);
+            addHitStop(2);
           }
           playStomp();
         } else if (player.invincible <= 0) {
