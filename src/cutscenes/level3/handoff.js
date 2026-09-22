@@ -14,6 +14,7 @@
 // onComplete, so they still end up holding it.
 
 import { createQuarrick } from '../../entities/npc.js';
+import { surfaceYAt } from '../../levels/levelLoader.js';
 import { spawnExplosion } from '../../entities/particles.js';
 import { playWeaponPickup, playHit } from '../../audio/sfx.js';
 import { getWeapon } from '../../weapons/registry.js';
@@ -35,7 +36,7 @@ function completeHandoff(c) {
 
   // He isn't a character any more, he's an obstacle in the shape of one.
   if (!c.state.enemies.some(e => e.quarrick)) {
-    const groundY = c.level.groundY;
+    const groundY = surfaceYAt(c.data.quarrickX == null ? c.player.x + 150 : c.data.quarrickX);
     c.state.enemies.push({
       quarrick: true,
       kind: 'octagon',
@@ -71,7 +72,7 @@ export const l3Handoff = {
       frames: 60,
       enter(c) {
         c.data.quarrickX = c.player.x + 150;
-        c.state.rescueNPC = createQuarrick(c.data.quarrickX, c.level.groundY, {
+        c.state.rescueNPC = createQuarrick(c.data.quarrickX, surfaceYAt(c.data.quarrickX), {
           facing: -1,
           // Worse than the player has ever seen him. The number is the
           // level's, so the arc is authored in one place.
@@ -141,7 +142,7 @@ export const l3Restored = {
           // He comes back scarred, not new. The corners the spheres took
           // are still gone — restoring someone isn't the same as undoing
           // what was done to them.
-          c.state.rescueNPC = createQuarrick(q.x, c.level.groundY, { facing: -1, damage: 2 });
+          c.state.rescueNPC = createQuarrick(q.x, surfaceYAt(q.x), { facing: -1, damage: 2 });
         }
       }
     },

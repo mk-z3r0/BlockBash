@@ -10,6 +10,7 @@
 // that stops being wrong.
 
 import { createQuarrick } from '../../entities/npc.js';
+import { surfaceYAt } from '../../levels/levelLoader.js';
 import { playRestore, playWin } from '../../audio/sfx.js';
 import { say } from '../say.js';
 import { setFlag } from '../../narrative.js';
@@ -30,8 +31,8 @@ export const l7Arrival = {
       name: 'quarrick',
       frames: 40,
       enter(c) {
-        c.state.rescueNPC = createQuarrick(
-          c.player.x + 150, c.level.groundY,
+        const at = c.player.x + 150;
+        c.state.rescueNPC = createQuarrick(at, surfaceYAt(at),
           { facing: -1, damage: c.level.quarrickDamage || 2 });
       }
     },
@@ -94,8 +95,8 @@ export const l7Ending = {
       name: 'quarrick-returns',
       frames: 44,
       enter(c) {
-        c.state.rescueNPC = createQuarrick(
-          c.player.x - 150, c.level.groundY, { facing: 1, damage: 2 });
+        const back = c.player.x - 150;
+        c.state.rescueNPC = createQuarrick(back, surfaceYAt(back), { facing: 1, damage: 2 });
         playWin();
       }
     },

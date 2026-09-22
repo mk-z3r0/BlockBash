@@ -518,6 +518,13 @@ export function drawEnemies(frameCount, cutsceneDone) {
       const r = enemy.w / 2;
       const hasThreatSwing = enemy.boss && enemy.awake && !cutsceneDone && enemy.mode !== 'fight';
       const carried = getWeapon(enemy.weapon);
+      // A boss's KIT, as opposed to a weapon it swings at you. The Excavator
+      // is "a sphere operating a drilling rig" and was drilling the floor
+      // with its bare hands: `hasThreatSwing` excludes fightable bosses (it's
+      // level 1's Foreman path) and a fightable boss has no `weapon`, so it
+      // fell through to the empty-handed arm. `tool` is drawn, never swung —
+      // contact and the phase machine are what actually threaten anyone.
+      const tool = !hasThreatSwing && !carried ? getWeapon(enemy.tool) : null;
 
       if (hasThreatSwing) {
         const swingProgress = (Math.sin(enemy.swingPhase * 0.24) + 1) / 2;
@@ -539,6 +546,26 @@ export function drawEnemies(frameCount, cutsceneDone) {
         const fist = carried.fistAt(r, r, facing, progress);
         const hand = drawMuscleArm(0, -r * 0.1, fist.x, fist.y);
         carried.drawHeld(hand, facing, progress);
+      } else if (tool) {
+        const facing = enemy.facing >= 0 ? 1 : -1;
+        if (enemy.mining) {
+          // Driving it into the floor. Same mining pose level 1's Foreman
+          // uses, driven by the phase machine's swingPhase, so the pit that
+          // opens is a pit something visibly dug.
+          const p = (Math.sin(enemy.swingPhase * 0.24) + 1) / 2;
+          const fist = miningFistAt(r, r, facing, p);
+          const hand = drawMuscleArm(0, -r * 0.1, fist.x, fist.y);
+          ctx.save();
+          ctx.translate(hand.x, hand.y);
+          ctx.scale(facing, 1);
+          ctx.rotate(miningAngleAt(p));
+          tool.drawIcon();
+          ctx.restore();
+        } else {
+          const fist = tool.fistAt(r, r, facing, 0);
+          const hand = drawMuscleArm(0, -r * 0.1, fist.x, fist.y);
+          tool.drawHeld(hand, facing, 0);
+        }
       } else {
         const fist = { x: side * (r + 17), y: -r * 0.35 };
         drawMuscleArm(0, -r * 0.1, fist.x, fist.y);

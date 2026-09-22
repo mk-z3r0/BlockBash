@@ -1,7 +1,7 @@
 import { ctx } from '../engine/renderer.js';
 import { drawStickLegs, drawMuscleArm } from '../engine/renderer.js';
 import { P } from '../engine/physics.js';
-import { getLevel } from '../levels/levelLoader.js';
+import { getLevel, surfaceYAt } from '../levels/levelLoader.js';
 import { spawnExplosion, spawnDust } from './particles.js';
 import { playStomp } from '../audio/sfx.js';
 import { spawnWeaponPickup } from './weaponPickup.js';
@@ -16,7 +16,7 @@ import { state } from '../state.js';
 export function createRescueNPC(spawnX) {
   return {
     x: spawnX,
-    y: getLevel().groundY - 44,
+    y: surfaceYAt(spawnX) - 44,
     width: 44, height: 44,
     velocityX: 8.5,
     velocityY: 0,
@@ -130,7 +130,11 @@ export function walkQuarrick(npc, dir, speed) {
 // Returns true once the NPC has run off-screen and should be discarded.
 export function updateRescueNPC(npc, viewWidth, cameraX) {
   const boss = state.enemies.find(e => e.boss);
-  const groundY = getLevel().groundY;
+  // The surface under HIM, re-read each frame because he runs across the
+  // level. `level.groundY` is only the base line now that ground can be
+  // terraced, and this whole routine — run in, leap, land, walk off — is
+  // written in terms of "the floor".
+  const groundY = surfaceYAt(npc.x);
 
   if (npc.state === 'running') {
     npc.x += npc.velocityX;

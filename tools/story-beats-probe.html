@@ -15,8 +15,9 @@
   import { player } from '../src/entities/player.js';
   import { state } from '../src/state.js';
   import { update, switchTo } from '../src/scenes/sceneManager.js';
-  import { getLevel } from '../src/levels/levelLoader.js';
+  import { getLevel, surfaceYAt } from '../src/levels/levelLoader.js';
   import { startAttack } from '../src/weapons/combat.js';
+  import { levels } from '../src/levels/registry.js';
   import { isCutsceneActive, activeCutsceneId, skipCutscene } from '../src/cutscenes/runner.js';
 
   const out = [];
@@ -181,6 +182,36 @@
       skipCutscene();
       tick(3);
       check(state.gameState === 'win', `and the ending wins the game (gameState: ${state.gameState})`);
+    }
+
+    // --- nobody is standing inside the scenery ---
+    //
+    // Every scene that puts a character on the ground used to pass
+    // `level.groundY`, which stopped meaning "the floor" when ground became
+    // terraced. Level 2's opening put Quarrick 120px inside the quarry rim
+    // and the player talked to the top of his head. Reported from play, not
+    // by any probe, which is why this one exists.
+    out.push('== characters stand on the ground ==');
+    for (let i = 0; i < levels.length; i++) {
+      state.currentLevelIndex = i;
+      switchTo('playing', { retry: true });
+      const lv = getLevel();
+      state.lives = 999;
+      player.invincible = 999999;
+      // Let whatever the level opens with get as far as placing people.
+      tick(90);
+      const npc = state.rescueNPC;
+      if (!npc) { out.push(`  ok   level ${i + 1}: no one placed at the start`); continue; }
+      const feet = npc.y + npc.height;
+      const surface = surfaceYAt(npc.x);
+      const buried = feet - surface;
+      // Positive = below the floor. A couple of px of slack for rounding.
+      if (buried > 3) {
+        fails++;
+        out.push(`  FAIL level ${i + 1}: ${'Quarrick'} is ${Math.round(buried)}px inside the ground (feet ${Math.round(feet)}, surface ${surface})`);
+      } else {
+        out.push(`  ok   level ${i + 1}: placed on the surface (feet ${Math.round(feet)}, surface ${surface})`);
+      }
     }
 
     out.push(fails ? `*** ${fails} FAILURE(S)` : 'PASS the story beats hold together');

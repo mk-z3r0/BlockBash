@@ -137,10 +137,10 @@ export default {
     // back, which is exactly what instinct says to ignore.
     { x: 6800, y: GROUND_Y - 26, w: 26, minX: 6660, maxX: 7200, speed: 1.5,
       boss: true, mode: 'fight', bossKind: 'crew', bossName: 'THE DEMOLITION CREW',
-      crew: 'demo', role: 'bruiser', hp: 2, stompProof: true },
+      crew: 'demo', role: 'bruiser', tool: 'pickaxe', hp: 2, stompProof: true },
     { x: 6950, y: GROUND_Y - 26, w: 26, minX: 6660, maxX: 7200, speed: 1.6,
       boss: true, mode: 'fight', bossKind: 'crew', crew: 'demo', role: 'bruiser',
-      hp: 2, stompProof: true },
+      tool: 'pickaxe', hp: 2, stompProof: true },
     { x: 7120, y: GROUND_Y - 26, w: 26, minX: 6700, maxX: 7250, speed: 1.2,
       boss: true, mode: 'fight', bossKind: 'crew', crew: 'demo', role: 'shooter',
       hp: 2, stompProof: true, dropsAmmo: 6 }

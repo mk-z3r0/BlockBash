@@ -16,6 +16,7 @@
 // dialogue bar and would otherwise paint over nothing.
 
 import { createQuarrick } from '../../entities/npc.js';
+import { surfaceYAt } from '../../levels/levelLoader.js';
 import { say } from '../say.js';
 
 export const l2Arrival = {
@@ -29,8 +30,11 @@ export const l2Arrival = {
       name: 'meet',
       frames: 46,
       enter(c) {
-        c.state.rescueNPC = createQuarrick(
-          c.player.x + 170, c.level.groundY,
+        // The surface under HIM, not the level's base line. Level 2 opens on
+        // the quarry rim, 120px above groundY, and placing him at groundY
+        // buried him in the terrace the player was standing on.
+        const at = c.player.x + 170;
+        c.state.rescueNPC = createQuarrick(at, surfaceYAt(at),
           { facing: -1, damage: c.level.quarrickDamage || 0 });
       }
     },

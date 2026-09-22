@@ -16,7 +16,7 @@
 // Everything else — hp, speed, patrol bounds — is ordinary enemy data.
 
 import { state } from '../state.js';
-import { getLevel } from '../levels/levelLoader.js';
+import { getLevel, surfaceYAt } from '../levels/levelLoader.js';
 import { carveGap } from '../levels/terrain.js';
 import { spawnWeaponPickup, spawnAmmoPickup } from './weaponPickup.js';
 import { spawnExplosion, spawnDust } from './particles.js';
@@ -307,13 +307,16 @@ export function onBossDefeated(boss) {
   const level = getLevel();
   spawnExplosion(boss.x + boss.w / 2, boss.y + boss.w / 2, '#ffd9a0');
   playExplosion();
+  // Onto the surface the boss is standing on, not the level's base line —
+  // a boss fought on a terrace would otherwise drop its weapon into the floor.
+  const at = boss.x + boss.w / 2;
   if (boss.drops) {
-    spawnWeaponPickup(boss.x + boss.w / 2, level.groundY, boss.drops);
+    spawnWeaponPickup(at, surfaceYAt(at), boss.drops);
   }
   // Later bosses have no new weapon to give — the player is carrying the
   // Cornerstone by then and it's the last one. They pay out in triangles
   // instead, which matters more at that point than another tool would.
   if (boss.dropsAmmo) {
-    spawnAmmoPickup(boss.x + boss.w / 2, level.groundY - 30, boss.dropsAmmo);
+    spawnAmmoPickup(at, surfaceYAt(at) - 30, boss.dropsAmmo);
   }
 }

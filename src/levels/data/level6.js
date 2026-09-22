@@ -162,6 +162,7 @@ export default {
     // Open the whole time, and it tells you before every charge.
     { x: 6850, y: GROUND_Y - 36, w: 36, minX: 6400, maxX: 7220, speed: 1.9,
       boss: true, mode: 'fight', bossKind: 'general', bossName: 'THE GENERAL',
+      tool: 'sledgehammer',
       hp: 6, stompProof: true, dropsAmmo: 8 }
   ],
 

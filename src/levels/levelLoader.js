@@ -123,3 +123,20 @@ export function loadLevel(data) {
 export function getLevel() {
   return current;
 }
+
+// The height of the ground at a given x.
+//
+// Since ground segments got their own `y` (terraces), `level.groundY` stopped
+// meaning "where the floor is" and started meaning only "the level's base
+// line" — the bottom of the quarry, the cavity floor. Anything that puts a
+// character or an object ON the ground has to ask where the ground actually
+// is, or it buries them.
+//
+// This is exactly how level 2's arrival scene ended up with Quarrick standing
+// 120px inside the rim: it placed him at groundY while the player was on a
+// terrace far above it.
+export function surfaceYAt(x, level = current) {
+  if (!level) return 0;
+  const seg = level.platforms.find(p => p.ground && x >= p.x && x <= p.x + p.width);
+  return seg ? seg.y : level.groundY;
+}

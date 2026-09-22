@@ -13,6 +13,7 @@
 // spending a scene explaining it would have spent it.
 
 import { createQuarrick } from '../entities/npc.js';
+import { surfaceYAt } from '../levels/levelLoader.js';
 import { say } from './say.js';
 
 // Every one of these opens the same way — he's just standing there when you
@@ -22,8 +23,8 @@ function meetQuarrick(frames = 46) {
     name: 'meet',
     frames,
     enter(c) {
-      c.state.rescueNPC = createQuarrick(
-        c.player.x + 170, c.level.groundY,
+      const at = c.player.x + 170;
+      c.state.rescueNPC = createQuarrick(at, surfaceYAt(at),
         { facing: -1, damage: c.level.quarrickDamage || 0 });
     }
   };
