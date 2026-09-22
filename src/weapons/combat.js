@@ -224,7 +224,7 @@ export function spawnRestoreTriangle(owner) {
     vy: 0,
     size: TRIANGLE_SIZE,
     life: TRIANGLE_LIFE,
-    spin: Math.random() * 100,
+    spin: (b.x * 7 + b.y * 13) % 100,   // tumble phase, from where it was fired — deterministic like everything else that affects a probe
     dead: false
   });
 }

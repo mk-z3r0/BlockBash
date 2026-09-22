@@ -128,7 +128,7 @@ export default {
   enemies: [
     { x: 220,  y: GROUND_Y - 22, w: 22, minX: 170,  maxX: 290,  speed: 1.7 },
     { x: 620,  y: 260,           w: 20, minX: 570,  maxX: 660,  speed: 1.3 },
-    { x: 880,  y: GROUND_Y - 22, w: 22, minX: 830,  maxX: 900,  speed: 1.6, canHop: true },
+    { x: 870,  y: GROUND_Y - 22, w: 22, minX: 820,  maxX: 900,  speed: 1.6, canHop: true },
     { x: 1330, y: GROUND_Y - 22, w: 22, minX: 1200, maxX: 1450, speed: 1.6,
       tier: 'aggressor', shoots: true },
     { x: 1700, y: GROUND_Y - 22, w: 22, minX: 1650, maxX: 1730, speed: 1.7,

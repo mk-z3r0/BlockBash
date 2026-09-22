@@ -349,15 +349,26 @@
 
     // A checkpoint inside an enemy's patrol span means respawning into a
     // sphere, which the design rules call a cheap death.
+    // Measured against what an enemy can actually REACH, not just where it
+    // walks. A pursuer breaks patrol at 230px and an aggressor shoots from
+    // 330 (entities/enemy.js), so a checkpoint 100px outside a shooter's
+    // patrol is still somewhere you respawn and get shot standing still.
+    // The old ±30 only knew about patrol spans and passed five checkpoints
+    // that tools/respawn-state-probe.html then proved were fatal.
+    const REACH = { passive: 30, pursuer: 240, aggressor: 340 };
     let badCheckpoint = 0;
     (lv.checkpoints || []).forEach(c => {
-      const e = (lv.enemySpawns || []).find(s => !s.boss && c.x > s.minX - 30 && c.x < s.maxX + 30);
+      const e = (lv.enemySpawns || []).find(s => {
+        if (s.boss) return false;
+        const r = REACH[s.tier || 'passive'] || 30;
+        return c.x > s.minX - r && c.x < s.maxX + r;
+      });
       // Advisory: respawning grants P.RESPAWN_INVINCIBLE_FRAMES, which is
       // what lets level 1 ship two of these without it reading as a cheap
       // death. Still worth not doing on purpose.
-      if (e) { badCheckpoint++; warn(`checkpoint at ${c.x} sits inside the patrol of the enemy at ${e.x} (${e.minX}-${e.maxX})`); }
+      if (e) { badCheckpoint++; warn(`checkpoint at ${c.x} is inside the reach of the ${e.tier || 'passive'} enemy at ${e.x} (${e.minX}-${e.maxX})`); }
     });
-    if (!badCheckpoint) out.push('  no checkpoint sits inside an enemy patrol');
+    if (!badCheckpoint) out.push('  no checkpoint is inside an enemy\'s reach');
 
     out.push(failures
       ? `*** ${failures} FAILURE(S)${warnings ? `, ${warnings} warning(s)` : ''}`

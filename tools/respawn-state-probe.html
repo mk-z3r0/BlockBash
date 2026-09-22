@@ -22,6 +22,7 @@
   import { state } from '../src/state.js';
   import { update, switchTo } from '../src/scenes/sceneManager.js';
   import { getLevel } from '../src/levels/levelLoader.js';
+  import { levels } from '../src/levels/registry.js';
 
   const out = [];
   let fails = 0;
@@ -92,6 +93,33 @@
       tick(4);
       check(state.weaponPickups.some(p => p.fromBoss && !p.collected),
         'and it does drop again when beaten a second time');
+    }
+
+    // --- every checkpoint in the game is somewhere you can survive ---
+    //
+    // The data probe checks a checkpoint has ground under it. This checks the
+    // stronger thing: that standing where it puts you, for a couple of
+    // seconds, doesn't kill you — not a pit, not inside spikes, not inside a
+    // patrolling sphere. A checkpoint that kills you is not a setback, it's
+    // the end of the run.
+    out.push('== every checkpoint is survivable ==');
+    for (let i = 0; i < levels.length; i++) {
+      startLevel(i);
+      const lv = getLevel();
+      const cps = lv.checkpoints || [];
+      let bad = 0;
+      for (const cp of cps) {
+        // Same placement loseLife() uses: setRespawnPoint(cp.x, cp.y - 20).
+        player.x = cp.x;
+        player.y = cp.y - 20;
+        player.velocityX = 0; player.velocityY = 0;
+        player.invincible = 0;
+        const lives0 = state.lives;
+        // No input: just stand there and see what the level does to you.
+        tick(120);
+        if (state.lives < lives0) { bad++; out.push(`  FAIL level ${i + 1}: checkpoint at ${cp.x} kills a player who stands still`); fails++; }
+      }
+      if (!bad) out.push(`  ok   level ${i + 1}: all ${cps.length} checkpoints survivable`);
     }
 
     out.push(fails ? `*** ${fails} FAILURE(S)` : 'PASS a death costs a life and nothing else');

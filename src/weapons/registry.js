@@ -27,8 +27,9 @@
 import { pickaxeAngleAt, pickaxeFistAt, drawHeldPickaxeAt, SWING_COOLDOWN, SWING_DURATION } from './pickaxe.js';
 import { sledgeAngleAt, sledgeFistAt, drawHeldSledgehammer } from './sledgehammer.js';
 import { cornerstoneAngleAt, cornerstoneFistAt, drawHeldCornerstone } from './cornerstone.js';
+import { chainsawAngleAt, chainsawFistAt, drawHeldChainsaw, drawChainsawIcon } from './chainsaw.js';
 import { drawPickaxeIcon, drawSledgehammerIcon, drawCornerstoneIcon } from '../engine/renderer.js';
-import { playPickaxeSwing, playSledgeSwing, playCornerstoneFire } from '../audio/sfx.js';
+import { playPickaxeSwing, playSledgeSwing, playCornerstoneFire, playChainsawStart } from '../audio/sfx.js';
 
 const WEAPONS = {
   pickaxe: {
@@ -71,6 +72,30 @@ const WEAPONS = {
     fistAt: sledgeFistAt,
     drawHeld: drawHeldSledgehammer,
     drawIcon: drawSledgehammerIcon
+  },
+
+  // Enemy kit, not the player's. Nothing drops one — it's here because a
+  // weapon is a weapon, and the whole point of this file is that the hit
+  // path doesn't care who is swinging. Level 6's pursuers carry it.
+  chainsaw: {
+    id: 'chainsaw',
+    label: 'CHAINSAW',
+    kind: 'melee',
+    // Faster than the sledgehammer, longer than the pickaxe, and with a much
+    // longer active window. A chainsaw held out in front of a sphere that is
+    // chasing you is a different problem from a swing you can wait out.
+    cooldown: 40,
+    duration: 26,
+    reach: 56,
+    damage: 1,
+    knockback: 4,
+    score: 150,
+    ammo: null,
+    sound: playChainsawStart,
+    angleAt: chainsawAngleAt,
+    fistAt: chainsawFistAt,
+    drawHeld: drawHeldChainsaw,
+    drawIcon: drawChainsawIcon
   },
 
   cornerstone: {

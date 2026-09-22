@@ -107,7 +107,7 @@ export default {
       tier: 'pursuer', weapon: 'pickaxe' },
     // The first sphere in the game that shoots — parked on the shelf edge,
     // firing down the open run the player has to cross.
-    { x: 1380, y: SHELF - 22,    w: 22, minX: 1345, maxX: 1450, speed: 1.4,
+    { x: 1700, y: SHELF - 22,    w: 22, minX: 1660, maxX: 1790, speed: 1.4,
       tier: 'aggressor', shoots: true },
     { x: 1600, y: 230,           w: 20, minX: 1560, maxX: 1650, speed: 1.3 },
     // ...and the first that hops. Nothing has left the ground under its own
@@ -115,7 +115,7 @@ export default {
     { x: 1960, y: SHELF - 22,    w: 22, minX: 1935, maxX: 2140, speed: 1.6, canHop: true },
     { x: 2250, y: SHELF - 26,    w: 26, minX: 2180, maxX: 2420, speed: 0.8,
       kind: 'octagon', restoreHits: 2 },
-    { x: 2760, y: SHELF - 22,    w: 22, minX: 2720, maxX: 2830, speed: 1.5,
+    { x: 3050, y: SHELF - 22,    w: 22, minX: 3000, maxX: 3140, speed: 1.5,
       tier: 'aggressor', shoots: true },
     { x: 3250, y: SHELF - 22,    w: 22, minX: 3150, maxX: 3370, speed: 1.6, canHop: true },
     { x: 3700, y: SHELF - 22,    w: 22, minX: 3620, maxX: 3880, speed: 1.6,

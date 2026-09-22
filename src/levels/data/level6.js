@@ -112,9 +112,14 @@ export default {
   ],
 
   enemies: [
+    // The pursuers here carry CHAINSAWS, not pickaxes. Same tier of enemy
+    // the player has been fighting since level 2, with a worse tool — the
+    // design doc's enemy table gives the late levels "chainsaws, lasers",
+    // and a chainsaw is held out in front rather than swung, so it's a
+    // different problem from a swing you can wait out.
     // --- arena 1 ---
     { x: 300,  y: GROUND_Y - 22, w: 22, minX: 200,  maxX: 360,  speed: 1.8,
-      tier: 'pursuer', weapon: 'pickaxe' },
+      tier: 'pursuer', weapon: 'chainsaw' },
     { x: 620,  y: GROUND_Y - 22, w: 22, minX: 560,  maxX: 690,  speed: 1.7, canHop: true },
     { x: 750,  y: 250,           w: 20, minX: 700,  maxX: 790,  speed: 1.3 },
     { x: 1150, y: GROUND_Y - 22, w: 22, minX: 1000, maxX: 1300, speed: 1.6,
@@ -123,9 +128,9 @@ export default {
       kind: 'octagon', restoreHits: 2 },
 
     // --- arena 2 ---
-    { x: 1980, y: GROUND_Y - 22, w: 22, minX: 1900, maxX: 2040, speed: 1.8,
-      tier: 'pursuer', weapon: 'pickaxe' },
-    { x: 2300, y: GROUND_Y - 22, w: 22, minX: 2150, maxX: 2400, speed: 1.7,
+    { x: 2250, y: GROUND_Y - 22, w: 22, minX: 2200, maxX: 2350, speed: 1.8,
+      tier: 'pursuer', weapon: 'chainsaw' },
+    { x: 2650, y: GROUND_Y - 22, w: 22, minX: 2600, maxX: 2780, speed: 1.7,
       tier: 'aggressor', shoots: true },
     { x: 2350, y: 230,           w: 20, minX: 2300, maxX: 2410, speed: 1.4 },
     { x: 2850, y: GROUND_Y - 22, w: 22, minX: 2790, maxX: 2980, speed: 1.7, canHop: true },
@@ -133,22 +138,22 @@ export default {
       kind: 'octagon', restoreHits: 2 },
 
     // --- arena 3: the hardest stretch of the level ---
-    { x: 3750, y: GROUND_Y - 22, w: 22, minX: 3680, maxX: 3810, speed: 1.8,
-      tier: 'pursuer', weapon: 'pickaxe' },
-    { x: 4050, y: GROUND_Y - 22, w: 22, minX: 3950, maxX: 4130, speed: 1.7,
+    { x: 3990, y: GROUND_Y - 22, w: 22, minX: 3940, maxX: 4090, speed: 1.8,
+      tier: 'pursuer', weapon: 'chainsaw' },
+    { x: 4360, y: GROUND_Y - 22, w: 22, minX: 4300, maxX: 4460, speed: 1.7,
       tier: 'aggressor', shoots: true },
-    { x: 4250, y: GROUND_Y - 22, w: 22, minX: 4200, maxX: 4330, speed: 1.7, canHop: true },
-    { x: 4620, y: GROUND_Y - 22, w: 22, minX: 4560, maxX: 4760, speed: 1.8,
-      tier: 'pursuer', weapon: 'pickaxe' },
-    { x: 4900, y: GROUND_Y - 22, w: 22, minX: 4820, maxX: 5040, speed: 1.7,
+    { x: 4650, y: GROUND_Y - 22, w: 22, minX: 4600, maxX: 4730, speed: 1.7, canHop: true },
+    { x: 4880, y: GROUND_Y - 22, w: 22, minX: 4820, maxX: 4990, speed: 1.8,
+      tier: 'pursuer', weapon: 'chainsaw' },
+    { x: 5080, y: GROUND_Y - 22, w: 22, minX: 5030, maxX: 5150, speed: 1.7,
       tier: 'aggressor', shoots: true },
     { x: 5150, y: GROUND_Y - 26, w: 26, minX: 5090, maxX: 5190, speed: 0.85,
       kind: 'octagon', restoreHits: 2 },
 
     // --- arena 4 ---
-    { x: 5450, y: GROUND_Y - 22, w: 22, minX: 5380, maxX: 5510, speed: 1.8,
-      tier: 'pursuer', weapon: 'pickaxe' },
-    { x: 5750, y: GROUND_Y - 22, w: 22, minX: 5650, maxX: 5900, speed: 1.7,
+    { x: 5700, y: GROUND_Y - 22, w: 22, minX: 5650, maxX: 5800, speed: 1.8,
+      tier: 'pursuer', weapon: 'chainsaw' },
+    { x: 5980, y: GROUND_Y - 22, w: 22, minX: 5920, maxX: 6080, speed: 1.7,
       tier: 'aggressor', shoots: true },
     { x: 6150, y: GROUND_Y - 22, w: 22, minX: 6090, maxX: 6220, speed: 1.7, canHop: true },
 
@@ -186,8 +191,13 @@ export default {
   ],
 
   checkpoints: [
-    { x: 1830, y: GROUND_Y - 70, width: 8, height: 70 },
-    { x: 3600, y: GROUND_Y - 70, width: 8, height: 70 },
-    { x: 5310, y: GROUND_Y - 70, width: 8, height: 70 }
+    // Just INSIDE each arena, not in the crossing before it. All three of
+    // these were originally at 1830 / 3600 / 5310 — which are 1800-1890,
+    // 3500-3650 and 5200-5360, i.e. the three pits. A checkpoint over a pit
+    // is a respawn into a fall, forever. Caught by tools/level-data-probe.html
+    // the first time it ran.
+    { x: 1920, y: GROUND_Y - 70, width: 8, height: 70 },
+    { x: 3680, y: GROUND_Y - 70, width: 8, height: 70 },
+    { x: 5390, y: GROUND_Y - 70, width: 8, height: 70 }
   ]
 };

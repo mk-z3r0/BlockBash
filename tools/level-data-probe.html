@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#000;">
+<canvas id="game" width="800" height="450"></canvas><pre id="out">running…</pre>
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true, narrative: { seenCutscenes: {}, npcStage: 0, flags: {} } })); window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERROR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  // Authoring errors that cost nothing to catch and a lot to find by hand.
+  //
+  // Every one of these is a mistake actually made while building levels 2-7:
+  // a weapon id that doesn't exist (a silent console warning and an enemy
+  // with bare hands), a cutscene id nothing is registered under (a level
+  // that never ends), a spawn point over a pit, a spike bed hanging over
+  // nothing. The per-obstacle audit catches none of them, because they
+  // aren't about whether a jump is possible.
+  import { levels } from '../src/levels/registry.js';
+  import { cutsceneLibrary } from '../src/cutscenes/library.js';
+  import { weaponIds } from '../src/weapons/registry.js';
+  import { loadLevel } from '../src/levels/levelLoader.js';
+
+  const out = [];
+  let fails = 0, warns = 0;
+  const fail = m => { fails++; out.push('  FAIL ' + m); };
+  const warn = m => { warns++; out.push('  warn ' + m); };
+
+  setTimeout(() => {
+    const known = new Set(weaponIds());
+    out.push(`weapons: ${[...known].join(', ')}`);
+    out.push(`cutscenes: ${Object.keys(cutsceneLibrary).join(', ')}`);
+
+    levels.forEach((raw, i) => {
+      const lv = loadLevel(raw);
+      const tag = `level ${i + 1} (${lv.name})`;
+
+      // --- weapons that don't exist ---
+      (lv.enemySpawns || []).forEach(e => {
+        if (e.weapon && !known.has(e.weapon)) fail(`${tag}: enemy at ${e.x} carries unknown weapon "${e.weapon}"`);
+        if (e.drops && !known.has(e.drops)) fail(`${tag}: boss at ${e.x} drops unknown weapon "${e.drops}"`);
+      });
+      (lv.weaponSpawns || []).forEach(w => {
+        if (!known.has(w.type)) fail(`${tag}: placed weapon at ${w.x} is unknown type "${w.type}"`);
+      });
+      if (lv.startsWith && !known.has(lv.startsWith)) fail(`${tag}: startsWith unknown weapon "${lv.startsWith}"`);
+
+      // --- cutscenes nothing is registered under ---
+      (lv.cutscenes || []).forEach(c => {
+        if (!cutsceneLibrary[c.id]) fail(`${tag}: declares cutscene "${c.id}" but nothing is registered under that id`);
+      });
+
+      // --- a level has to be able to END ---
+      const ends = (lv.cutscenes || []).some(c =>
+        c.when && (c.when.nearWorldEdge != null || c.when.bossDefeated != null));
+      if (!ends) fail(`${tag}: nothing in it can end the level`);
+
+      const ground = lv.platforms.filter(p => p.ground).sort((a, b) => a.x - b.x);
+
+      // --- the edge transition assumes the last segment is at groundY ---
+      const last = ground[ground.length - 1];
+      const usesEdge = (lv.cutscenes || []).some(c => c.when && c.when.nearWorldEdge != null);
+      if (usesEdge && last.y !== lv.groundY) {
+        fail(`${tag}: walks off its edge from a terrace at y${last.y}, but the transition is built around groundY (${lv.groundY})`);
+      }
+
+      // --- spawn over solid ground ---
+      const spawnOk = ground.some(p => lv.playerSpawn.x >= p.x && lv.playerSpawn.x <= p.x + p.width);
+      if (!spawnOk) fail(`${tag}: player spawns at x${lv.playerSpawn.x} with no ground under them`);
+
+      // --- checkpoints over solid ground ---
+      (lv.checkpoints || []).forEach(c => {
+        if (!ground.some(p => c.x >= p.x && c.x <= p.x + p.width)) {
+          fail(`${tag}: checkpoint at ${c.x} has no ground under it`);
+        }
+      });
+
+      // --- hazards over solid ground, at the height of that ground ---
+      (lv.hazards || []).forEach(h => {
+        const under = ground.find(p => h.x >= p.x && h.x < p.x + p.width);
+        if (!under) { fail(`${tag}: spikes at ${h.x} hang over nothing`); return; }
+        const endsOver = ground.some(p => (h.x + h.width) > p.x && (h.x + h.width) <= p.x + p.width);
+        if (!endsOver) fail(`${tag}: spikes at ${h.x} run ${h.width}px and end over a pit`);
+        if (h.y !== under.y) fail(`${tag}: spikes at ${h.x} sit at y${h.y} on ground at y${under.y}`);
+      });
+
+      // --- enemies inside their own patrol bounds ---
+      // An overshoot smaller than the enemy's own width is survivable: the
+      // patrol clamps it on the first frame it runs. Level 1 ships with one
+      // (its boss starts 3px past its maxX) and has done since before any of
+      // this existed, so failing on it would mean failing a finished level
+      // over a rounding error. Anything larger is a real placement mistake.
+      (lv.enemySpawns || []).forEach(e => {
+        if (e.minX == null) return;
+        const over = Math.max(e.minX - e.x, (e.x + e.w) - e.maxX);
+        if (over > e.w) fail(`${tag}: enemy at ${e.x} starts ${Math.round(over)}px outside its own patrol (${e.minX}-${e.maxX})`);
+        else if (over > 1) warn(`${tag}: enemy at ${e.x} starts ${Math.round(over)}px outside its patrol — clamps on frame one`);
+      });
+
+      out.push(`  ok   ${tag}: ${ground.length} ground segments, ${(lv.enemySpawns || []).length} enemies, ${(lv.cutscenes || []).length} scenes`);
+    });
+
+    out.push(fails
+      ? `*** ${fails} FAILURE(S)${warns ? `, ${warns} warning(s)` : ''}`
+      : `PASS every level references things that exist and sits on solid ground${warns ? ` (${warns} warning(s))` : ''}`);
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 250);
+</script></body></html>

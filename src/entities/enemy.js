@@ -38,6 +38,20 @@ const SHOT_COOLDOWN = 110;
 // toward you, and the speed says so.
 const OCTAGON_SPEED = 0.75;
 
+// Timers that used to be Math.random() are derived from the enemy's own
+// position instead.
+//
+// The point isn't determinism for its own sake: a probe that passes standing
+// alone and fails in the suite is worse than no probe, and "is this
+// checkpoint survivable" was exactly that — whether a sphere's first shot
+// landed inside the test window came down to a dice roll at spawn. The
+// spread across a level is just as good from a hash of x, and now a failure
+// means something changed rather than that the coin came up differently.
+function spread(x, base, range) {
+  const n = Math.sin(x * 0.7351) * 43758.5453;
+  return base + Math.floor((n - Math.floor(n)) * range);
+}
+
 // Builds live enemies from a level's raw spawn data.
 export function spawnEnemies(spawns) {
   const built = spawns.map(e => ({
@@ -50,7 +64,7 @@ export function spawnEnemies(spawns) {
     baseY: e.y,
     baseX: e.x,
     hopVY: 0,
-    hopTimer: 90 + Math.floor(Math.random() * 150), // ticks down to the next surprise hop
+    hopTimer: spread(e.x, 90, 150),   // ticks down to the next surprise hop
     shout: 0,
     awake: false,     // boss only: has the pickaxe come out yet
     swingPhase: 0,    // boss only: drives the threatening pickaxe swing
@@ -63,7 +77,7 @@ export function spawnEnemies(spawns) {
     hitFlash: 0,
     knockback: 0,
     thudTimer: 0,
-    shotTimer: 40 + Math.floor(Math.random() * SHOT_COOLDOWN),
+    shotTimer: spread(e.x + 97, 40, SHOT_COOLDOWN),
     charge: 0,      // 0..1 wind-up before a shot, drives the draw
     // octagons only
     restoreTotal: e.restoreHits == null ? 2 : e.restoreHits,
@@ -212,7 +226,7 @@ export function updateEnemies(player, cutsceneActive) {
       if (enemy.hopTimer <= 0) {
         enemy.hopVY = -7.5;
         enemy.shout = 22;
-        enemy.hopTimer = 150 + Math.floor(Math.random() * 200);
+        enemy.hopTimer = spread(enemy.x + enemy.hopTimer, 150, 200);
         playSurprise();
       }
     }
