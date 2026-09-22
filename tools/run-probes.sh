@@ -19,12 +19,17 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FILTER="${1:-}"
 BROWSER="${BROWSER:-brave-browser}"
 
+# An entry may carry a query string; it's appended to the URL as-is.
 ASSERTING=(
+  module-load-probe
   cutscene-runner-probe dialogue-probe cutscene-probe
   mining-and-nohop-probe progression-probe save-probe
   boot-flow-probe respawn-safety-probe coin-probe weapon-probe
   climb-probe coin-trio-check platform-coin-check
 )
+# One per level in the registry — the gate an authored level has to pass
+# before it counts as built. Regenerate the list when a level is added.
+for i in 0 1 2 3 4 5 6; do ASSERTING+=("level-audit-probe?level=$i"); done
 REPORT_ONLY=(gap-probe walk-only-autoplay edge-transition-trace)
 
 started_server=0
@@ -37,8 +42,16 @@ cleanup() { [ "$started_server" = 1 ] && pkill -f "http.server $PORT" >/dev/null
 trap cleanup EXIT
 
 run_one() {
+  # Split "name?query" into page and query string.
+  local page="${1%%\?*}" query=""
+  [ "$page" != "$1" ] && query="?${1#*\?}"
+  # The per-obstacle level audit runs a few hundred simulated jumps, which
+  # needs a much longer virtual-time budget than a probe that ticks a few
+  # hundred frames once.
+  local budget=13000
+  case "$page" in level-audit-probe) budget=90000 ;; esac
   "$BROWSER" --headless=new --disable-gpu --no-sandbox \
-    --virtual-time-budget=13000 --dump-dom "http://localhost:$PORT/tools/$1.html" 2>/dev/null \
+    --virtual-time-budget=$budget --dump-dom "http://localhost:$PORT/tools/$page.html$query" 2>/dev/null \
     | python3 "$ROOT/tools/probe-extract.py"
 }
 

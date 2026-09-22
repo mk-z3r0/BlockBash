@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#000;">
+<canvas id="game" width="800" height="450"></canvas>
+<pre id="out">running…</pre>
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true, narrative: { seenCutscenes: {}, npcStage: 0, flags: {} } })); window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERROR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  // Per-obstacle audit of a level: is every gap and every jumpable spike bed
+  // actually clearable, and does the geometry obey the level design rules?
+  //
+  //   ?level=N     which level index to audit (default 0)
+  //
+  // This is the gate an authored level has to pass, and it replaced a
+  // whole-level autoplay bot that turned out to be useless as a gate: that
+  // bot dies ~70 times on level 1, which is FINISHED and tuned, for reasons
+  // gap-probe.html already documents as bot precision rather than unfair
+  // geometry. Testing one obstacle at a time from a clean runway is the
+  // instrument that actually measures the level instead of the bot.
+  //
+  // Everything here is adapted from tools/gap-probe.html, which did exactly
+  // this for level 1 only, with the pass/fail and the structural rules added.
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update, switchTo } from '../src/scenes/sceneManager.js';
+  import { getLevel } from '../src/levels/levelLoader.js';
+  import { levels } from '../src/levels/registry.js';
+  import { P } from '../src/engine/physics.js';
+
+  const params = new URLSearchParams(location.search);
+  const levelIndex = parseInt(params.get('level') || '0', 10);
+  const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+  const out = [];
+  let failures = 0, warnings = 0;
+  const fail = msg => { failures++; out.push('  FAIL ' + msg); };
+  // Advisory only. A warning is something the design rules discourage that
+  // level 1 nonetheless ships and playtests fine with, so failing a level
+  // over it would make this gate lie.
+  const warn = msg => { warnings++; out.push('  warn ' + msg); };
+
+  setTimeout(() => {
+    if (levelIndex >= levels.length) {
+      document.getElementById('out').textContent =
+        `*** FAIL no level at index ${levelIndex} (registry has ${levels.length})\nerrors: none`;
+      return;
+    }
+    state.currentLevelIndex = levelIndex;
+    switchTo('playing', { retry: true });
+
+    const lv = getLevel();
+    lv.cutscenes.length = 0;   // a dialogue beat would wait for a keypress
+    const ground = lv.platforms.filter(p => p.ground).sort((a, b) => a.x - b.x);
+    const floating = lv.platforms.filter(p => !p.ground && p.width > 1);
+
+    function place(x, y) {
+      player.x = x; player.y = y;
+      player.velocityX = 0; player.velocityY = 0;
+      // Never a "safety" value: the hazard-death check is itself gated on
+      // invincible<=0, so anything above zero silently makes spikes
+      // harmless and every measurement below meaningless. This exact trap
+      // invalidated a whole earlier pass — see the level design rules.
+      player.invincible = 0;
+      player.isOnGround = false;
+      // Arrive at speed, with the P-meter already full.
+      //
+      // Starting each test from a dead stop was the first version and it
+      // reported two of level 1's small spike beds as uncrossable, which
+      // they demonstrably are not. The reason is runway: the bed at 5700
+      // sits 108px into its ground segment, and 108px from standing isn't
+      // enough to reach the run cap — but a real player arrives there
+      // already moving, having crossed the whole stretch before it. The
+      // test has to model arrival, not a standing start, or it measures
+      // the runway rather than the obstacle.
+      player.velocityX = primedSpeed;
+      player.pMeter = P.pMeterSegments;
+      state.lives = 99;
+    }
+    let primedSpeed = P.runMax;
+    const clearEnemies = () => state.enemies.forEach(e => { e.alive = false; });
+
+    function runwayStart(triggerX, segStart) {
+      const prevHazardEnd = lv.hazards
+        .filter(h => h.x + h.width < triggerX)
+        .reduce((m, h) => Math.max(m, h.x + h.width + 12), 0);
+      let start = Math.max(segStart + 2, prevHazardEnd, triggerX - 300);
+      // ...and never inside a solid block sitting ON the ground. Level 1's
+      // staircase (2990-3222) is exactly this case: a runway that began at
+      // 3200 put the player inside a tread, where they pressed right into a
+      // wall for 300 frames and the test reported "no result" for a gap
+      // that is perfectly clearable. Walk the runway forward past anything
+      // solid it starts inside of.
+      for (const p of floating) {
+        const standsOnGround = p.y + p.height >= lv.groundY - 2;
+        if (standsOnGround && start >= p.x - player.width && start <= p.x + p.width) {
+          start = p.x + p.width + 4;
+        }
+      }
+      return Math.min(start, triggerX - 60);
+    }
+
+    function jumpTest(triggerX, fromX, targetX, lead, hold, run) {
+      primedSpeed = run ? P.runMax : P.walkMax;
+      place(runwayStart(triggerX, fromX), lv.groundY - player.height);
+      clearEnemies();
+      const lives0 = state.lives;
+      key('keydown', 'ArrowRight');
+      if (run) key('keydown', 'Shift');
+      let jumped = false, h = 0, res = 'no result';
+      for (let i = 0; i < 300; i++) {
+        if (!jumped && player.isOnGround && player.x + player.width >= triggerX - lead) {
+          key('keydown', ' '); jumped = true; h = hold;
+        }
+        if (h > 0 && --h === 0) key('keyup', ' ');
+        update();
+        if (state.lives < lives0) { res = 'DIED'; break; }
+        if (jumped && player.isOnGround && player.x > targetX) { res = `ok +${Math.round(player.x - targetX)}`; break; }
+      }
+      key('keyup', ' '); key('keyup', 'ArrowRight'); key('keyup', 'Shift');
+      return res;
+    }
+
+    // Timings a real player might use, at BOTH speeds. An obstacle passes
+    // if any one of them clears it.
+    //
+    // Testing run only was wrong, and level 1 proved it: its 35px and 50px
+    // beds at 5700 and 5850 sit 115px apart, so a full-power run jump off
+    // the first lands within a few px of the second. They're walk-speed
+    // obstacles. The design rules are explicit that walk and run are two
+    // different skills rather than one being strictly better, so a gate
+    // that only measures run declares hand-tuned, shipped geometry broken.
+    const TIMINGS = [['edge+long', 0, 22], ['early+long', 45, 22], ['edge+short', 0, 8]];
+    const STYLES = [];
+    for (const run of [true, false]) {
+      for (const [n, l, h] of TIMINGS) STYLES.push([`${run ? 'run' : 'walk'}/${n}`, l, h, run]);
+    }
+    const anyOk = results => results.some(r => r.startsWith('ok'));
+    // Only the timings that worked, so a passing line stays readable.
+    const summarise = results => {
+      const ok = STYLES.map(([n], i) => [n, results[i]]).filter(([, r]) => r.startsWith('ok'));
+      return ok.length ? ok.map(([n, r]) => `${n}:${r}`).join('  ') : 'NOTHING CLEARS IT';
+    };
+
+    out.push(`== LEVEL ${levelIndex}: ${lv.name} ==`);
+
+    // ---- gaps ----
+    const gaps = [];
+    ground.forEach((s, i) => {
+      if (i === 0) return;
+      const prev = ground[i - 1], edge = prev.x + prev.width;
+      if (s.x - edge > 2) gaps.push({ edge, landing: s.x, size: s.x - edge, from: prev.x });
+    });
+    out.push(`== GAPS (${gaps.length}) ==`);
+    gaps.forEach(g => {
+      const results = STYLES.map(([, l, h, run]) => jumpTest(g.edge, g.from, g.landing, l, h, run));
+      out.push(`  ${g.edge}-${g.landing} (${g.size}px)  ${summarise(results)}`);
+      if (!anyOk(results)) fail(`gap ${g.edge}-${g.landing} (${g.size}px) is not clearable at any tested speed or timing`);
+    });
+
+    // ---- spike beds ----
+    // Anything over 200px wide is meant to be crossed on platforms rather
+    // than jumped (level 1's long bed is the reference case), so it's
+    // checked for stepping stones instead of for clearance.
+    out.push('== SPIKE BEDS ==');
+    lv.hazards.forEach(hz => {
+      const seg = ground.find(p => hz.x >= p.x && hz.x <= p.x + p.width);
+      if (!seg) { out.push(`  ${hz.x} (${hz.width}px): floating hazard, not audited`); return; }
+      if (hz.width > 200) {
+        const stones = floating.filter(p => p.x + p.width > hz.x && p.x < hz.x + hz.width);
+        out.push(`  ${hz.x}-${hz.x + hz.width} (${hz.width}px): crossed on ${stones.length} platform(s)`);
+        if (stones.length === 0) fail(`spike bed ${hz.x}-${hz.x + hz.width} is ${hz.width}px wide (> 200) with no platform over it to cross on`);
+        return;
+      }
+      const results = STYLES.map(([, l, h, run]) => jumpTest(hz.x, seg.x, hz.x + hz.width, l, h, run));
+      out.push(`  ${hz.x}-${hz.x + hz.width} (${hz.width}px)  ${summarise(results)}`);
+      if (!anyOk(results)) fail(`spike bed ${hz.x}-${hz.x + hz.width} (${hz.width}px) is not clearable at any tested speed or timing`);
+    });
+
+    // ---- structural rules, checked statically ----
+    // "Never put a platform directly above a jump-off point. The player
+    // rises into it and a correctly-timed jump becomes a death. This caused
+    // the worst bug in level 1."
+    out.push('== STRUCTURE ==');
+    const JUMP_RISE = 225;      // measured, see the level design rules
+    const LIP = 40;             // how much of the take-off lip counts as the jump-off point
+    // Only gaps that actually demand a committed jump. Level 1 has a 25px
+    // gap directly under a wide platform and is completely fine, because a
+    // gap that narrow is crossed with a hop or simply run over — the rule
+    // is about full-power jumps, so the check has to be too.
+    const NEEDS_REAL_JUMP = 45;
+    let overhead = 0;
+    gaps.filter(g => g.size > NEEDS_REAL_JUMP).forEach(g => {
+      floating.forEach(p => {
+        const overLip = p.x < g.edge + 4 && p.x + p.width > g.edge - LIP;
+        const withinRise = p.y + p.height > lv.groundY - JUMP_RISE && p.y < lv.groundY - player.height;
+        if (overLip && withinRise) {
+          overhead++;
+          fail(`platform ${p.x}-${p.x + p.width} @y${p.y} sits directly above the jump-off lip of the gap at ${g.edge}`);
+        }
+      });
+    });
+    if (!overhead) out.push('  no platform overhangs any jump-off lip');
+
+    // "Keep landing zones clear of the next hazard. A hard jump carries
+    // 162px — don't let a full-power leap off a pit land in spikes."
+    let badLanding = 0;
+    gaps.forEach(g => {
+      const hz = lv.hazards.find(h => h.x >= g.landing && h.x < g.landing + 70);
+      if (hz) { badLanding++; fail(`spikes at ${hz.x} sit only ${hz.x - g.landing}px past the landing of the gap at ${g.edge}-${g.landing}`); }
+    });
+    if (!badLanding) out.push('  every gap landing is clear of the next hazard');
+
+    // A checkpoint inside an enemy's patrol span means respawning into a
+    // sphere, which the design rules call a cheap death.
+    let badCheckpoint = 0;
+    (lv.checkpoints || []).forEach(c => {
+      const e = (lv.enemySpawns || []).find(s => !s.boss && c.x > s.minX - 30 && c.x < s.maxX + 30);
+      // Advisory: respawning grants P.RESPAWN_INVINCIBLE_FRAMES, which is
+      // what lets level 1 ship two of these without it reading as a cheap
+      // death. Still worth not doing on purpose.
+      if (e) { badCheckpoint++; warn(`checkpoint at ${c.x} sits inside the patrol of the enemy at ${e.x} (${e.minX}-${e.maxX})`); }
+    });
+    if (!badCheckpoint) out.push('  no checkpoint sits inside an enemy patrol');
+
+    out.push(failures
+      ? `*** ${failures} FAILURE(S)${warnings ? `, ${warnings} warning(s)` : ''}`
+      : `PASS all obstacles clearable, structure clean${warnings ? ` (${warnings} warning(s))` : ''}`);
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 250);
+</script></body></html>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#000;">
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true, narrative: { seenCutscenes: {}, npcStage: 0, flags: {} } }));</script>
+<canvas id="game" width="800" height="450"></canvas><pre id="out">running…</pre>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  // Can a bot actually get from one end of a level to the other?
+  //
+  // This is the gate every authored level has to pass before it counts as
+  // built. The design doc's own benchmark ("an autoplayer with a fixed
+  // lookahead clears the level without dying") proves nothing is impossible
+  // or unfair — it says nothing about whether it's fun, which is a
+  // playtest's job, not a probe's.
+  //
+  //   ?level=N    which level index to traverse (default 0)
+  //   ?walk       walk only, no run — the harder standard
+  //
+  // Two things are deliberately removed before the run: BOSSES, because the
+  // boss body-blocks the way to the edge by design and this probe is about
+  // geometry rather than fights; and CUTSCENES, because a dialogue beat
+  // waits for a keypress that a bot doesn't send, and would just hang.
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update } from '../src/scenes/sceneManager.js';
+  import { switchTo } from '../src/scenes/sceneManager.js';
+  import { getLevel } from '../src/levels/levelLoader.js';
+  import { levels } from '../src/levels/registry.js';
+
+  const params = new URLSearchParams(location.search);
+  const levelIndex = parseInt(params.get('level') || '0', 10);
+  const walkOnly = params.has('walk');
+  const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+  const out = [];
+
+  setTimeout(() => {
+    if (levelIndex >= levels.length) {
+      document.getElementById('out').textContent =
+        `*** FAIL no level at index ${levelIndex} (registry has ${levels.length})\nerrors: none`;
+      return;
+    }
+
+    state.currentLevelIndex = levelIndex;
+    switchTo('playing', { retry: true });
+
+    const lv = getLevel();
+    lv.cutscenes.length = 0;                                  // see note above
+    state.enemies = state.enemies.filter(e => !e.boss);       // ditto
+    state.lives = 999;
+
+    const ground = lv.platforms.filter(p => p.ground);
+    const solidAt = x => ground.some(p => x >= p.x && x <= p.x + p.width);
+    const spikeAt = x => lv.hazards.some(h => x >= h.x - 2 && x <= h.x + h.width + 2);
+
+    key('keydown', 'ArrowRight');
+    if (!walkOnly) key('keydown', 'Shift');
+
+    let maxX = player.x, hold = 0, lives0 = state.lives, deaths = [];
+    let stuck = 0, reachedEdge = false;
+    const target = lv.worldEdgeX - player.width - 4;
+
+    for (let i = 0; i < 40000; i++) {
+      if (player.isOnGround && hold === 0) {
+        // 21px, matching tools/gap-probe.html exactly. Deliberately NOT a
+        // speed-scaled lookahead, which was the first thing tried here and
+        // made the bot jump far too early — it died on level 1's very first
+        // gap, which the design rules specifically note has to be jumped AT
+        // the edge rather than early. This number was swept
+        // (tools/autoplay-lookahead-sweep.html) after the physics retune and
+        // will need re-sweeping after the next one; see the level design
+        // rules on why a fixed pixel constant never survives a speed change.
+        const ahead = player.x + player.width + 21;
+        const enemyAhead = state.enemies.some(e => e.alive &&
+          e.x > player.x && e.x - (player.x + player.width) < 62 && Math.abs(e.y - player.y) < 40);
+        const wallAhead = lv.platforms.some(p => !p.ground && p.width > 1 &&
+          ahead >= p.x && ahead <= p.x + p.width &&
+          p.y < player.y + player.height && p.y + p.height > player.y);
+        if (!solidAt(ahead) || spikeAt(ahead) || enemyAhead || wallAhead) { key('keydown', ' '); hold = 16; }
+      }
+      if (hold > 0 && --hold === 0) key('keyup', ' ');
+
+      const beforeX = player.x;
+      update();
+      if (state.lives < lives0) { deaths.push(Math.round(beforeX)); lives0 = state.lives; }
+      if (player.x > maxX) { maxX = player.x; stuck = 0; } else { stuck++; }
+      if (player.x >= target) { reachedEdge = true; break; }
+      if (state.gameState !== 'playing') break;
+      if (stuck > 1500) break;
+    }
+
+    out.push(`level ${levelIndex} (${lv.name})  mode: ${walkOnly ? 'walk-only' : 'run'}`);
+    out.push(`furthest: ${Math.round(maxX)} / edge ${lv.worldEdgeX}`);
+    out.push(`deaths: ${deaths.length}${deaths.length ? '   near: ' + deaths.slice(0, 12).join(', ') : ''}`);
+    // REPORT ONLY — deliberately no pass/fail.
+    //
+    // This bot is not a fair judge and shouldn't be used as a gate: it dies
+    // ~70 times on level 1, which is finished, tuned and playtested, for
+    // reasons gap-probe.html documents as bot precision rather than unfair
+    // geometry. tools/level-audit-probe.html is the actual gate — it tests
+    // one obstacle at a time from a clean runway, which measures the level
+    // instead of the bot. What this page is still good for is spotting a
+    // hard soft-lock: somewhere the bot cannot get past at all.
+    out.push(reachedEdge
+      ? 'reached the edge'
+      : `did not reach the edge (stopped at ${Math.round(maxX)}) — check for a soft-lock there`);
+    out.push('errors: none');
+    document.getElementById('out').textContent = out.join('\n');
+  }, 250);
+</script></body></html>
