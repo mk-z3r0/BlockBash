@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<!-- The cutscene runner against synthetic beat lists. Needs the local
+     server running.
+
+     Everything here is about the runner's CONTRACT rather than any
+     particular cutscene, because that contract is what every future
+     cutscene is written against: what the locks mean, when beats end,
+     that beats chain within a tick, that a skip reaches the payoff, and
+     that nothing leaks into the next run. Get one of these wrong and the
+     symptom shows up months later as "the ending sometimes doesn't fire",
+     so they're asserted directly instead of inferred from a playthrough. -->
+<html><body style="margin:0;background:#000;"><canvas id="game" width="800" height="450"></canvas>
+<pre id="out" style="color:#8effc0;font:12px monospace"></pre>
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true }));
+window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  import {
+    startCutscene, updateCutscene, skipCutscene, isCutsceneActive,
+    currentLocks, currentBeatName, hasCompleted, resetCutscenes,
+    activeCutsceneId, setWorldTransform, getWorldTransform
+  } from '../src/cutscenes/runner.js';
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update } from '../src/scenes/sceneManager.js';
+  import { getLevel } from '../src/levels/levelLoader.js';
+
+  const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+  const out = [];
+  const check = (label, got, want) =>
+    out.push(`${got === want ? 'ok  ' : 'FAIL'}  ${label}: ${got}${got === want ? '' : `  (expected ${want})`}`);
+
+  const ctxFor = extra => ({ player, state, data: {}, setWorldTransform, ...extra });
+
+  setTimeout(() => {
+    // --- 1. beats end on `frames`, and chain within one tick ------------
+    // The boss showdown depends on this: its beats were a run of separate
+    // `if`s in one function, so falling out of one fell straight into the
+    // next on the same frame.
+    resetCutscenes();
+    const log = [];
+    startCutscene({
+      id: 'chain-test',
+      beats: [
+        { name: 'a', frames: 1, enter: () => log.push('enter-a'), exit: () => log.push('exit-a') },
+        { name: 'b', frames: 1, enter: () => log.push('enter-b'), exit: () => log.push('exit-b') },
+        { name: 'c', frames: 3, enter: () => log.push('enter-c') }
+      ],
+      onComplete: () => log.push('complete')
+    }, ctxFor());
+    updateCutscene();   // a runs and ends -> b runs and ends -> c starts
+    check('one tick ran three beats', log.join(','), 'enter-a,exit-a,enter-b,exit-b,enter-c');
+    check('...and landed on the third', currentBeatName(), 'c');
+    updateCutscene(); updateCutscene();
+    check('c ended after its 3rd update', isCutsceneActive(), false);
+    check('onComplete fired', log[log.length - 1], 'complete');
+    check('marked completed', hasCompleted('chain-test'), true);
+
+    // --- 2. `until` ends a beat early -----------------------------------
+    resetCutscenes();
+    let stop = false;
+    startCutscene({
+      id: 'until-test',
+      beats: [{ name: 'wait', frames: 9999, until: () => stop }]
+    }, ctxFor());
+    for (let i = 0; i < 5; i++) updateCutscene();
+    check('still going before the condition', isCutsceneActive(), true);
+    stop = true;
+    updateCutscene();
+    check('ended as soon as until went true', isCutsceneActive(), false);
+
+    // --- 3. locks ---------------------------------------------------------
+    resetCutscenes();
+    check('idle input is free', currentLocks().input, 'free');
+    check('idle physics runs', currentLocks().physics, 'run');
+    startCutscene({
+      id: 'lock-test',
+      beats: [
+        { name: 'default', frames: 2 },
+        { name: 'frozen', frames: 2, locks: { physics: 'freeze' } }
+      ]
+    }, ctxFor());
+    updateCutscene();
+    check('a cutscene locks input by default', currentLocks().input, 'locked');
+    check('...but leaves the world running', currentLocks().physics, 'run');
+    check('...and the camera following', currentLocks().camera, 'follow');
+    // One more tick, not two: 'default' has frames: 2, so its second
+    // update ends it AND chains straight into 'frozen' in the same tick.
+    updateCutscene();
+    check('a beat can freeze physics', currentLocks().physics, 'freeze');
+    check('...without unlocking input', currentLocks().input, 'locked');
+
+    // --- 4. physics: freeze really does stop the player -------------------
+    // The declaration is only worth anything if the scene honours it, so
+    // this drives the REAL update loop rather than the runner alone.
+    resetCutscenes();
+    key('keydown', ' '); key('keyup', ' ');     // title -> playing
+    state.enemies.forEach(e => { e.alive = false; });
+    player.respawnFreeze = 0;
+    player.x = 300; player.y = getLevel().groundY - player.height;
+    player.velocityX = 0; player.velocityY = 0;
+    startCutscene({
+      id: 'freeze-test',
+      beats: [{ name: 'held', frames: 40, locks: { physics: 'freeze' } }]
+    }, ctxFor());
+    key('keydown', 'ArrowRight');
+    const frozenFrom = player.x;
+    for (let i = 0; i < 20; i++) update();
+    key('keyup', 'ArrowRight');
+    check('frozen physics left the player where it was', player.x, frozenFrom);
+
+    // --- 5. input: locked ignores movement while the world still ticks ----
+    resetCutscenes();
+    player.x = 300; player.velocityX = 0; player.velocityY = 0;
+    startCutscene({
+      id: 'input-test',
+      beats: [{ name: 'watch', frames: 40 }]   // defaults: locked + running
+    }, ctxFor());
+    key('keydown', 'ArrowRight');
+    const lockedFrom = player.x;
+    for (let i = 0; i < 20; i++) update();
+    key('keyup', 'ArrowRight');
+    check('locked input ignored a held arrow key', Math.round(player.x), Math.round(lockedFrom));
+
+    // --- 6. skip reaches the payoff but not the choreography --------------
+    resetCutscenes();
+    const skipLog = [];
+    startCutscene({
+      id: 'skip-test',
+      beats: [
+        { name: 'long', frames: 9999, exit: () => skipLog.push('exit') },
+        { name: 'later', frames: 10, enter: () => skipLog.push('enter-later') }
+      ],
+      onComplete: () => skipLog.push('complete')
+    }, ctxFor());
+    updateCutscene();
+    skipCutscene();
+    check('skip ended it', isCutsceneActive(), false);
+    check('skip ran onComplete', skipLog.includes('complete'), true);
+    check('skip did NOT run the exit hooks it jumped over', skipLog.includes('exit'), false);
+    check('skip did NOT enter the beats it jumped over', skipLog.includes('enter-later'), false);
+
+    // --- 7. nothing leaks between runs ------------------------------------
+    resetCutscenes();
+    const def = {
+      id: 'leak-test',
+      beats: [{
+        name: 'scribble', frames: 2,
+        enter: c => { c.data.marker = (c.data.marker || 0) + 1; },
+      }]
+    };
+    const sharedCtx = ctxFor();
+    startCutscene(def, sharedCtx);
+    updateCutscene(); updateCutscene();
+    const firstMarker = sharedCtx.data.marker;
+    startCutscene(def, sharedCtx);
+    updateCutscene();
+    check('c.data is wiped on start', sharedCtx.data.marker, firstMarker);
+    resetCutscenes();
+    check('resetCutscenes clears the completed set', hasCompleted('leak-test'), false);
+    check('resetCutscenes drops the active cutscene', activeCutsceneId(), null);
+    check('resetCutscenes clears the world transform', getWorldTransform(), null);
+
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    out.push(out.some(l => l.startsWith('FAIL')) ? '\n*** SOME CHECKS FAILED ***' : '\nall checks passed');
+    document.getElementById('out').textContent = out.join('\n');
+  }, 250);
+</script></body></html>

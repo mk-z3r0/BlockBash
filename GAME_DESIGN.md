@@ -121,14 +121,40 @@ Two hard constraints on whatever it turns out to be:
 ### NPCs
 
 - Supporting NPC characters appear throughout the game.
-- The **rescue NPC** has a full multi-level arc and is the game's mentor figure — see below.
+- The **rescue NPC**, [Quarrick](#the-rescue-npc-arc), has a full multi-level arc and is the game's mentor figure — see below.
 - Other NPC roles (quest givers, comic relief, survivors) are still TBD.
+
+### Dialogue
+
+**Built 2026-09-21.** Characters can talk. A **bottom bar**, JRPG style: a
+panel across the bottom of the screen with the speaker's name, text
+revealed a character at a time, advanced with Space. Chosen over speech
+bubbles floating above characters because it takes a line of any length
+without reflowing the composition, it's always in the same place, and it
+doesn't fight the camera.
+
+Colour is the whole of a speaker's identity — the art is procedural shapes
+and there's no room for portraits, so each character's name appears in the
+palette they're already drawn in. Each also has a pitch for the tick that
+plays as their text appears: lower for bigger characters. Both of those are
+learned from play rather than explained.
+
+**Level 1 says nothing, on purpose.** It's the tutorial level and the story
+is deliberately withheld there — the spheres arrive, the boss is
+unwinnable, Quarrick saves you and hands you a pickaxe, and none of it is
+narrated. **The story starts opening up in level 2**, which is where the
+first real dialogue belongs. Putting placeholder lines in the one finished
+level would mean shipping words nobody meant.
+
+> The system, the beat format, and the traps are in IMPLEMENTATION_PLAN's
+> "The cutscene system" section. Anyone writing a conversation should read
+> that first — a line of dialogue is one entry in a beat list.
 
 ### The rescue NPC arc
 
 The single biggest piece of character writing in the game, and the spine the weapon progression hangs off. **The overall arc is decided; the ending beat is open.**
 
-> **TBD: the NPC needs a name.** They carry the game's emotional throughline and are currently called "the rescue NPC," which is a code identifier, not a character.
+> **Named (2026-09-21): Quarrick.** He carries the game's emotional throughline; "the rescue NPC" was a code identifier, not a character. The code still uses `rescueNPC` for the boss-cutscene instance and `cornerQuarrick` for the edge-transition one — worth unifying whenever the NPC arc gets real narrative state (IMPLEMENTATION_PLAN, step 7).
 
 **1. Level 1 — the protector.** *(Built.)* The NPC arrives during the boss cutscene, stomps the boss sphere, and leaves the **pickaxe** behind for the player. Visibly **larger and stronger** than the player. Establishes them as ally, protector, and the reason the player is armed at all.
 
@@ -175,10 +201,13 @@ What the player experiences:
 
 1. They walk to the edge and stop. There's nothing past it — open space, and a long way down.
 2. The camera settles on them and **looks down**, so the depth of the drop is legible before anything happens.
-3. They **jump off the edge**, and the world **rotates 90° underneath them** mid-air.
-4. They land on what was the vertical face below and is now simply *the ground*. Gravity has shifted with the world.
+3. **Quarrick is already down there**, standing on the next face — which from here is a sheer wall — walking *up* it toward the corner they're both standing on. His feet are on his ground; ours is at right angles to it. He arrives and waits, looking up at the player.
+4. They **jump off the edge**, and the world **rotates 90° underneath them** mid-air. Quarrick turns with it, because he's standing on the part that's turning. The player doesn't, because they're in the air.
+5. They land on what was the vertical face below and is now simply *the ground* — one tile in front of Quarrick, face to face. Gravity has shifted with the world.
 
 This is a **visual cutscene**, not a gameplay mechanic — no physics or collision runs during the rotation, and the player can't fail it. It's the cube-planet premise made literal once per level: the world doesn't end, it turns.
+
+The Quarrick beat is doing narrative work as well as spatial: he's the one character who is never disoriented by the geometry, and he's always *already there*. That's the protector phase of his arc reading as competence — and it's what makes the later phases land, when he stops being able to get there first. See "The rescue NPC arc" below.
 
 > Implementation (the state machine, the canvas rotation, the trigger) lives in IMPLEMENTATION_PLAN's "Level-edge transition" section. The level-1 version is built and playable.
 
@@ -273,11 +302,13 @@ Music direction is still open.
 - [x] ~~Boss fights — one per level? Only at key story beats?~~ → **One per level**, framework in [Bosses](#bosses).
 - [x] ~~Octagon restoration — is it required (rescue mechanic) or optional?~~ → **Required at least twice**: the NPC beat forces it, and the final boss *is* it. Whether individual field octagons are optional is still open (below).
 - [x] ~~Cutscene style — animated in-engine or comic-panel stills?~~ → **In-engine**, decided with the opening cutscene (see IMPLEMENTATION_PLAN's "Decisions made").
+- [x] ~~How do characters talk?~~ → **A bottom bar, typewritten, advanced with Space** (2026-09-21). Built and working; see [Dialogue](#dialogue). Level 1 stays wordless, the story opens up in level 2.
 - [x] ~~NPC roles and dialogue~~ → partially: the [rescue NPC arc](#the-rescue-npc-arc) is defined. *Other* NPCs are still open.
 
 **Still open:**
 
-- [ ] **Names.** The restoration weapon and the rescue NPC both need real ones.
+- [x] ~~The rescue NPC's name~~ → **Quarrick** (2026-09-21).
+- [ ] **Names.** The restoration weapon still needs one.
 - [ ] **What do spheres shoot?** Ranged sphere attack, mid-to-late game — must be visually distinct from triangles. See [Spheres shoot back](#spheres-shoot-back--open-question).
 - [ ] **The middle weapon tier.** Which 1–3 of the candidates actually ship, and in what order.
 - [ ] **Weapon inventory** — carry one at a time, or collect a loadout?

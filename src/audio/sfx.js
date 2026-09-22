@@ -155,3 +155,12 @@ export function playGameOver() {
   const t = audioCtx.currentTime;
   [392, 349.23, 293.66, 220].forEach((f, i) => tone(f, t + i * 0.15, 0.25, 'sawtooth', 0.18, sfxGain, 900));
 }
+
+// One character tick of dialogue. Pitched per speaker (cutscenes/
+// speakers.js), very short and very quiet: it fires every few characters,
+// so anything with a tail turns a sentence into a drone.
+export function playDialogueBlip(freq) {
+  if (!audioCtx || !freq) return;
+  const t = audioCtx.currentTime;
+  tone(freq, t, 0.03, 'square', 0.045, sfxGain, 2600);
+}

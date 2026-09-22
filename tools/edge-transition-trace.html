@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<!-- Numbers behind tools/edge-transition-shot.html: ticks the whole ending
+     and prints the player's position, the camera and the life count per
+     frame, so the beat boundaries and the landing spot can be checked
+     without eyeballing a screenshot. Needs the local server running. -->
+<html><body style="margin:0;overflow:hidden;background:#0a0d1c;"><canvas id="game" width="800" height="450"></canvas><pre id="out" style="color:#8effc0;font:12px monospace"></pre>
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true })); window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update } from '../src/scenes/sceneManager.js';
+  import { getLevel } from '../src/levels/levelLoader.js';
+  import { camera } from '../src/engine/camera.js';
+  const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+  const out = [];
+  setTimeout(() => {
+    key('keydown', ' '); key('keyup', ' ');
+    const lv = getLevel();
+    const E = lv.worldEdgeX, G = lv.groundY;
+    state.lives = 3;
+    player.x = E - 110; player.y = G - player.height;
+    player.velocityX = 0; player.velocityY = 0; player.respawnFreeze = 0;
+    // Seed the camera where normal play would already have it — otherwise
+    // 'brink' spends its whole budget easing in from x=0 and the shot shows
+    // a completely different part of the level.
+    camera.x = Math.max(0, Math.min(player.x - 800 / 2.6, lv.worldWidth - 800));
+    camera.y = 0;
+    let last = null;
+    for (let i = 0; i < 400; i++) {
+      if (state.gameState !== 'playing') { out.push(`frame ${i}: gameState -> ${state.gameState}`); break; }
+      state.enemies.forEach(e => { e.alive = false; });
+      update();
+      last = i;
+      if (i % 10 === 0 || (i > 95 && i < 130)) {
+        out.push(`f${i} px=${player.x.toFixed(1)} py=${player.y.toFixed(1)} lives=${state.lives} camx=${camera.x.toFixed(0)} camy=${camera.y.toFixed(0)} inv=${player.invincible}`);
+      }
+    }
+    out.push(`ran ${last + 1} frames; final gameState=${state.gameState}`);
+    out.push(`worldEdgeX=${E} groundY=${G} playerW=${player.width}`);
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 200);
+</script></body></html>

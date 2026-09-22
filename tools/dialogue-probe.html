@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<!-- The dialogue bar on its own, away from any cutscene. Needs the local
+     server running.
+       tools/dialogue-probe.html               - assertions, printed
+       tools/dialogue-probe.html?test&live=N   - the sandbox conversation in
+                                                 the real game, N frames in,
+                                                 for a screenshot
+
+     `?test` is required for the live mode: the sandbox conversation only
+     exists in data/testLevel.js, because level 1 is deliberately wordless.
+     Live mode drives the actual game rather than calling drawDialogue by
+     hand — a hand-drawn panel gets painted over by the scene's own render
+     loop on the next frame, and it wouldn't be exercising the real path
+     (drawCutsceneScreen, over the HUD) anyway.
+
+     Checks the things that are easy to get wrong and invisible until
+     someone writes a long line months from now: wrapping at the panel
+     width, the typewriter reaching exactly the end, and advance-while-
+     revealing completing the line rather than skipping it. -->
+<html><body style="margin:0;overflow:hidden;background:#0a0d1c;">
+<canvas id="game" width="800" height="450"></canvas><pre id="out" style="color:#8effc0;font:12px monospace"></pre>
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true }));
+window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  import { ctx } from '../src/engine/renderer.js';
+  import {
+    showDialogue, updateDialogue, drawDialogue, closeDialogue,
+    advanceDialogue, isDialogueOpen, isDialogueRevealed, isDialogueAdvanced
+  } from '../src/ui/dialogue.js';
+  import { wrapText } from '../src/ui/textWrap.js';
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update } from '../src/scenes/sceneManager.js';
+  const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+
+  const q = new URLSearchParams(location.search);
+  const out = [];
+  const LONG = 'The spheres did not destroy this place. They smoothed it. Every corner they touch is one less corner the world has, and there are not so many left that we can spare them.';
+
+  setTimeout(() => {
+    if (q.has('live')) {
+      key('keydown', ' '); key('keyup', ' ');      // title -> playing
+      state.lives = 3;
+      player.respawnFreeze = 0;
+      state.enemies.forEach(e => { e.alive = false; });
+      player.x = 260;                               // past sandbox-chat's reachX
+      for (let i = 0; i < Number(q.get('live')); i++) update();
+      document.getElementById('out').textContent = '';
+      return;
+    }
+
+    // --- 1. wrapping stays inside the panel ---
+    ctx.font = '15px Trebuchet MS, Arial, sans-serif';
+    const maxWidth = 800 - 14 * 2 - 18 * 2;
+    const lines = wrapText(ctx, LONG, maxWidth);
+    const widest = Math.max(...lines.map(l => ctx.measureText(l).width));
+    out.push(`1. wrapped into ${lines.length} lines, widest ${widest.toFixed(0)}px of ${maxWidth}px  ` +
+             (widest <= maxWidth ? 'OK' : '<-- OVERFLOWS'));
+    out.push(`   no line lost a word: ${lines.join(' ') === LONG.replace(/\s+/g, ' ') ? 'OK' : '<-- TEXT MANGLED'}`);
+
+    // --- 2. typewriter lands exactly on the end ---
+    showDialogue('quarrick', LONG);
+    let ticks = 0;
+    while (!isDialogueRevealed() && ticks < 999) { updateDialogue(); ticks++; }
+    out.push(`2. fully revealed after ${ticks} ticks (${(ticks / 60).toFixed(1)}s)  ` +
+             (ticks < 999 ? 'OK' : '<-- NEVER FINISHED'));
+
+    // --- 3. a revealed line does not advance on its own ---
+    for (let i = 0; i < 120; i++) updateDialogue();
+    out.push(`3. still waiting after 2 more seconds: ${!isDialogueAdvanced()}  (must be true)`);
+    advanceDialogue();
+    out.push(`   advances when asked: ${isDialogueAdvanced()}  (must be true)`);
+    closeDialogue();
+
+    // --- 4. advance mid-reveal completes, it does not skip ---
+    showDialogue('quarrick', LONG);
+    updateDialogue(); updateDialogue();
+    advanceDialogue();
+    out.push(`4. mid-reveal advance completed the line: ${isDialogueRevealed()}  (must be true)`);
+    out.push(`   ...without also advancing past it: ${!isDialogueAdvanced()}  (must be true)`);
+    advanceDialogue();
+    out.push(`   second press advances: ${isDialogueAdvanced()}  (must be true)`);
+
+    // --- 5. close ---
+    closeDialogue();
+    out.push(`5. closed: ${!isDialogueOpen()}  (must be true)`);
+
+    // --- 6. an unknown speaker warns but does not throw ---
+    let threw = false;
+    try { showDialogue('nobody-by-that-name', 'hi'); } catch { threw = true; }
+    out.push(`6. unknown speaker threw: ${threw}  (must be false)`);
+    closeDialogue();
+
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 200);
+</script></body></html>

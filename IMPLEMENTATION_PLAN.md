@@ -188,15 +188,107 @@ to persist it too, or quitting mid-game loses the story position while keeping
 the level progress — which would read as a bug. **Design this before building
 the NPC's level 2+ appearances**, not alongside them.
 
-**`playingScene.js` is becoming a god module.** At 362 lines it already owns:
-level loading, the gameplay update loop, every collision response, the boss
-cutscene, the edge transition, pause, life/death/respawn, the level-end check,
-drawing the entire world, and input routing. Every system listed above wants to
-add more to it. Worth a deliberate decomposition: extract collision response,
-extract the cutscene runner, and turn the update loop into a sequence of named
-subsystem calls instead of an inline block. **The target: adding a new system
-means adding a module and one line to the update sequence — not weaving 40 lines
-into the middle of an existing function.**
+**~~`playingScene.js` is a god module~~ — resolved 2026-09-21.** It had
+reached **768 lines, 61% of it two hand-rolled cutscenes**, with six more
+levels planned at roughly two cutscenes each. The fix was the cutscene
+system below, not a tidy-up: **370 lines** now, and adding a cutscene no
+longer touches the file at all.
+
+The measured before/after, since the original note's line count went stale
+without anyone noticing and that's worth not repeating:
+
+| Responsibility | Before | After |
+|---|---|---|
+| Boss showdown | ~252 (inline) | `cutscenes/level1/bossShowdown.js` |
+| Edge transition | ~213 (inline) | `cutscenes/level1/edgeTransition.js` |
+| Collision responses | inline | `scenes/playing/collisions.js` |
+| Terrain damage | inline (`minedGap`) | `levels/terrain.js` |
+| Scene object, draw, level start | ~266 | ~270, unchanged in substance |
+
+**The remaining rule still holds:** adding a new system means adding a
+module and one line to the update sequence, not weaving 40 lines into the
+middle of an existing function. `update()` is now a sequence of named steps
+gated on one `currentLocks()` read.
+
+### The cutscene system (2026-09-21) — read this before writing one
+
+Build-order step 4b, done. **This is the contract every future cutscene is
+written against**, so it's documented here rather than left to be
+reverse-engineered from `cutscenes/runner.js`.
+
+**Adding a cutscene is three things and none of them are in a scene file:**
+
+1. A beat list in `src/cutscenes/<level>/<name>.js`
+2. A line in `src/cutscenes/library.js` registering it by id
+3. A trigger in the level's data: `{ id, when: {...}, once?: true }`
+
+**A beat is data:**
+
+```js
+{
+  name: 'charge',
+  locks: { physics: 'freeze' },   // omitted = defaults, see below
+  enter(c) {}, update(c, frame) {}, exit(c) {},
+  draw(c) {},        // in-world, inside the camera AND world-rotation transform
+  drawScreen(c) {},  // screen space, over the HUD
+  frames: 45,        // end after N updates, and/or
+  until: c => bool   // end as soon as this goes true — whichever fires first
+}
+```
+
+**Locks are the heart of it.** Three axes, fixed vocabulary, defaults chosen
+so the common case ("the player can't move but the world keeps living") is
+an empty `locks`:
+
+| Axis | Values | Default | What it means |
+|---|---|---|---|
+| `input` | `locked` / `free` | `locked` | does the player drive the avatar |
+| `physics` | `run` / `freeze` | `run` | does the world simulate at all |
+| `camera` | `follow` / `scripted` | `follow` | `scripted` = the scene doesn't touch it |
+
+`playingScene.update()` reads this **once, at the top**, and branches in one
+place. That read happens *before* the cutscene advances, deliberately: a
+beat that ends this frame still governs this frame, which is what the
+hand-rolled code did and what the probes' frame counts assume.
+
+**Dialogue is a beat type.** `say('quarrick', 'text', { auto: 90 })` from
+`cutscenes/say.js`. Bottom-bar panel (`ui/dialogue.js`), word-wrapped
+(`ui/textWrap.js` — canvas has no wrapping), typewritten, per-speaker blip.
+Speakers are registered in `cutscenes/speakers.js`; colour is the whole of a
+speaker's identity, since there's no room for portraits. Defaults to
+freezing the world and waiting for a keypress; both overridable.
+
+**Three traps, each of which cost something to find:**
+
+- **Beats chain within one tick.** When a beat ends, the next one enters
+  *and* updates in the same tick. Not a stylistic choice — the boss beats
+  were a run of separate `if`s in one function, so falling out of one fell
+  into the next, and `cutscene-probe.html` asserts the boss dies on a
+  specific frame. Anything else shifts that by one frame per boundary.
+- **`c.data` is for things that die with the cutscene, and nothing else.**
+  Entities that outlive it (Quarrick keeps walking off-screen after the
+  showdown hands control back) belong in `state`. World mutation that must
+  survive a respawn (the boss's mined pit) belongs to the level —
+  `levels/terrain.js`, which is also the seam the chamfer work will use.
+- **The outcome goes in `onComplete`, not in the last beat's `exit`.** A
+  skip runs `onComplete` but deliberately *not* the exit hooks it jumped
+  over, because firing every sound and spawning every particle the player
+  just chose to skip is not what skipping means. Put "the boss is dead and
+  the pickaxe is on the ground" in `onComplete` and make it idempotent —
+  otherwise Escape at the wrong moment strands the player next to a live
+  boss with no weapon. Asserted in `cutscene-probe.html`.
+
+**Not converted: `introScene.js`.** 511 lines of bespoke 3D planet
+rendering in a standalone scene with no gameplay world, so the in-world lock
+machinery buys it nothing. The runner is scene-agnostic, so its *timeline*
+could move later while keeping its draw code. Revisit when a second
+standalone cutscene exists.
+
+**Probes:** `cutscene-runner-probe.html` asserts the contract above against
+synthetic beat lists (24 checks — lock semantics driven through the real
+update loop, chaining, skip, leak-freedom). `dialogue-probe.html` covers
+wrapping, the typewriter, and advance-vs-complete, plus `?test&live=N` to
+screenshot the bar in the running game.
 
 ---
 
@@ -267,20 +359,34 @@ early, sanded-smooth sections mid-game, barely-square architecture by level 6.
 That's authored terrain, not a system, so it costs nothing extra at runtime,
 but it does mean the level tool (step 3) should make cut depth easy to vary.
 
-**4b. Cutscene runner — pulled forward from Phase 5** *(added 2026-09-21)*
-A lightweight `cutsceneRunner.js` that takes a sequence of timed beats
-(freeze, animate, callback) and runs them, so scripted moments stop living
-inside `playingScene.js`. Originally filed under step 9's "cutscenes"; moved
-here because two state machines already share that file (boss + edge
-transition) and everything queued behind this step adds more: octagon
-corruption reveals, the NPC handoff and corruption beat, a boss per level.
-Doing it before the content lands means each of those is a data-shaped beat
-list instead of another 100 lines welded into the update loop. See the
-scaling notes in Architecture constraints.
+**~~4b. Cutscene runner~~ — DONE 2026-09-21.** Pulled forward from Phase 5
+and built out further than the original one-paragraph sketch, once the real
+count landed: **six more levels at roughly two cutscenes each, most with
+dialogue.** At ~100 lines welded into `playingScene.js` per cutscene, that
+was not a file that survived the content.
 
-Pairs with the first slice of the **`playingScene.js` decomposition** — the
-update loop becoming a sequence of named subsystem calls. The cutscene runner
-is the piece that makes the rest of that decomposition possible.
+Shipped: the beat runner and its lock vocabulary, both existing in-world
+cutscenes ported to it with frame-identical behaviour, a bottom-bar dialogue
+system, narrative state persisted to the save, and triggers declared in
+level data. Also pulled the collision responses and terrain damage out while
+the seams were open. **The contract is documented under Architecture
+constraints — read that before writing a cutscene.**
+
+Dialogue exists but level 1 says nothing, deliberately: the story starts
+opening up in level 2, and placeholder lines in the one finished level would
+be words nobody meant. The dialogue path is exercised in the `?test` sandbox
+instead (`cutscenes/sandbox/sandboxChat.js`).
+
+Still open behind this, for whoever writes level 2's cutscenes:
+- **`introScene.js` is still hand-rolled** — see the note in Architecture
+  constraints for why that's the right call for now.
+- **Skip keys are inconsistent.** The intro takes any key; in-world
+  cutscenes take Escape only, and dialogue takes Space to advance. The
+  in-world pair is deliberate (an ordinary jump input used to clear the
+  level); the intro is just older. Worth unifying once there's a second
+  standalone cutscene to unify *with*.
+- **`state.rescueNPC` is a single slot.** Fine while Quarrick is the only
+  scripted character on screen. A scene with two of them needs a list.
 
 **5. Enemies**
 Base class and the passive → pursuing → aggressive tiers. Enemies hold weapons.
@@ -725,6 +831,58 @@ Seeing it in motion changed most of it. What the first pass got wrong:
   and stops at the 3500 gap instead, which is genuinely run-only by
   design. When one bot gets a fix for a whole class of obstacle, check
   every bot.
+
+### 2026-09-21 later: Quarrick meets you on the next face
+
+The ending had the player leaping into an empty world. Now the rescue NPC
+— **Quarrick**, named this session — is already standing on the next face
+when the player arrives at the lip, walking up it toward the shared corner,
+and the player lands exactly one tile in front of him.
+
+- **He's a second, separate instance.** `state.rescueNPC` deletes itself
+  once it runs off-screen after the boss fight, and `updateRescueNPC` is
+  all boss choreography, so reusing it would mean running stomp logic
+  against a character standing on a wall. The corner version lives in the
+  edge transition's own `c.data.quarrick`, built by `createCornerQuarrick`
+  in `entities/npc.js`. *(Updated after the cutscene refactor later the
+  same day — he was a module-level slot in `playingScene.js` when this was
+  first written.)*
+- **The rotation animates him for free, and that's the whole trick.** He's
+  drawn *inside* the world-rotation transform (unlike the player, who is
+  drawn outside it so they stay upright through the arc), and he carries a
+  `spin` of `+PI/2` about his own centre. Before the transition those two
+  compose to "standing sideways on the vertical face"; as the world runs
+  `0 -> -PI/2` they cancel, and he ends upright on the new ground. Nothing
+  interpolates him — his feet are on solid ground on every single frame,
+  which is the only orientation that makes sense for someone who was never
+  falling.
+- **`alongFace` is the coordinate that survives the rotation.** How far he
+  is down the face from the corner *before* becomes how far along the new
+  ground he is *after*, so positioning him is the same arithmetic on both
+  sides of the spin. `QUARRICK_STOP_ALONG` is derived from `LEAP_REACH`
+  rather than authored, so the one-tile landing gap holds if the arc is
+  ever retuned.
+- **He faces the corner the whole time and never turns around.** Local `-x`
+  is up the face before the rotation and back toward the edge after it —
+  the same facing reads as "walking toward the corner" and then "looking at
+  the player who just landed".
+- **`BRINK_FRAMES` went 80 -> 105.** At 80 he was still walking when the
+  player jumped, so the two never shared a still frame. The extra 25 buys
+  the held beat where they're both just standing there, which is the point
+  of putting him there at all.
+- **He only appears on levels with a boss** (`level.boss`), which today
+  means "levels where he showed up to rescue you". That's a stand-in for
+  real narrative state — see the NPC arc in step 7 and the `narrativeState`
+  note under Scaling concerns.
+
+Checked with `tools/edge-transition-shot.html?f=N` (renders frame N of the
+ending) and `tools/edge-transition-trace.html` (per-frame player/camera
+numbers, and where the beat boundaries actually fall). A trap worth
+remembering: both of those teleport the player to the lip, and the first
+version left `camera.x` at 0, so `brink` spent its whole budget easing in
+from the far side of the level and the screenshots showed a completely
+different stretch of ground. They seed the camera where normal play would
+have left it now.
 
 ---
 

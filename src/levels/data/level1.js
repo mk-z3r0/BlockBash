@@ -158,6 +158,18 @@ export default {
   // jump, there's no arc to preserve for enemies — they don't jump (see the
   // `canHop` gate in entities/enemy.js; off until a later level turns it
   // on) — so this is a flat rescale, nothing more.
+  // What plays, and what sets it off (cutscenes/triggers.js evaluates
+  // these; the beats live in cutscenes/level1/). Level 1 is deliberately
+  // WORDLESS — neither of these says anything. The story starts opening up
+  // in level 2; see GAME_DESIGN.md.
+  //
+  // Neither is `once`: dying to the boss should mean seeing the fight
+  // again, and the ending is the only way out of the level.
+  cutscenes: [
+    { id: 'boss-showdown',   when: { bossInView: true } },
+    { id: 'edge-transition', when: { nearWorldEdge: 100 } }
+  ],
+
   enemies: [
     { x: 250,  y: GROUND_Y - 22, w: 22, minX: 220,  maxX: 460,  speed: 1.6 },
     { x: 700,  y: GROUND_Y - 22, w: 22, minX: 650,  maxX: 950,  speed: 1.95 },

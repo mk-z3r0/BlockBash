@@ -9,6 +9,8 @@
   import { getLevel } from '../src/levels/levelLoader.js';
   import { particles } from '../src/entities/particles.js';
   import { camera } from '../src/engine/camera.js';
+  import { switchTo } from '../src/scenes/sceneManager.js';
+  import { isCutsceneActive, hasCompleted } from '../src/cutscenes/runner.js';
   const key=(t,k)=>document.dispatchEvent(new KeyboardEvent(t,{key:k}));
   const out=[];
   setTimeout(() => {
@@ -49,6 +51,30 @@
     out.push(particlesOnDeath >= 20
       ? '  -> 22 = explosion + landing dust = REAL STOMP, the NPC came down on it'
       : '  -> 10 = explosion only = FALLBACK, the NPC landed on the ground and the boss just popped');
+    // === skipping the fight still leaves it won (2026-09-21) ===
+    // The kill and the pickaxe drop moved into the cutscene's onComplete
+    // when it was ported to the runner, precisely so that Escape (and the
+    // Shift+K parent unlock) can't strand the player next to a live boss
+    // with no weapon and no way past. Asserted rather than assumed,
+    // because the failure is unreachable in normal play and would only
+    // ever be found by whoever pressed Escape at the wrong moment.
+    out.push('=== skipping the showdown still resolves it ===');
+    switchTo('playing');                        // re-enter = a fresh run
+    const lv2 = getLevel();
+    const boss2 = state.enemies.find(e => e.boss);
+    player.x = lv2.boss.wakeX - 40; player.y = lv2.groundY - player.height;
+    player.velocityX = 0; player.velocityY = 0; player.invincible = 99999;
+    camera.x = Math.min(player.x - 800 / 2.6, lv2.worldWidth - 800);
+    key('keydown','ArrowRight');
+    for (let i = 0; i < 80 && !boss2.awake; i++) update();
+    key('keyup','ArrowRight');
+    for (let i = 0; i < 30; i++) update();      // a little way into the scene
+    out.push(`cutscene running before the skip: ${isCutsceneActive()}  (must be true)`);
+    key('keydown','Escape'); key('keyup','Escape');
+    out.push(`boss alive after skipping: ${boss2.alive}  (must be false)`);
+    out.push(`pickaxe left on the ground: ${state.weaponPickups.length > 0}  (must be true)`);
+    out.push(`way to the edge is clear: ${hasCompleted('boss-showdown')}  (must be true)`);
+
     out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
     document.getElementById('out').textContent = out.join('\n');
   }, 200);

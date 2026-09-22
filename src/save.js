@@ -6,6 +6,16 @@
 // goes through try/catch and saving is best-effort: losing a save is fine,
 // crashing the game over it is not.
 const SAVE_KEY = 'blockbash-save';
+// Still 1 after narrative state landed (2026-09-21), deliberately. The
+// rule above is about data that can't be trusted, not about every change
+// to the shape: a save written before `narrative` existed is perfectly
+// interpretable, it just hasn't seen any cutscenes yet, and "hasn't seen
+// any cutscenes" is exactly what the default says. Bumping would have
+// thrown away real progress to express nothing.
+//
+// Bump when an existing field changes MEANING or a level's geometry moves
+// under a stored position. Adding an optional field that defaults
+// correctly is not that.
 const SAVE_VERSION = 1;
 
 function defaultSave() {
@@ -13,7 +23,10 @@ function defaultSave() {
     saveVersion: SAVE_VERSION,
     furthestLevelIndex: 0,
     bestScore: 0,
-    hasSeenIntro: false
+    hasSeenIntro: false,
+    // Story position — which cutscenes have played, how far through the
+    // NPC arc we are. Owned by narrative.js; save.js only carries it.
+    narrative: { seenCutscenes: {}, npcStage: 0, flags: {} }
   };
 }
 
@@ -23,6 +36,17 @@ function isWellFormed(save) {
     && Number.isInteger(save.furthestLevelIndex)
     && Number.isInteger(save.bestScore)
     && typeof save.hasSeenIntro === 'boolean';
+  // `narrative` is deliberately NOT checked here — see SAVE_VERSION. A save
+  // without it, or with a malformed one, is still a valid save; loadSave
+  // below just substitutes the default.
+}
+
+function isWellFormedNarrative(n) {
+  return n
+    && typeof n === 'object'
+    && typeof n.seenCutscenes === 'object' && n.seenCutscenes !== null
+    && Number.isInteger(n.npcStage)
+    && typeof n.flags === 'object' && n.flags !== null;
 }
 
 export function loadSave() {
@@ -30,7 +54,13 @@ export function loadSave() {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return defaultSave();
     const parsed = JSON.parse(raw);
-    return isWellFormed(parsed) ? parsed : defaultSave();
+    if (!isWellFormed(parsed)) return defaultSave();
+    // Fill in a narrative block for saves written before there was one,
+    // rather than discarding an otherwise good save over it.
+    if (!isWellFormedNarrative(parsed.narrative)) {
+      parsed.narrative = defaultSave().narrative;
+    }
+    return parsed;
   } catch {
     // corrupted JSON, storage disabled, or a private-browsing throw
     return defaultSave();
@@ -66,4 +96,22 @@ export function markIntroSeen() {
     save.hasSeenIntro = true;
     writeSave(save);
   }
+}
+
+// --- narrative state ---
+// Kept in the same blob as progress so there's one thing to version and one
+// thing to clear. narrative.js owns the shape; these two just move it.
+
+export function loadNarrative() {
+  return loadSave().narrative;
+}
+
+export function saveNarrative(narrative) {
+  const save = loadSave();
+  save.narrative = {
+    seenCutscenes: { ...narrative.seenCutscenes },
+    npcStage: narrative.npcStage,
+    flags: { ...narrative.flags }
+  };
+  writeSave(save);
 }

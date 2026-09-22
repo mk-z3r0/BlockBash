@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<!-- Frame-by-frame look at the end-of-level edge transition. Needs the
+     local server running.
+       tools/edge-transition-shot.html?f=160   - tick N frames, then render
+     Frame map for level 1 (from tools/edge-transition-trace.html):
+       0-78    approach    the scripted walk to the lip
+       79-184  brink       camera tips down; Quarrick climbs the next face
+       185-268 leap        the arc out, world rotating underneath
+       269-302 land        both of them standing on the new face
+     Kills the boss every frame so the ending can be reached without
+     sitting through the whole cutscene first. -->
+<html><body style="margin:0;overflow:hidden;background:#0a0d1c;"><canvas id="game" width="800" height="450"></canvas>
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true }));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update } from '../src/scenes/sceneManager.js';
+  import { getLevel } from '../src/levels/levelLoader.js';
+  import { camera } from '../src/engine/camera.js';
+  const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+  const q = new URLSearchParams(location.search);
+  setTimeout(() => {
+    key('keydown', ' '); key('keyup', ' ');
+    const lv = getLevel();
+    state.lives = 3;
+    state.enemies.forEach(e => { e.alive = false; });   // boss out of the way
+    player.x = lv.worldEdgeX - 110; player.y = lv.groundY - player.height;
+    player.velocityX = 0; player.velocityY = 0; player.respawnFreeze = 0;
+    // Seed the camera where normal play would already have it — otherwise
+    // 'brink' spends its whole budget easing in from x=0 and the shot shows
+    // a completely different part of the level.
+    camera.x = Math.max(0, Math.min(player.x - 800 / 2.6, lv.worldWidth - 800));
+    camera.y = 0;
+    for (let i = 0; i < Number(q.get('f') || 0); i++) {
+      if (state.gameState !== 'playing') break;
+      state.enemies.forEach(e => { e.alive = false; });  // keep the boss down every frame
+      update();
+    }
+  }, 200);
+</script></body></html>

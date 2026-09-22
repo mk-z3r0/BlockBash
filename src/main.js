@@ -9,6 +9,12 @@ import { playingScene } from './scenes/playingScene.js';
 import { winScene } from './scenes/winScene.js';
 import { gameOverScene } from './scenes/gameOverScene.js';
 import { P } from './engine/physics.js';
+import { initNarrative } from './narrative.js';
+
+// Story position comes back from the save before any scene runs, so a
+// cutscene marked `once` knows on the very first frame whether it has
+// already been seen.
+initNarrative();
 
 registerScene('intro', introScene);
 registerScene('title', titleScene);

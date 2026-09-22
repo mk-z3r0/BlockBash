@@ -49,6 +49,12 @@ export function loadLevel(data) {
     // standing in for. The edge itself is the goal now; see `worldEdgeX`
     // above and the transition trigger in scenes/playingScene.js.
     boss: data.boss ? { ...data.boss } : null,
+
+    // Which cutscenes this level has and what sets each one off. Evaluated
+    // by cutscenes/triggers.js; the beat lists themselves are registered in
+    // cutscenes/library.js. Cloned per entry so a level reload can't
+    // inherit anything a previous attempt scribbled on.
+    cutscenes: (data.cutscenes || []).map(c => ({ ...c, when: { ...c.when } })),
     house: data.house ? { ...data.house } : null,
 
     // raw spawn data — the entity modules build their own run state from these

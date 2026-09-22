@@ -66,6 +66,15 @@ export default {
 
   // Rescaled to match level1.js's physics-lab retune, 2026-09-20 (~1.79x,
   // matching how far walkMax grew) — see level1.js for the full note.
+  // Same two as level 1, PLUS the dialogue demo — this is the sandbox
+  // (?test in the URL), which is where the dialogue path gets exercised so
+  // that level 1 can stay wordless. See cutscenes/sandbox/sandboxChat.js.
+  cutscenes: [
+    { id: 'sandbox-chat',    when: { reachX: 240 } },
+    { id: 'boss-showdown',   when: { bossInView: true } },
+    { id: 'edge-transition', when: { nearWorldEdge: 100 } }
+  ],
+
   enemies: [
     { x: 250,  y: GROUND_Y - 22, w: 22, minX: 220,  maxX: 460,  speed: 1.6 },
     { x: 700,  y: GROUND_Y - 22, w: 22, minX: 650,  maxX: 950,  speed: 1.95 },

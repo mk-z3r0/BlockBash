@@ -10,6 +10,12 @@ export const state = {
   coinsCollected: 0,
   currentLevelIndex: 0,
   enemies: [],
+  // Quarrick during the boss fight. An entity slot rather than cutscene
+  // scratch because he OUTLIVES the cutscene that spawns him: once the
+  // showdown is over he's still walking off-screen under his own steam
+  // while the player has control back. See cutscenes/runner.js's note on
+  // what belongs in a cutscene's `data` and what doesn't.
+  rescueNPC: null,
   weaponPickups: [],
   missiles: [] // unused while the bazooka is parked — see weapons/bazooka.js
 };
