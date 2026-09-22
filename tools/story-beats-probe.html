@@ -68,11 +68,11 @@
     }
 
     // 2. walking past 3400 starts the handoff
-    player.x = 3402;
+    player.x = 3252;
     player.y = lv.groundY - player.height;
     tick(2);
     check(isCutsceneActive() && activeCutsceneId() === 'l3-handoff',
-      `the handoff fires at 3400 (active: ${activeCutsceneId()})`);
+      `the handoff fires at 3250 (active: ${activeCutsceneId()})`);
 
     // 3. and skipping it still leaves the player armed and the target there
     skipCutscene();

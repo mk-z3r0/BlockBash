@@ -95,7 +95,10 @@ export default {
     // holding the level's starting weapon again, and the scene that gives
     // them the Cornerstone has to be able to run a second time — otherwise
     // the Sculptor, which can only be beaten with it, is unbeatable.
-    { id: 'l3-handoff',  when: { reachX: 3400 } },
+    // 3250, not 3400: the scene stands Quarrick 150px ahead of the player,
+    // and triggering at 3400 put him within 50px of the pit at 3600 — the
+    // most important conversation in the game, held on the lip of a hole.
+    { id: 'l3-handoff',  when: { reachX: 3250 } },
     { id: 'l3-restored', when: { quarrickRestored: true } },
     { id: 'edge-transition', when: { nearWorldEdge: 100 } }
   ],
@@ -164,10 +167,10 @@ export default {
 
   checkpoints: [
     { x: 2040, y: GROUND_Y - 70, width: 8, height: 70 },
-    // Just before the handoff trigger at 3400, so a death after it means a
+    // Just before the handoff trigger at 3250, so a death after it means a
     // short walk back into the scene rather than it firing the instant the
     // player reappears.
-    { x: 3300, y: GROUND_Y - 70, width: 8, height: 70 },
+    { x: 3140, y: GROUND_Y - 70, width: 8, height: 70 },
     { x: 5180, y: GROUND_Y - 70, width: 8, height: 70 }
   ]
 };

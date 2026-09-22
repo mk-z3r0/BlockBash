@@ -12,20 +12,25 @@ http (Live Server) — not `file://`.
 
 ```
 src/
-  main.js     fixed-timestep loop (accumulator, see Architecture constraints)
-  state.js    run state (lives, score, enemies, …)
-  save.js     versioned localStorage progress
-  engine/     physics constants (SMB3-derived), input, gamepad, camera, renderer
-  entities/   player, enemy, npc, coins, particles, weaponPickup
-  weapons/    pickaxe (melee, earned — see the Level 1 retrofit),
-              bazooka, chainsaw (both parked, not wired into any scene — for later levels)
-  levels/     levelLoader, levelRenderer, registry, trickPlatforms (parked),
-              data/level1.js, data/testLevel.js (sandbox dupe, see below)
-  scenes/     sceneManager + title, intro, playing, win, gameOver; blockHouse (shared drawing)
-  ui/         hud, overlays
-  audio/      audio (synth), sfx
-tools/        ~35 single-purpose probe pages (gap-probe, climb-probe, progression-probe,
-              save-probe, physics-lab, …) — dev-only, need the server running
+  main.js       fixed-timestep loop (accumulator, see Architecture constraints)
+  state.js      run state (lives, score, enemies, projectiles, …)
+  save.js       versioned localStorage progress + narrative state
+  narrative.js  story position — cutscenes seen, NPC stage, flags. Persisted
+  engine/       physics constants (SMB3-derived), input, gamepad, camera, renderer
+  entities/     player, enemy, bosses, npc, coins, particles, weaponPickup
+  weapons/      registry + combat (entity-agnostic), pickaxe, sledgehammer,
+                cornerstone; bazooka + chainsaw still parked for a later level
+  levels/       levelLoader, levelRenderer, registry, terrain,
+                trickPlatforms (parked), data/level1..level7.js,
+                data/testLevel.js (sandbox dupe, see below)
+  cutscenes/    runner, library, triggers, say, speakers,
+                level1/ level2/ level3/ level7/ faces.js sandbox/
+  scenes/       sceneManager + title, intro, playing, win, gameOver;
+                blockHouse (shared drawing); playing/collisions.js
+  ui/           hud, dialogue, overlays, textWrap
+  audio/        audio (synth), sfx
+tools/          ~45 single-purpose probe pages — dev-only, need the server
+                running. See "Verifying a level" for which ones matter
 ```
 
 `tools/` is append-only by habit: each probe is a throwaway page written to
@@ -42,10 +47,34 @@ the real level 1. It diverges freely once created; nothing keeps it in sync.
 | Phase | Status |
 |---|---|
 | 0 — module split + scene manager | done |
-| 1 — data-driven levels, loader, transitions | steps 1–4 done — loader, renderer, spikes, level 1 extended |
-| **Milestone: Level 1 complete** | **reached (2026-09-21)** — progression + versioned save done, and all 5 retrofit items now done (intro cutscene, coin thresholds, skybox, weapon gating resolved, carved platform damage) |
-| 2+ (level tool, chamfers, enemies, weapons, octagons, world manipulation, polish) | not started, re-scoped by the design doc, blocked on the milestone |
-| *out of band* — SMB3 physics rewrite + tuning lab, level-1 retune, level-edge transition | done, merged to `main` in a74db2f. None of these were in the numbered order; they came up because the game needed to *feel* right and needed a way to leave a level before level 2 was worth building |
+| 1 — data-driven levels, loader, transitions | done |
+| **Milestone: Level 1 complete** | **reached (2026-09-21)** |
+| **The whole game** | **playable start to finish (2026-09-21)** — seven levels, seven bosses, three weapons, the full NPC arc, and the ending. See "What got built" below |
+| 4 — chamfers as a collision surface | **not built.** The visual half shipped (carved undersides, `chewed` platforms); collision is still square. See the honest list at the end |
+| 3 — level authoring tool | **not built, and probably not needed** — see the note under Build order |
+| 8 — live sphere-driven world manipulation | **partial.** Bosses carve terrain during fights; the parked trick platforms are still parked |
+| *out of band* — SMB3 physics rewrite + tuning lab, level-1 retune, level-edge transition | done, merged to `main` in a74db2f |
+
+### What got built (2026-09-21)
+
+The game goes from the block house to the core. Seven levels, each ending at
+the edge of its cube face except the sixth, which ends by falling through it.
+
+| System | Where | Note |
+|---|---|---|
+| Weapon registry | `weapons/registry.js` | Register by name; look up behaviour, drawing and sound by type. Three weapons |
+| Entity-agnostic combat | `weapons/combat.js` | An *owner* is anything with a position, a facing, a weapon id and three timers. A sphere swings through the same path the player does |
+| Enemy tiers | `entities/enemy.js` | passive → pursuer → aggressor, declared per spawn, defaulting to passive so level 1 never moved |
+| Octagons | `entities/enemy.js` | Cannot be beaten by anything. Restored, or walked past |
+| Bosses | `entities/bosses.js` | One small state machine each — jam it, restore it, puzzle it, survive the room, out-fight it, put the world back |
+| Narrative state | `narrative.js` (existing) | Now actually carries the arc: `npcStage`, `flags`, persisted |
+| The audit gate | `tools/level-audit-probe.html` | Per-obstacle proof that a level is playable. See "Verifying a level" |
+
+**Every level's geometry is machine-checked**, not eyeballed: `run-probes.sh`
+audits each level in the registry, and a level that fails does not ship. That
+gate caught a re-introduction of the single worst bug level 1 ever had (a
+platform directly over a spike bed's take-off) within an hour of it being
+written.
 
 Level 1 runs 0–7200px: pits and passive spheres, a staircase and a tall wall,
 then a spike half, then an unwinnable boss (50% larger than a normal sphere,
@@ -56,15 +85,11 @@ the cube rotates under them, and they land on the next face (see
 [Level-edge transition](#level-edge-transition-2026-09-20-physics-lab-branch)).
 
 Level 1 is face 1 of 6, then a descent, then the hollow centre — GAME_DESIGN.md's
-"Story Arc — surface to core" is the shape the rest of the build order is
-aimed at. Only level 1 exists today; the registry has one real entry.
+"Story Arc — surface to core" is the shape the whole build order was aimed at,
+and as of 2026-09-21 all of it exists. The registry has seven entries.
 
-The `physics-lab` branch carries the SMB3-derived physics rewrite, the tuning
-lab, the level-1 retune, and the edge transition. It hasn't been merged to
-`main` — deliberately, at the user's instruction.
-
-See [Milestone: Level 1 complete](#milestone-level-1-complete) — nothing
-below it starts until that's checked off.
+The `physics-lab` work (SMB3-derived physics rewrite, the tuning lab, the
+level-1 retune, the edge transition) was merged to `main` in a74db2f.
 
 ---
 
@@ -76,6 +101,11 @@ below it starts until that's checked off.
 | The bazooka vs. "player starts unarmed" | **Parked, not converted.** Level 1's retrofit (2026-09-19) got to "player starts unarmed, earns a weapon from a defeated enemy" first, via a melee pickaxe dropped by the boss (`weapons/pickaxe.js`) — the bazooka isn't the player's level 1 weapon anymore. It still exists in the codebase (`weapons/bazooka.js`), just not wired into any scene right now: confirmed (2026-09-19) it's planned to reappear later in the game, so it's parked rather than deleted or converted. The triangle-shooter idea is still the plan for whatever *that* eventually becomes, whenever it's actually built | Triangles *are* the missing corners, so restoring an octagon is literal geometry, not metaphor — that reasoning still holds whenever the triangle shooter actually gets built |
 | Level 1 | **Keep it, retrofit it.** Good concept test | Passive enemies, foreshadowing boss and rescue NPC already fit the story |
 | Spikes (absent from the design doc) | **Just an obstacle** (2026-09-21). Briefly decided as debris from the carved world; reversed — too few platforms sit over spikes for that reading to land, and the plain one (the spheres put them there to slow you down) needs no scaffolding | An obstacle doesn't have to earn a narrative justification before it's allowed to exist |
+| Does a weapon survive a level boundary? | **Yes — levels declare what the player arrives carrying** (`startsWith` in level data, 2026-09-21). The old rule reset the player to unarmed on every load | Losing an earned weapon at a seam, for no reason the player can see, reads as a bug. Declaring it per level also survives a retry, which carrying it in run state would not |
+| One weapon or a loadout? | **One at a time**, stomping as the fallback | It's the only thing that keeps the Cornerstone's ammo scarcity honest — with a melee weapon also in hand, running dry costs nothing |
+| Can an octagon be killed? | **No. By anything.** Swinging at one thuds | "Restoration is a rescue verb" stops being true the moment there's a faster way through. It also removes the moral trap of letting the player kill a victim by accident |
+| Is a boss "can't be hurt"? | **Per-boss, via `invulnerable` in data** — level 1's Foreman sets it permanently, the Excavator's phase machine toggles it | "Is a boss" and "can't be hurt" stopped being the same thing the moment a second boss existed |
+| What ends level 6? | **A fall, not a rotation** | Five faces of walking off an edge and having the world turn under you is the setup. The descent is the one that doesn't |
 | What a restored octagon does | **Becomes a square again and flees** — an ally, not a recruit | Restoration is a *rescue* verb. Keeps freed squares out of the combat math |
 | Does the triangle shooter still kill? | **Yes — it still pops spheres** | It's the main gun with a second verb, not a niche tool |
 | Trick platforms | Parked in `levels/trickPlatforms.js`, out of level 1, returning later | Level 1 is the beginner level; trolling escalates in later levels |
@@ -338,26 +368,48 @@ reset cleanly instead of trusting bad data, and a simulated storage failure
 See the checklist below. This is what turns "concept test" into "finished
 level."
 
-**3. Level authoring tool**
-A small in-browser layout tool: click to place platforms/hazards/enemies/coins,
-drag to resize, export in the existing level-data format. It doesn't need to
-be pretty — it needs to kill the hand-type-coordinates-then-eyeball-the-probe-
-output loop that level 1's spike section took. Worth drawing the ~162px jump
-arc directly on the canvas as a placement guide, so an obviously-bad gap or an
-overhead platform is visible *before* a probe run catches it. Pays off starting
-with level 2, and every level after.
+**~~3. Level authoring tool~~ — not built, and the need turned out to be
+something else.**
 
-**4. Chamfer rendering + collision — authored only**
-Cut corners as level data, drawn and collided, with nothing carving them yet.
-Level 2 can open with pre-cut blocks showing the spheres have been at work.
-De-risks the foundation without needing enemy AI to exist. Comes after the
-level tool so the tool only has to support one terrain format, not two.
-*Expect jump tuning to shift slightly near cut edges — re-run the gap probe.*
+Six levels were hand-authored after this was written, and the loop it was
+meant to kill never hurt the way it was expected to. Typing coordinates is
+fast. What was actually slow and dangerous was *not knowing whether a layout
+was playable* — and the thing that answers that is not a canvas with a jump
+arc drawn on it, it's a machine that tries the jump.
 
-Chamfers also carry the design doc's **visual degradation** arc — minor chips
-early, sanded-smooth sections mid-game, barely-square architecture by level 6.
-That's authored terrain, not a system, so it costs nothing extra at runtime,
-but it does mean the level tool (step 3) should make cut depth easy to vary.
+`tools/level-audit-probe.html?level=N` does that: every gap and every jumpable
+spike bed, at both speeds across three timings, from a clean runway, plus the
+structural rules checked statically. A level that fails it doesn't ship. It
+caught a platform sitting over a spike bed's take-off in level 2 — the exact
+class of bug this section calls "the worst bug in level 1" — within an hour of
+that level being written, which is faster than a placement guide would have.
+
+A visual editor would still be nice for *shaping* a level rather than
+validating one, and if hand-authoring ever does start hurting, this is the
+thing to build. It just isn't blocking anything today.
+
+**4. Chamfer rendering + collision — HALF BUILT, and the half that shipped is
+the visual one.**
+
+What exists: carved undersides on any platform over a spike bed, and a
+`chewed: true` flag in level data that forces the same damage anywhere. That
+carries the design doc's **visual degradation arc** exactly as intended —
+a couple of chipped platforms in level 2, most of level 5, nearly everything
+by level 6 and 7. It's authored terrain, costs nothing at runtime, and the
+square-minus-its-corners language now runs from a platform's underside
+through the octagons and Quarrick's body all the way to the core.
+
+What does NOT exist: **chamfer as a collision surface.** Platforms are still
+flat-top rectangles. Nothing is walked up, nothing is stood on at 45°, and
+`overlapTop` is untouched. The plan's "surface profile, not a flag" note in
+Architecture constraints is still the right design and still unimplemented.
+
+Doing it now is harder than doing it then, which is what this step warned
+about — seven levels of geometry are authored against square collision. But
+it is not as bad as it sounds: no level *depends* on a cut corner being
+walkable, because none of them could. Adding sloped collision would change
+how existing terrain feels, not whether it works. **Re-run the gap probe and
+every level audit after**, which is now one command.
 
 **~~4b. Cutscene runner~~ — DONE 2026-09-21.** Pulled forward from Phase 5
 and built out further than the original one-paragraph sketch, once the real
@@ -388,24 +440,53 @@ Still open behind this, for whoever writes level 2's cutscenes:
 - **`state.rescueNPC` is a single slot.** Fine while Quarrick is the only
   scripted character on screen. A scene with two of them needs a list.
 
-**5. Enemies**
-Base class and the passive → pursuing → aggressive tiers. Enemies hold weapons.
-Also where the **spheres' ranged attack** lands (mid-to-late tiers) — the design
-doc flags *what* they fire as an open question, with the hard constraint that it
-can't be the player's triangle projectile and has to read as sphere-shaped.
+**~~5. Enemies~~ — DONE 2026-09-21.**
+`tier` on the spawn: `passive` (the default, so level 1's data never changed),
+`pursuer` (breaks patrol inside ~230px and swings whatever tool it carries),
+`aggressor` (further, faster, and shoots). All three share one movement
+function with different numbers, deliberately — what the player feels is range
+and commitment, not manoeuvre.
 
-**6. Weapons + weapon registry**
-Entity-agnostic (see constraints). Player starts unarmed, weapons drop from
-defeated enemies — level 1's melee pickaxe (`weapons/pickaxe.js`) is a
-narrow, single-level version of this already; this step generalizes it
-across enemy tiers and adds the ranged triangle shooter with limited ammo.
+`minX`/`maxX` stay the leash even while chasing: a sphere that could follow
+anywhere would walk off its own platform, and levels are authored assuming it
+can't.
 
-Build the **weapon registry in the same piece of work**, not after it:
-`entities/weaponPickup.js` currently assumes one drop type, and the second
-weapon turns both the pickup and the input/hit paths into if/else chains that
-grow per weapon. Register by name, look up behaviour/drawing/sound by type.
-Target roster is 3–5 weapons; only the pickaxe and the restoration weapon are
-decided, so the registry has to tolerate the middle tier changing shape.
+The **ranged attack** is a slow round pellet, in from level 4. GAME_DESIGN has
+the reasoning; the short version is that legibility beat theme.
+
+**~~6. Weapons + weapon registry~~ — DONE 2026-09-21, and done first.**
+Built before a second weapon existed rather than during it, which is what this
+step asked for. Three weapons: pickaxe, sledgehammer, Cornerstone.
+
+The entity-agnostic part is real, not aspirational: `startAttack(owner)` and
+`tickWeapon(owner)` take anything with a position, a facing, a `weapon` id and
+three timers. A tool-carrying sphere in level 2 swings through the identical
+path the player does. The one place the sides still differ is `opponentsOf()`,
+because the player's targets live in a list and a sphere's target is a
+singleton — a fact about the game, not a special case in the weapon logic.
+
+Everything that can hurt the player — a sphere's swing, a sphere's shot,
+walking into a corrupted square — raises **one** flag (`state.playerTouchedHazard`),
+consumed once per frame by the scene. What being hit *means* is one decision
+in one place regardless of what did the hitting.
+
+**~~7. Octagons + the NPC arc~~ — DONE 2026-09-21.**
+Both prerequisites this section named turned out to matter exactly as
+predicted. Narrative state already existed (`narrative.js`) and now carries the
+arc. The handoff/corruption beat is a beat list, not an inline state machine,
+and it is the clearest possible argument for having built the runner first.
+
+One thing this section did not anticipate: **the handoff cutscene must not be
+`once: true`.** A player who dies after it respawns holding the level's
+starting weapon, and a scene marked as seen would never run again — leaving
+the Sculptor, which can only be beaten with the Cornerstone, unbeatable. It
+replays per attempt, the same call level 1's boss showdown makes. The skip
+path hands the weapon over too, because `onComplete` is the outcome.
+
+The original text follows, since its reasoning about the ammo tension is still
+exactly right and is what the numbers were tuned against.
+
+---
 
 **7. Octagons + the NPC arc**
 Needs 5 and 6 — they're enemies, and restoring them needs the triangle weapon.
@@ -435,17 +516,35 @@ numbers get tuned: if triangles are plentiful, the choice evaporates.
 
 Stomping stays the unarmed fallback, so running dry is never a dead end.
 
-**8. Live world manipulation**
-Sphere actors that carve terrain and move platforms. Revives the parked trick
-code behind a visible sphere cause. Merges "trolling" and "reshaping" — they're
-one system.
+**8. Live world manipulation — PARTIAL.**
+What shipped: bosses that reshape the world while you're standing in it. The
+Excavator drills pits out of its own arena; the Terraformer raises and drops
+the platforms the fight happens on; the Core collapses sections of the cavity
+floor. All of it runs through `levels/terrain.js`'s `carveGap`, all of it is
+undone on a respawn, and all of it has a visible cause on screen — the design
+rule that every troll moment must have one.
 
-**9. Bosses, cutscenes, controller, polish**
-Roughly the original roadmap. The opening cutscene may be worth pulling earlier
-since it's the player's first impression and motivates everything. **Touch
-controls belong here too** — parked for now (2026-09-18), see note below.
-"Polish" here means procedural refinement (particles, screen shake, animation
-curves, juice) — not a sprite pipeline; see the art-direction decision above.
+What did NOT ship: ordinary spheres doing it. `levels/trickPlatforms.js` is
+still parked, and its tuning constants are still the valuable part. The
+trigger model this section describes — a sphere actor near the platform rather
+than the player's position — is still the right one and still unwritten.
+
+One number worth keeping: the Core's floor collapses are **capped at six**.
+Uncapped, a long fight saws the arena into islands the player can't cross,
+which turns "hard" into "over".
+
+**9. Bosses, cutscenes, controller, polish — BOSSES AND CUTSCENES DONE.**
+All seven bosses are built (`entities/bosses.js` plus level 1's cutscene-driven
+Foreman), and every scripted moment in the game is a beat list. The
+per-boss content this step was left holding is the content that shipped.
+
+Still open from this step: **touch controls** (still parked, note below) and
+**polish** in the procedural-juice sense — screen shake, richer particles,
+animation curves. Nothing here is load-bearing; the game plays without it.
+
+A note for whoever does the polish pass: the boss phase machines are the
+obvious place for screen shake, and they already have the hooks — each one
+ends a phase at a known frame, which is exactly where a shake wants to start.
 
 The generic cutscene machinery has moved out of this step to **4b**; what's
 left here is the per-level boss content itself. The design doc now carries a
@@ -468,6 +567,47 @@ which is step 8's carving system pointed at the player instead of the scenery.
 Chamfers sit at #4 — right after the level tool, before any of the systems
 that depend on the damage language (octagons, carving) — because retrofitting
 a flat-top format after six more levels are authored would be miserable.
+
+---
+
+## Verifying a level
+
+`bash tools/run-probes.sh` runs everything. It needs a server on :8000 or
+starts its own (`PORT=` overrides), and takes a few minutes. It is the only thing that has to pass.
+
+What's in it, and what each thing is actually for:
+
+| Probe | Answers |
+|---|---|
+| `module-load-probe` | Does every module still parse? There is no build step and no node here, so a syntax error otherwise shows up as a blank canvas in whatever runs next. **Run this first after any edit** — it's seconds |
+| `level-audit-probe?level=N` | Is this level *playable*? Every gap and jumpable bed, both speeds, three timings, from a clean runway, plus the structural rules. One per level in the registry, counted off the registry itself |
+| `boss-fight-probe` | Does each boss open, close and pay out? |
+| `story-beats-probe` | Can the player be blocked by a story beat? The handoff, the restoration, the Sculptor, the core |
+| `progression-chain-probe` | Does every level actually lead to the next one? |
+| `full-playthrough-probe` | One run, cleared save to win screen, every story scene asserted |
+| the older probes | Physics, coins, saves, cutscene contract — unchanged, and all still green |
+
+**Adding a level** means: write the data file, add it to `levels/registry.js`,
+run `python3 tools/gen-module-probe.py`, and run the suite. The audit list and
+the module list both size themselves off the repo, so nothing else needs
+touching.
+
+### What the audit is and isn't
+
+It proves **nothing is impossible**. It says nothing about whether a level is
+*fun*, or fairly paced, or the right difficulty for a seven-year-old. Those
+need a person with a controller.
+
+It is also calibrated against level 1, which is the only reason to trust it —
+every complaint it raised about that finished, playtested level turned out to
+be the instrument being wrong, and each fix is written up in the probe at the
+line it applies to. Four of them are worth knowing about because they'll bite
+anyone who extends it: tests must **arrive at speed** (a standing start
+measures the runway, not the obstacle), a runway must not begin **inside a
+solid block or a spike bed**, obstacles must be tested at **both walk and run**
+(some are deliberately walk-only), and the static "platform over a take-off"
+rule is **advisory** because it can't see horizontal travel and the simulation
+can.
 
 ---
 
@@ -931,7 +1071,27 @@ To add:
 GAME_DESIGN.md is the register of record for open *design* questions — this
 list is only the subset that changes what gets built, and in what order.
 
-**Blocking:** none right now.
+**Blocking:** none. The game is finishable.
+
+**The honest list — what a reader should not assume exists.** Everything
+below is deliberately unbuilt, not overlooked, and each has its reasoning at
+the build-order step it belongs to:
+
+- **Chamfered terrain is visual only.** Platforms are still flat-top
+  rectangles; nothing is walked up at 45°. Step 4.
+- **No level authoring tool.** Six levels were hand-authored without missing
+  it; the audit probe answered the need it was really for. Step 3.
+- **Ordinary spheres don't reshape the world.** Bosses do. The parked trick
+  platforms are still parked. Step 8.
+- **No music.** Every weapon and enemy has a sound identity; there is no
+  score.
+- **No touch controls.** Still parked, see the note at the end of this file.
+- **Coins still only buy lives.** The shop idea is untouched, and all seven
+  levels' thresholds are tuned for lives-only.
+- **Difficulty is unplaytested by a human.** Every level is machine-proved
+  *possible*. Nobody has yet sat down with a controller and found out whether
+  levels 4-6 are too hard for a seven-year-old, which is the single most
+  likely thing to need changing.
 
 **Decided since this list was last written** (2026-09-21 — full reasoning in
 GAME_DESIGN.md, repeated here only where it constrains the build):

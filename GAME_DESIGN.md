@@ -63,27 +63,21 @@ It's defeated with the **triangle restoration weapon** — the same mechanic use
 
 **Every player weapon is mining, demolition, or terraforming equipment.** The spheres are reshaping the earth; the player fights back with earth-moving tools. That theme is the constraint any candidate weapon has to satisfy — it's what keeps the arsenal from drifting into generic shooter guns.
 
-Target roster is **3–5 weapons total**, including the two decided ones below, with clear escalation between them.
+Target roster was **3–5 weapons total**. **Three shipped** (2026-09-21), which is the bottom of that range and deliberate: each one gets a real stretch of the game to itself rather than three of them overlapping.
 
-**Decided:**
+**Built:**
 
-| Weapon | Level | Role |
+| Weapon | Where | Role |
 |---|---|---|
-| **Pickaxe** | 1 (built) | Short melee swing. Earned from the boss via the rescue NPC. The foundation the rest escalates from. |
-| **Restoration weapon** *(name TBD)* | Mid-to-late (see [the NPC arc](#the-rescue-npc-arc)) | Fires **triangle projectiles** that restore octagons by snapping their missing corners back on. Also kills spheres on contact. **Limited ammo** — that scarcity is the tension. This is the key narrative weapon and the one that defeats the final boss. |
+| **Pickaxe** | Earned in level 1, carried into 2 | Short melee swing, fast cooldown. The foundation the rest escalates from. Dropped by the Foreman via Quarrick's stomp. |
+| **Sledgehammer** | Dropped by the Excavator, level 2 | Half the swing rate, ~22% more reach, double damage, and it knocks enemies back. The middle tier's stated axis — trade mobility for power — in its bluntest form. Carried until the handoff. |
+| **The Cornerstone** | Handed over by Quarrick, level 3 | Fires **triangle projectiles** that restore octagons by snapping their missing corners back on. Kills spheres on contact too. **Limited ammo.** The last weapon in the game: nothing after level 3 drops another one, and it's what defeats the core. |
 
-> **TBD: the restoration weapon needs a real name.** "Restoration weapon" is a working label, not a name. It's the most story-important object in the game and deserves better.
+> **The restoration weapon has a name: the Cornerstone.** A cornerstone is the block a structure is set out from; it's masonry rather than weaponry, which satisfies the standing constraint that every weapon is earth-moving kit; and the word has the job inside it. It puts corners back.
 
-**Candidates — under consideration, none confirmed.** The middle tier is open for redesign; these are the current shortlist, not a plan:
+**Cut, for now.** The drill, the dynamite and the bulldozer shield were the rest of the middle-tier shortlist. The sledgehammer was picked over them because "heavier, slower, knocks back" needed no new system to express, and three weapons across seven levels already gives each one room. The other three are still good ideas and nothing in the registry (`weapons/registry.js`) resists adding them.
 
-| Candidate | Idea | Status |
-|---|---|---|
-| **Sledgehammer** | Heavier and slower than the pickaxe, with knockback. Could crack weakened platforms to open hidden areas. | Candidate |
-| **Drill / Jackhammer** | Sustained-contact damage; locks the player in place while active. | Candidate |
-| **Dynamite / blasting charges** | Placeable, timed, area damage — and can hurt the player. | Candidate |
-| **Bulldozer shield** | Defensive. Pushes enemies and debris; can't jump while active. | Candidate |
-
-Each of these trades mobility for power in a different way, which is the axis worth protecting when the roster gets cut down to size.
+**One at a time.** *(Answers an open question below.)* The player carries a single weapon, not a loadout. This is what keeps the Cornerstone's scarcity honest — with a melee weapon also in hand, running out of triangles would cost nothing. **Stomping is the unarmed fallback**, so running dry is never a dead end.
 
 **Parked, not cut:** the bazooka (`weapons/bazooka.js`) and chainsaw (`weapons/chainsaw.js`) both exist in the codebase, unwired, kept for a later level. See the implementation plan's "Decisions made" for why the bazooka stopped being level 1's weapon.
 
@@ -108,14 +102,19 @@ Two hard constraints on whatever it turns out to be:
 - It is **not** the triangle restoration weapon. That projectile belongs to the player and means "repair." A sphere firing triangles would break the one piece of visual grammar the whole story rests on.
 - It must be **visually distinct from triangles** and read as sphere-shaped thinking — round, smooth, curved.
 
-**Open — needs design.** Candidates floated so far, none chosen: something round; energy blasts; compressed-air bursts that shove terrain (and the player) around. The compressed-air idea is the most on-theme, since it attacks by *reshaping* rather than by damaging, but it's also the hardest to read at a glance.
+**Answered (2026-09-21): a slow round pellet**, pink like the spheres, with a soft halo and a filtered puff for a sound. It arrives in **level 4**, which is where the ranged tier lands.
+
+The compressed-air idea was the most on-theme and it lost on legibility, which this doc had already flagged as its weakness. With a seven-year-old as the target player, a projectile that has to be *interpreted* is a projectile that kills you unfairly. Round versus pointed, at a glance, across a moving screen, is a distinction that survives being seven — and it's the same distinction the whole visual language already rests on.
+
+It's slow enough to jump or outrun, which is what keeps ranged enemies fair rather than just punishing.
 
 ### Octagons (Corrupted Squares)
 
 - Squares that have had their **corners sanded off** by spheres, turning them into octagons.
-- Introduced via a **cutscene** showing the corruption process.
-- Behave like **zombies** — they serve the spheres mindlessly.
-- Can be **restored** back into squares using a special weapon that **shoots triangles** at them (restoring their missing corners).
+- Introduced in **level 3**, on open ground, ~900px before anyone explains what they are.
+- Behave like **zombies** — they serve the spheres mindlessly. They shamble rather than hunt.
+- **Nothing in the arsenal can beat one.** Swinging at an octagon thuds and accomplishes nothing — a deliberately unsatisfying sound, because it's the sound of doing the wrong thing to a victim. They can be restored, or walked past, and that is all.
+- Can be **restored** back into squares with the Cornerstone's triangles (putting their missing corners back). The shape squares up visibly, corner by corner, rather than flipping at the end.
 - The same corruption, at planetary scale, is [the core](#the-core) — and restoring it is how the game ends.
 
 ### NPCs
@@ -166,10 +165,14 @@ The single biggest piece of character writing in the game, and the spine the wea
 
 > The sequencing is the whole trick: give the weapon, then immediately create the one target the player can't refuse. The tutorial for the mechanic *is* the emotional peak.
 
-**Open questions on the ending of the arc:**
-- [ ] Does the NPC **stay** restored, or re-corrupt over time?
-- [ ] Do they **help in the final level**, or is the core fight strictly solo?
-- [ ] Do they **sacrifice themselves** at some point — and if so, does the player have any agency over it?
+**The ending of the arc — decided 2026-09-21, and built:**
+
+- **He stays restored.** Re-corruption would make the player's one act of rescue provisional, and the whole game is an argument that putting something back is worth doing.
+- **He does not stay whole.** He comes back scarred: the corners the spheres took are still gone, on every appearance after level 3. Restoring someone is not the same as undoing what was done to them, and the game says so out loud exactly once, at the end — *"You're still missing your corners." / "So is everyone worth knowing."*
+- **He is at the core, and he does not fight.** He meets the player in the cavity, gives them the last of his triangles, says the same thing he said in level 3 ("the same as always — put it back"), and withdraws. The final fight is solo.
+- **He does not sacrifice himself.** He is alive at the end and the last line of the game is him suggesting they go up and look at the world together. This is a game built with and for a seven-year-old; the mentor surviving is not a softer ending, it's the one the story earned.
+
+> The beat this arc was really built for is **his absence on level 6**. He meets the player at every new face — four, five — and then on six he simply isn't there, and nothing explains it. Being always already there was the whole of his competence. Taking it away was the last thing the arc needed the player to feel before the descent.
 
 ---
 
@@ -177,17 +180,19 @@ The single biggest piece of character writing in the game, and the spine the wea
 
 **7 levels minimum** — one per face of the cube, plus the **center of the planet**.
 
-| Level | Location | Notes |
-|---|---|---|
-| 1 | Starting face (near block house) | Tutorial area, passive enemies |
-| 2 | Adjacent face | Enemies begin carrying tools |
-| 3 | Adjacent face | Octagon enemies introduced (cutscene) |
-| 4 | Adjacent face | Enemies pursue the player |
-| 5 | Adjacent face | Environment manipulation intensifies |
-| 6 | Opposite face / damaged corner | Heavy combat, all weapon types |
-| 7 | Center of the planet | Final level / boss area |
+**All seven are built** (2026-09-21). The framework below is what shipped; where it drifted from the original sketch, the reason is in the right-hand column.
 
-> Level locations and progression are flexible — this is a starting framework.
+| Level | Name | What it introduces |
+|---|---|---|
+| 1 | **The First Stand** | Tutorial. Passive spheres, an unwinnable boss, no dialogue at all. |
+| 2 | **The Quarry** | The game starts talking. Spheres that carry tools and break patrol. A boss that can be fought. |
+| 3 | **What the Sanders Left** | Octagons, then the Cornerstone, then the Sculptor. The turn the game is built around. |
+| 4 | **Three Against One** | Spheres shoot back. The Demolition Crew. |
+| 5 | **The Room That Moves** | The arena itself becomes the threat. |
+| 6 | **No Tricks Left** | Everything at once, and nobody waiting for you. |
+| 7 | **The Middle of the World** | The hollow centre and the core. |
+
+Two drifts worth recording. **Pursuing enemies arrived in level 2, not 4** — once tool-carrying spheres existed, having them ignore the player was stranger than having them chase. And **octagons arrived in 3 alongside the Cornerstone rather than a level ahead of it**, because the beat only works if the player meets something they cannot beat shortly before being handed the thing that answers it.
 
 Levels 1–6 are the **six outer faces**; level 7 is the **hollow interior** reached by descending after the sixth face. See [Story Arc](#story-arc--surface-to-core).
 
@@ -217,15 +222,17 @@ The Quarrick beat is doing narrative work as well as spatial: he's the one chara
 
 One boss per level, at the end. **A starting framework in the same spirit as the level table** — only level 1 (built) and level 7 (decided, it's the story's ending) are settled. Everything between is a candidate and expected to change.
 
-| Level | Boss | Concept | Status |
+**All seven are built** (2026-09-21), and each one shipped close to its sketch. How each is actually beaten is in the right-hand column, because that's the part that had to survive contact with a game whose only verb is *hit*.
+
+| Level | Boss | Concept | How it's beaten |
 |---|---|---|---|
-| 1 | **The Foreman** | Oversized sphere with a pickaxe. Unwinnable — resolved by the rescue NPC, who stomps it and leaves the pickaxe behind. | **Built** |
-| 2 | **The Excavator** | A sphere operating a drilling rig. Terrain deforms in real time during the fight; the player wins by jamming the mechanism rather than out-damaging it. | Candidate |
-| 3 | **The Sculptor** | First **octagon** boss — a large corrupted square. Defeated by **restoration, not combat**, which teaches the verb the endgame depends on. | Candidate |
-| 4 | **The Demolition Crew** | Three coordinated smaller spheres with distinct roles. Boss-as-puzzle: read the roles, break the coordination. | Candidate |
-| 5 | **The Terraformer** | Never fights directly. Reshapes the arena around the player — platforms rise, fall, and shift — and the fight is against the room. | Candidate |
-| 6 | **The General** | Pure combat. Fast, aggressive, no gimmick. The hardest *fair* fight in the game. | Candidate |
-| 7 | **The Core** | The corrupted dodecahedron itself. Geological attacks, orbited on platforms, restored face-by-face with the triangle weapon. | **Decided** — see [Story Arc](#the-final-boss) |
+| 1 | **The Foreman** | Oversized sphere with a pickaxe. Unwinnable — resolved by Quarrick, who stomps it and leaves the pickaxe behind. | It isn't. That's the point. |
+| 2 | **The Excavator** | A sphere operating a drilling rig. Terrain deforms in real time during the fight. | Never open while it's working. It advances, drills a pit out of the floor, and the drill **binds** — every hit has to land in that ~2s window. The pits it leaves are the real pressure. |
+| 3 | **The Sculptor** | A large corrupted square. | Six triangles. Nothing can hurt it. |
+| 4 | **The Demolition Crew** | Three coordinated spheres with distinct roles. | While all three are up they shield each other and only the **shooter** can be hurt — and the shooter is the one hanging back, which is exactly what instinct says to ignore. Break the link and the others are ordinary. |
+| 5 | **The Terraformer** | Never fights directly; reshapes the arena. | It sits on a ledge no standing jump reaches and works the room. It's open at the top of its own breath — the same moment the platforms it is raising put you level with it. **The thing it's doing to the arena is the window.** |
+| 6 | **The General** | Pure combat, no gimmick. | Nothing to solve. Open the whole time, telegraphs every charge, and the recovery after one is your turn. |
+| 7 | **The Core** | The corrupted dodecahedron itself. | Twelve triangles, landed while it takes the room apart. See [the final boss](#the-final-boss). |
 
 Note the intended shape of the progression: it escalates through **mechanic variety** (jam it, restore it, puzzle it, survive it, out-fight it) before the finale, rather than through bigger health bars.
 
@@ -305,15 +312,25 @@ Music direction is still open.
 - [x] ~~How do characters talk?~~ → **A bottom bar, typewritten, advanced with Space** (2026-09-21). Built and working; see [Dialogue](#dialogue). Level 1 stays wordless, the story opens up in level 2.
 - [x] ~~NPC roles and dialogue~~ → partially: the [rescue NPC arc](#the-rescue-npc-arc) is defined. *Other* NPCs are still open.
 
-**Still open:**
+**Answered 2026-09-21, while building levels 2–7:**
 
-- [x] ~~The rescue NPC's name~~ → **Quarrick** (2026-09-21).
-- [ ] **Names.** The restoration weapon still needs one.
-- [ ] **What do spheres shoot?** Ranged sphere attack, mid-to-late game — must be visually distinct from triangles. See [Spheres shoot back](#spheres-shoot-back--open-question).
-- [ ] **The middle weapon tier.** Which 1–3 of the candidates actually ship, and in what order.
-- [ ] **Weapon inventory** — carry one at a time, or collect a loadout?
-- [ ] **Are field octagons optional?** Restoring them costs ammo that the player may want for spheres — is that a real choice, or does skipping them cost something?
-- [ ] **How the NPC arc ends** — stays restored? helps at the core? sacrifices themselves? See [the arc](#the-rescue-npc-arc).
-- [ ] **Coins beyond lives** — the between-levels shop idea. See [Economy](#should-coins-buy-more-than-lives--candidate).
-- [ ] **Music direction** (weapon sound identities are now specified — see [Sound Design](#sound-design)).
+- [x] ~~The rescue NPC's name~~ → **Quarrick**.
+- [x] ~~Names. The restoration weapon still needs one.~~ → **The Cornerstone**.
+- [x] ~~What do spheres shoot?~~ → **A slow round pellet**, from level 4. Legibility beat theme; see [Spheres shoot back](#spheres-shoot-back--open-question).
+- [x] ~~The middle weapon tier.~~ → **The sledgehammer, and only it.** Three weapons total.
+- [x] ~~Weapon inventory — one at a time, or a loadout?~~ → **One at a time**, with stomping as the fallback.
+- [x] ~~Are field octagons optional?~~ → **Optional, and they cost you.** Nothing forces a field rescue: an octagon can be walked past. Restoring one costs 2 triangles out of a supply the level meters carefully, and a freed square just leaves. That's the choice the ammo scarcity was for.
+- [x] ~~How the NPC arc ends.~~ → **Stays restored, stays scarred, present at the core but doesn't fight, survives.** See [the arc](#the-rescue-npc-arc).
+
+**Still open — genuinely, not for lack of time:**
+
+- [ ] **Coins beyond lives** — the between-levels shop idea. See [Economy](#should-coins-buy-more-than-lives--candidate). Deliberately not built: the thresholds across all seven levels are tuned for lives-only, and adding a second sink means re-tuning every level rather than adding a menu.
+- [ ] **Music direction.** Every weapon and enemy now has a sound identity (see [Sound Design](#sound-design)); there is still no music.
+- [ ] **A second NPC.** Quarrick carries the entire cast. `state.rescueNPC` is a single slot and a scene with two characters in it would need a list first.
 - [ ] Multiplayer / co-op potential?
+
+**Deliberately not built, and worth knowing before picking any of it up:**
+
+- [ ] **Chamfered terrain as a collision surface.** The plan's step 4 wanted platforms to become a height-at-x function so cut corners are walked on. What shipped is the *visual* half — carved undersides and `chewed` platforms carrying the degradation arc — with collision still square. The visual language is everywhere; the sloped-surface physics is not.
+- [ ] **Live sphere-driven world manipulation** (the plan's step 8). Bosses carve terrain during fights, which is most of the way there, but the parked trick platforms in `levels/trickPlatforms.js` are still parked and no ordinary sphere reshapes the world while you watch.
+- [ ] **The level authoring tool** (step 3). Never built. `tools/level-audit-probe.html` turned out to answer the need it was really for — "is this layout actually playable" — without a UI.
