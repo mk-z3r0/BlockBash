@@ -110,17 +110,54 @@ export function noiseBurst(startTime, duration, gainVal, dest, filterType, filte
 const BASS_STEPS = [110, null, null, null, 146.83, null, null, null, 130.81, null, null, null, 98, null, null, null];
 const ARP_STEPS  = [220, null, 261.63, 329.63, null, 440, 329.63, 261.63, 220, null, 293.66, 349.23, null, 440, 392, 329.63];
 
+// --- moods ---
+//
+// One loop carried all seven levels for a long time, and GAME_DESIGN's open
+// question about music direction was really a question about that: a game
+// that runs from a tutorial to the middle of a hollow planet shouldn't sound
+// the same the whole way down.
+//
+// These are variations on the SAME loop rather than different tracks, on
+// purpose. The pattern is never restarted — startMusic() is called on every
+// level load and is idempotent precisely so transitions don't stutter — so a
+// mood change has to be something the running loop can absorb mid-phrase.
+// Tempo, register and which layers are playing all can. A new melody can't.
+const MOODS = [
+  // levels 1-2: the original. Steady, bright, nothing wrong yet.
+  { bpm: 128, arp: 1,    hats: true,  bassOct: 1,   arpOct: 1 },
+  { bpm: 128, arp: 1,    hats: true,  bassOct: 1,   arpOct: 1 },
+  // levels 3-4: faster, and the arpeggio climbs an octave. The story has
+  // opened up and the spheres have started shooting back.
+  { bpm: 136, arp: 1,    hats: true,  bassOct: 1,   arpOct: 2 },
+  { bpm: 136, arp: 1,    hats: true,  bassOct: 1,   arpOct: 2 },
+  // levels 5-6: driven, and the bass drops an octave under it.
+  { bpm: 144, arp: 1,    hats: true,  bassOct: 0.5, arpOct: 2 },
+  { bpm: 148, arp: 1,    hats: true,  bassOct: 0.5, arpOct: 2 },
+  // level 7: the cavity. Half speed, no hats, no arpeggio — just the bass,
+  // an octave down, with room around it. The loudest thing this soundtrack
+  // does is stop.
+  { bpm: 84,  arp: null, hats: false, bassOct: 0.5, arpOct: 1 }
+];
+
+let mood = MOODS[0];
+
+// Called on every level load. Changes the running loop in place rather than
+// restarting it.
+export function setMusicMood(levelIndex) {
+  mood = MOODS[Math.max(0, Math.min(MOODS.length - 1, levelIndex))] || MOODS[0];
+}
+
 function scheduleMusic() {
   if (!audioCtx) return;
-  const sixteenth = (60 / 128) / 4;
+  const sixteenth = (60 / mood.bpm) / 4;
   while (nextNoteTime < audioCtx.currentTime + 0.12) {
     const bassFreq = BASS_STEPS[step16];
-    if (bassFreq) tone(bassFreq, nextNoteTime, 0.42, 'sawtooth', 0.22, musicGain, 500);
+    if (bassFreq) tone(bassFreq * mood.bassOct, nextNoteTime, 0.42, 'sawtooth', 0.22, musicGain, 500);
 
-    const arpFreq = ARP_STEPS[step16];
-    if (arpFreq) tone(arpFreq, nextNoteTime, 0.14, 'square', 0.10, musicGain, 2400);
+    const arpFreq = mood.arp ? ARP_STEPS[step16] : null;
+    if (arpFreq) tone(arpFreq * mood.arpOct, nextNoteTime, 0.14, 'square', 0.10, musicGain, 2400);
 
-    if (step16 % 4 === 2) noiseBurst(nextNoteTime, 0.05, 0.05, musicGain, 'highpass', 6000);
+    if (mood.hats && step16 % 4 === 2) noiseBurst(nextNoteTime, 0.05, 0.05, musicGain, 'highpass', 6000);
 
     nextNoteTime += sixteenth;
     step16 = (step16 + 1) % 16;

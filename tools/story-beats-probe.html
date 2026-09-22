@@ -109,6 +109,34 @@
       check(!blocking, 'restoring it opens the way to the edge');
     }
 
+    // --- level 6: the choice ---
+    // The sledgehammer on the shelf is the only place in the game where the
+    // player gives something up to gain something. It has to actually be
+    // both: a real trade, and a level that is still finishable either way.
+    state.currentLevelIndex = 5;
+    switchTo('playing', { retry: true });
+    const lv6 = getLevel();
+    lv6.cutscenes.length = 0;
+    state.lives = 999;
+    player.invincible = 999999;
+    out.push(`== level 6 (${lv6.name}) ==`);
+    check(player.weapon === 'cornerstone' && player.ammo >= 12,
+      `arrives with the Cornerstone loaded (${player.weapon}, ${player.ammo})`);
+    const hammer = state.weaponPickups.find(w => w.type === 'sledgehammer');
+    check(!!hammer, 'a sledgehammer is lying in the level');
+    if (hammer) {
+      check(!hammer.fromBoss, 'placed by the level, not dropped by a boss');
+      // it should not be collectable by accident — it's up on a shelf
+      check(hammer.y < lv6.groundY - 40, `it's up on a shelf (y ${hammer.y} vs ground ${lv6.groundY})`);
+      player.x = hammer.x - 4;
+      player.y = hammer.y - player.height - 2;
+      tick(6);
+      check(player.weapon === 'sledgehammer', `taking it swaps weapons (${player.weapon})`);
+      // and nothing in the level forces the verb it just gave up
+      const mustRestore = state.enemies.some(e => e.boss && (e.kind === 'octagon' || e.kind === 'core'));
+      check(!mustRestore, 'nothing in the level has to be restored, so the trade is survivable');
+    }
+
     // --- level 7: the core, and the end of the game ---
     state.currentLevelIndex = 6;
     switchTo('playing', { retry: true });

@@ -14,12 +14,17 @@ import { drawRestoreTriangle } from '../engine/renderer.js';
 // `type` is a weapon id from weapons/registry.js. It used to be implicit
 // (there was only the pickaxe), which is exactly the if/else chain the
 // registry was built to avoid.
-export function spawnWeaponPickup(x, groundY, type = 'pickaxe') {
+export function spawnWeaponPickup(x, groundY, type = 'pickaxe', fromBoss = true) {
   // `fromBoss` marks this as something a fight produced rather than
   // something the level placed. A respawn clears boss drops (the fight is
   // restarting, and a drop from the last attempt would sit stranded beside a
   // boss that's alive again) and must NOT clear the level's own pickups.
-  state.weaponPickups.push({ x, y: groundY, size: 22, type, kind: 'weapon', fromBoss: true, collected: false });
+  //
+  // It defaults to true because for most of this game's life a dropped
+  // weapon was the ONLY kind. Level 6's sledgehammer is the first one a
+  // level places itself, and it was being swept off its shelf during load
+  // until this argument existed.
+  state.weaponPickups.push({ x, y: groundY, size: 22, type, kind: 'weapon', fromBoss, collected: false });
 }
 
 // Triangles for the Cornerstone. Placed in levels rather than dropped,

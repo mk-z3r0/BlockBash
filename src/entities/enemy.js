@@ -64,6 +64,7 @@ export function spawnEnemies(spawns) {
     knockback: 0,
     thudTimer: 0,
     shotTimer: 40 + Math.floor(Math.random() * SHOT_COOLDOWN),
+    charge: 0,      // 0..1 wind-up before a shot, drives the draw
     // octagons only
     restoreTotal: e.restoreHits == null ? 2 : e.restoreHits,
     restoreHits: e.restoreHits == null ? 2 : e.restoreHits,
@@ -182,11 +183,19 @@ export function updateEnemies(player, cutsceneActive) {
         if (enemy.shoots) {
           if (--enemy.shotTimer <= 0) {
             enemy.shotTimer = SHOT_COOLDOWN;
+            enemy.charge = 0;
             spawnSphereShot(enemy);
+          } else {
+            // Wind-up, so a shot is something the player saw coming rather
+            // than something that happened to them. 0 until the last ~28
+            // frames, then ramps to 1 at the moment of firing — the same
+            // shape every boss telegraph in the game uses.
+            enemy.charge = Math.max(0, 1 - enemy.shotTimer / 28);
           }
         }
       } else {
         patrol(enemy);
+        if (enemy.charge) enemy.charge = Math.max(0, enemy.charge - 0.08);
       }
     }
 
@@ -412,10 +421,32 @@ export function drawEnemies(frameCount, cutsceneDone) {
       continue;
     }
 
+    // A sphere that shoots has to be tellable from one that doesn't, at a
+    // glance, before it fires. Without this they are the same pink ball and
+    // the player's only way to identify a shooter is to be shot by it —
+    // which turns the ranged tier from a problem into an ambush.
+    //
+    // Two signals: a permanent hot core (it's carrying something), and a
+    // halo that swells through the wind-up so the shot itself is telegraphed.
+    if (enemy.shoots && !squashed) {
+      const r = enemy.w / 2;
+      const halo = ctx.createRadialGradient(0, 0, r * 0.6, 0, 0, r * (1.5 + enemy.charge * 0.9));
+      halo.addColorStop(0, `rgba(255, 210, 120, ${0.25 + enemy.charge * 0.5})`);
+      halo.addColorStop(1, 'rgba(255, 150, 60, 0)');
+      ctx.fillStyle = halo;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * (1.6 + enemy.charge), 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     const grad = ctx.createRadialGradient(-enemy.w * 0.2, -enemy.w * 0.2, 2, 0, 0, enemy.w * 0.7);
     if (enemy.hitFlash > 0) {
       grad.addColorStop(0, '#ffffff');
       grad.addColorStop(1, '#ff8fb5');
+    } else if (enemy.shoots) {
+      // hotter and more orange than a plain sphere, at every moment
+      grad.addColorStop(0, '#ffe9a8');
+      grad.addColorStop(1, '#b03a2e');
     } else if (enemy.boss) {
       grad.addColorStop(0, enemy.awake ? '#ffd9a0' : '#ffb0c8');
       grad.addColorStop(1, enemy.awake ? '#8a1020' : '#7a1f45');

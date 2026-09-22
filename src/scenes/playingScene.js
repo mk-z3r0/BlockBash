@@ -23,7 +23,7 @@ import { drawBlockHouse } from './blockHouse.js';
 import { levels } from '../levels/registry.js';
 import { showToast, updateToast, drawHUD, toast } from '../ui/hud.js';
 import { playHit, playWin, playGameOver } from '../audio/sfx.js';
-import { startMusic } from '../audio/audio.js';
+import { startMusic, setMusicMood } from '../audio/audio.js';
 import { switchTo } from './sceneManager.js';
 import { recordProgress } from '../save.js';
 import { markCutsceneSeen } from '../narrative.js';
@@ -196,6 +196,9 @@ function startLevel(index) {
   state.currentLevelIndex = index;
   recordProgress(index, state.score);
   startMusic(); // idempotent — no-op on retries once it's already playing
+  // Changes the running loop in place rather than restarting it, so the
+  // music doesn't stutter at a level seam. See the MOODS note in audio.js.
+  setMusicMood(index);
   paused = false;
 
   const level = loadLevel(levels[index]);
@@ -203,7 +206,7 @@ function startLevel(index) {
   resetCoins();
   state.weaponPickups = [];
   level.ammoSpawns.forEach(a => spawnAmmoPickup(a.x, a.y == null ? level.groundY - 30 : a.y, a.amount || 4));
-  level.weaponSpawns.forEach(w => spawnWeaponPickup(w.x, w.y == null ? level.groundY : w.y, w.type));
+  level.weaponSpawns.forEach(w => spawnWeaponPickup(w.x, w.y == null ? level.groundY : w.y, w.type, false));
   state.missiles = []; // unused while the bazooka is parked — see weapons/bazooka.js
   resetProjectiles();
   state.restoredCount = 0;
