@@ -7,10 +7,12 @@ import { playStomp } from '../audio/sfx.js';
 import { spawnWeaponPickup } from './weaponPickup.js';
 import { state } from '../state.js';
 
-// The rescue NPC only exists during the boss cutscene (see
-// scenes/playingScene.js): it runs in from off-screen, jumps the pickaxe-
-// wielding boss, and exits stage right. Kept as its own module since Phase 5's
-// cutscene engine will likely want to reuse "a scripted character" like this.
+// Quarrick — the rescue NPC. He shows up twice in a level: during the boss
+// cutscene (see scenes/playingScene.js), where he runs in from off-screen,
+// jumps the pickaxe-wielding boss and exits stage right; and again at the
+// world's edge, already standing on the next face, waiting for the player to
+// make the jump. Kept as its own module since Phase 5's cutscene engine will
+// likely want to reuse "a scripted character" like this.
 export function createRescueNPC(spawnX) {
   return {
     x: spawnX,
@@ -24,6 +26,77 @@ export function createRescueNPC(spawnX) {
     timer: 0,
     stomped: false
   };
+}
+
+// Quarrick's second appearance: standing on the NEXT cube face while the
+// player is still on this one, walking up it toward the shared corner.
+//
+// The next face is the vertical plane at x = worldEdgeX running down from
+// the corner — that's the surface the edge transition rotates into place as
+// the new ground (see scenes/playingScene.js and levelRenderer.js's
+// drawWorldEdge, which draws that plane as the bright seam). Its material
+// lies to the LEFT of that line, so standing on it means being to the RIGHT
+// of it, out over what currently looks like empty space. Which is the point:
+// he's already on the next face, and its gravity isn't ours yet.
+//
+// `alongFace` is how far down the face he is from the corner. After the
+// world rotates -PI/2 it becomes how far along the new ground he is, so
+// positioning him is the same arithmetic before and after — see
+// cornerQuarrickBox() below.
+//
+// `spin` is a rotation about his own centre, applied by drawRescueNPC. At
+// +PI/2 his feet point at the wall (world -x) instead of at our floor. He's
+// drawn INSIDE the world-rotation transform, so as that runs 0 -> -PI/2 the
+// two cancel and he ends the transition upright on the new ground without
+// anything having to animate him. His feet are on solid ground the whole
+// way through, which is the only orientation that makes sense for someone
+// who was never falling in the first place.
+export function createCornerQuarrick(worldEdgeX, groundY, alongFace) {
+  const npc = {
+    x: 0, y: 0,            // filled in by placeCornerQuarrick below
+    width: 44, height: 44,
+    velocityX: 0,
+    velocityY: 0,
+    jumpVX: 0,
+    // Faces the corner, which is the direction he's walking and also where
+    // the player comes down. Local +x is his front; with spin at +PI/2 that
+    // points down the face, so -1 is the way up it. Once the world has
+    // rotated the same -1 reads as "facing back toward the edge", so he
+    // never has to turn around: he walks up to meet the player and is
+    // already looking at them when they land.
+    facing: -1,
+    state: 'cornerWalk',
+    timer: 0,
+    stomped: true,         // his boss work is already done by this point
+    spin: Math.PI / 2,
+    alongFace
+  };
+  placeCornerQuarrick(npc, worldEdgeX, groundY);
+  return npc;
+}
+
+// Derives the npc box from alongFace. Kept separate because both the
+// constructor and every walk step need it, and because the offset is easy to
+// get subtly wrong: his centre sits half his height out from the face (so
+// his feet land exactly on it), and `alongFace` measures his CENTRE's
+// distance from the corner, not his leading edge.
+function placeCornerQuarrick(npc, worldEdgeX, groundY) {
+  npc.x = worldEdgeX + npc.height / 2 - npc.width / 2;
+  npc.y = groundY + npc.alongFace - npc.height / 2;
+}
+
+// Walks him up the face toward the corner until he's `stopAlong` from it.
+// Returns true on the frame he arrives.
+export function updateCornerQuarrick(npc, worldEdgeX, groundY, stopAlong, speed) {
+  if (npc.state !== 'cornerWalk') return false;
+  npc.alongFace = Math.max(stopAlong, npc.alongFace - speed);
+  placeCornerQuarrick(npc, worldEdgeX, groundY);
+  if (npc.alongFace <= stopAlong) {
+    npc.state = 'cornerStand';
+    npc.timer = 0;
+    return true;
+  }
+  return false;
 }
 
 // Returns true once the NPC has run off-screen and should be discarded.
@@ -120,11 +193,19 @@ export function drawRescueNPC(npc, frameCount) {
   const legLength = 14;
   const groundY = hh;
   const hipY = groundY - legLength;
-  const moving = npc.state === 'running' || npc.state === 'exit';
-  const legSwing = moving ? Math.sin(frameCount * 0.5) * 14 : 4;
+  const moving = npc.state === 'running' || npc.state === 'exit' || npc.state === 'cornerWalk';
+  // The corner walk is a climb up a wall, not a sprint across a floor — same
+  // gait, slowed down, so it reads as deliberate rather than as the stomp
+  // run played back at the wrong speed.
+  const gait = npc.state === 'cornerWalk' ? 0.22 : 0.5;
+  const legSwing = moving ? Math.sin(frameCount * gait) * 14 : 4;
 
   ctx.save();
   ctx.translate(npc.x + hw, npc.y + hh);
+  // Rotation about his own centre — only the corner-walk version sets this
+  // (see createCornerQuarrick). Applied after the translate so the pivot is
+  // him, not the world.
+  if (npc.spin) ctx.rotate(npc.spin);
 
   // stick legs
   drawStickLegs(hipY, npc.state === 'jumping' || npc.state === 'landing' ? hipY + 6 : groundY, legSwing);
