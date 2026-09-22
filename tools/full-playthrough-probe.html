@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#000;">
+<canvas id="game" width="800" height="450"></canvas><pre id="out">running…</pre>
+<script>localStorage.removeItem('blockbash-save'); window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERROR: '+(e.message||e.error)));window.addEventListener('unhandledrejection',e=>window.__errs.push('REJECT: '+e.reason));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  // One run of the whole game, from a cleared save to the win screen.
+  //
+  // Every other probe tests a piece. This one asks the only question that
+  // matters the morning after: can a player get from the block house to the
+  // core without the game breaking? It plays every level in order, lets
+  // every cutscene that wants to fire actually fire, beats every boss the
+  // way that boss has to be beaten, and walks out the far side — and it
+  // starts from NO SAVE, so the opening cutscene and first-boot path are
+  // part of the run rather than skipped past.
+  //
+  // It is not a skill test. The player is moved along each level rather than
+  // platformed through it; tools/level-audit-probe.html is what proves the
+  // platforming is possible. This is about the seams: scenes, weapons,
+  // bosses, level transitions, the ending, and anything that throws.
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update, switchTo, getCurrentName } from '../src/scenes/sceneManager.js';
+  import { getLevel } from '../src/levels/levelLoader.js';
+  import { levels } from '../src/levels/registry.js';
+  import { isCutsceneActive, activeCutsceneId, skipCutscene } from '../src/cutscenes/runner.js';
+  import { restoreTarget } from '../src/weapons/combat.js';
+
+  const out = [];
+  let fails = 0;
+  const check = (ok, label) => { if (!ok) fails++; out.push(`  ${ok ? 'ok  ' : 'FAIL'} ${label}`); };
+  const tick = n => { for (let i = 0; i < n; i++) update(); };
+
+  // Let whatever wants to play, play — then move on.
+  function drainCutscenes(limit = 12) {
+    const seen = [];
+    for (let i = 0; i < limit; i++) {
+      tick(8);
+      if (!isCutsceneActive()) break;
+      seen.push(activeCutsceneId());
+      skipCutscene();
+      tick(4);
+    }
+    return seen;
+  }
+
+  // Beat every boss the way its own design says it has to be beaten:
+  // restore the ones that are corrupted, defeat the ones that are enemies.
+  function clearBosses() {
+    let guard = 0;
+    // The corrupted Quarrick is not a boss and does not block anything, but
+    // restoring him is the beat the entire game is built around, so a
+    // playthrough that walked past him would be missing the point of the run.
+    for (const q of state.enemies.filter(e => e.quarrick && !e.restored)) {
+      while (!q.restored && guard++ < 50) restoreTarget(q);
+    }
+    for (const boss of state.enemies.filter(e => e.boss && e.alive && !e.restored)) {
+      if (boss.kind === 'octagon' || boss.kind === 'core') {
+        while (!boss.restored && guard++ < 200) restoreTarget(boss);
+      } else {
+        boss.hp = 0;
+        boss.alive = false;
+        boss.squish = 14;
+      }
+    }
+    tick(6);
+  }
+
+  setTimeout(() => {
+    const t0 = performance.now();
+    // Boot the way a first-time player does: the title, then a new run.
+    // With the save cleared, that means the opening cutscene too.
+    out.push(`boot scene: ${getCurrentName()}`);
+    for (let i = 0; i < 4000 && getCurrentName() !== 'playing'; i++) {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+      document.dispatchEvent(new KeyboardEvent('keyup', { key: ' ' }));
+      update();
+    }
+    check(getCurrentName() === 'playing', `reaches gameplay from a cleared save (scene: ${getCurrentName()})`);
+
+    const visited = [];
+    const allScenes = [];
+    for (let n = 0; n < levels.length + 2; n++) {
+      if (state.gameState !== 'playing') break;
+      const lv = getLevel();
+      const index = state.currentLevelIndex;
+      visited.push(index);
+      state.lives = 99;
+      player.invincible = 999999;   // the seams, not the survival
+
+      const opening = drainCutscenes();
+      allScenes.push(...opening);
+
+      // Walk the level in stages so anything position-triggered gets its
+      // chance — level 3's handoff sits in the middle of the level, not at
+      // its end, and a single teleport to the edge would skip straight past
+      // the moment the whole game is built around.
+      const stageScenes = [];
+      for (let stage = 1; stage <= 6; stage++) {
+        player.x = (lv.worldEdgeX - 200) * (stage / 6);
+        player.y = lv.groundY - player.height;
+        player.velocityX = 0; player.velocityY = 0;
+        tick(6);
+        // Collected, not discarded: level 3's handoff fires in the MIDDLE of
+        // its level, and an earlier version of this probe threw these away
+        // and so never noticed whether the game's central scene had played.
+        const midway = drainCutscenes();
+        allScenes.push(...midway);
+        stageScenes.push(...midway);
+        if (state.currentLevelIndex !== index) break;
+      }
+      if (state.currentLevelIndex !== index) continue;
+
+      clearBosses();
+      const afterBoss = drainCutscenes();
+      allScenes.push(...afterBoss);
+
+      if (state.gameState !== 'playing' || state.currentLevelIndex !== index) {
+        out.push(`  level ${index + 1} (${lv.name}) — ${[...opening, ...stageScenes, ...afterBoss].join(', ') || 'no scenes'}`);
+        continue;
+      }
+
+      // still here: walk to the edge and let the level end however it ends
+      player.x = lv.worldEdgeX - 110;
+      player.y = lv.groundY - player.height;
+      tick(6);
+      const ending = drainCutscenes();
+      allScenes.push(...ending);
+      out.push(`  level ${index + 1} (${lv.name}) — ${[...opening, ...stageScenes, ...afterBoss, ...ending].join(', ') || 'no scenes'}`);
+    }
+
+    check(visited.length === levels.length,
+      `played all ${levels.length} levels in order (visited ${visited.map(i => i + 1).join(' -> ')})`);
+    // The story spine, asserted rather than assumed. A run that reaches the
+    // win screen without these has skipped the game.
+    const spine = ['l2-arrival', 'l3-handoff', 'l3-restored', 'l4-arrival',
+                   'l5-arrival', 'l6-arrival', 'descent', 'l7-arrival', 'l7-ending'];
+    const missing = spine.filter(id => !allScenes.includes(id));
+    check(missing.length === 0, `every story scene played (${missing.length ? 'missing: ' + missing.join(', ') : 'all ' + spine.length})`);
+    check(state.gameState === 'win', `the run ends in a win (gameState: ${state.gameState})`);
+    check(getCurrentName() === 'win', `and lands on the win screen (scene: ${getCurrentName()})`);
+    out.push(`  (${Math.round(performance.now() - t0)}ms of simulation)`);
+
+    out.push(fails ? `*** ${fails} FAILURE(S)` : 'PASS the whole game can be played from the block house to the core');
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 300);
+</script></body></html>
