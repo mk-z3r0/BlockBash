@@ -195,12 +195,82 @@ const KINDS = {
   excavator: updateExcavator,
   crew: updateCrew,
   terraformer: updateTerraformer,
-  general: updateGeneral
+  general: updateGeneral,
+  core: updateCore
 };
 
+// --- level 7: The Core ------------------------------------------------
+// "It doesn't move or patrol like anything else in the game — it sits at the
+// centre of the hollow interior, and the player orbits it on platforms. Its
+// attacks are geological, not combat moves."
+//
+// So it has no hp and it is never closed. It cannot be hurt at all, by
+// anything; the only thing that touches it is a triangle, and every triangle
+// puts one face back. The fight is entirely about surviving the room long
+// enough to land twelve of them, which is why all three of its phases attack
+// the arena rather than the player.
+const CORE = { shockwave: 210, collapse: 180, pull: 200 };
+// The floor is finite. Left uncapped, a long fight eventually saws the arena
+// into islands the player cannot cross, which turns "hard" into "over".
+const CORE_MAX_COLLAPSES = 6;
+
+function updateCore(boss, player) {
+  const level = getLevel();
+  boss.invulnerable = false;      // restoration is always available
+  boss.phaseTimer--;
+
+  if (boss.phase === 'shockwave') {
+    // Rolling out from the centre along the floor, both ways at once, so
+    // there is no side of the arena that is simply safe.
+    if (boss.phaseTimer % 70 === 0) {
+      for (const dir of [-1, 1]) {
+        state.projectiles.push({
+          team: 'sphere', kind: 'wave',
+          x: boss.x + boss.w / 2, y: level.groundY - 15,
+          vx: dir * 3.6, vy: 0,
+          size: 15, life: 260, spin: 0, dead: false
+        });
+      }
+      playRumble();
+    }
+    if (boss.phaseTimer <= 0) setPhase(boss, 'collapse', CORE.collapse);
+    return;
+  }
+
+  if (boss.phase === 'collapse') {
+    // One section rounds off and drops out, near the player but never under
+    // their feet — a hole opening where you are standing isn't an attack you
+    // can answer, it's just a death.
+    if (boss.phaseTimer === CORE.collapse - 1 && boss.collapses < CORE_MAX_COLLAPSES) {
+      const side = player.x < boss.x ? -1 : 1;
+      const at = player.x + side * 150;
+      if (carveGap(level, at, 46, { margin: 40 })) {
+        boss.collapses++;
+        playRumble();
+        spawnDust(at + 23, level.groundY, 16, { spread: 6, size: 9, life: 34 });
+        showToast('THE FLOOR IS GOING', 70);
+      }
+    }
+    if (boss.phaseTimer <= 0) setPhase(boss, 'pull', CORE.pull);
+    return;
+  }
+
+  // pull: it leans on gravity. Not enough to take control away — enough that
+  // standing still stops being neutral.
+  const dir = Math.sign((boss.x + boss.w / 2) - (player.x + player.width / 2)) || 1;
+  player.velocityX += dir * 0.075;
+  if (boss.phaseTimer === CORE.pull - 1) showToast('IT IS PULLING YOU IN', 70);
+  if (boss.phaseTimer <= 0) setPhase(boss, 'shockwave', CORE.shockwave);
+}
+
+const OPENING_PHASE = { general: 'stalk', core: 'shockwave' };
+
 export function initBoss(boss) {
-  boss.phase = boss.bossKind === 'general' ? 'stalk' : 'advance';
-  boss.phaseTimer = boss.bossKind === 'general' ? 90 : EXCAVATOR.advance;
+  boss.phase = OPENING_PHASE[boss.bossKind] || 'advance';
+  boss.phaseTimer = boss.bossKind === 'core' ? CORE.shockwave
+                  : boss.bossKind === 'general' ? 90
+                  : EXCAVATOR.advance;
+  boss.collapses = 0;
   boss.cycle = 0;
   boss.chargeDir = -1;
   boss.shotTimer = 90;

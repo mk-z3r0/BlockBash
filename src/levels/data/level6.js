@@ -79,7 +79,9 @@ export default {
 
   cutscenes: [
     { id: 'l6-arrival', when: { levelStart: true }, once: true },
-    { id: 'edge-transition', when: { nearWorldEdge: 100 } }
+    // NOT the edge transition. Five faces of walking off an edge and having
+    // the world turn under you is the setup; this is the one that doesn't.
+    { id: 'descent', when: { nearWorldEdge: 100 } }
   ],
 
   enemies: [

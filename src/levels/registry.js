@@ -7,6 +7,7 @@ import level3 from './data/level3.js';
 import level4 from './data/level4.js';
 import level5 from './data/level5.js';
 import level6 from './data/level6.js';
+import level7 from './data/level7.js';
 import testLevel from './data/testLevel.js';
 
 // ?test in the URL swaps in the sandbox duplicate instead of the real
@@ -14,4 +15,4 @@ import testLevel from './data/testLevel.js';
 // level1.js. Resolved once at load, same as everything else here.
 const useTestLevel = typeof location !== 'undefined' && new URLSearchParams(location.search).has('test');
 
-export const levels = useTestLevel ? [testLevel] : [level1, level2, level3, level4, level5, level6];
+export const levels = useTestLevel ? [testLevel] : [level1, level2, level3, level4, level5, level6, level7];

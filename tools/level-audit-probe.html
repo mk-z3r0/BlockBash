@@ -94,7 +94,14 @@
           start = p.x + p.width + 4;
         }
       }
-      return Math.min(start, triggerX - 60);
+      // Never clamp back INTO a hazard. The "leave at least 60px of runway"
+      // clamp could undo the "start after the previous spike bed" guard and
+      // place the player standing in spikes, which then read as the obstacle
+      // being uncrossable — level 7 had a bed ending 50px before a gap and
+      // this reported the gap as impossible. If a level really does leave
+      // almost no runway between two obstacles, that is a fact about the
+      // level and the test should show it rather than paper over it.
+      return Math.max(prevHazardEnd, Math.min(start, triggerX - 60));
     }
 
     function jumpTest(triggerX, fromX, targetX, lead, hold, run) {

@@ -147,7 +147,11 @@ function rebuffOctagon(octagon) {
 }
 
 export function damageEnemy(enemy, weapon, dir = 1) {
-  if (enemy.kind === 'octagon') { rebuffOctagon(enemy); return false; }
+  // Corrupted squares and the core are the same kind of thing at different
+  // scales, and neither can be beaten — only put back. The ending of this
+  // game is a restoration, not a kill, and that has to be true of the hit
+  // path and not just of the cutscene after it.
+  if (enemy.kind === 'octagon' || enemy.kind === 'core') { rebuffOctagon(enemy); return false; }
   // Level 1's Foreman — the unwinnable boss. Marked in level data rather
   // than inferred from `boss`, because every boss after it CAN be fought.
   if (enemy.invulnerable) return false;
@@ -261,7 +265,7 @@ export function updateProjectiles() {
         if (!enemy.alive || enemy.restored) continue;
         if (!isColliding(projectileBox(p), boxOf(enemy))) continue;
         p.dead = true;
-        if (enemy.kind === 'octagon') restoreTarget(enemy);
+        if (enemy.kind === 'octagon' || enemy.kind === 'core') restoreTarget(enemy);
         else damageEnemy(enemy, { damage: 1, score: 150 }, Math.sign(p.vx) || 1);
         break;
       }
@@ -276,6 +280,25 @@ export function updateProjectiles() {
 export function drawProjectiles(frameCount) {
   for (const p of state.projectiles) {
     if (p.kind === 'triangle') { drawRestoreProjectile(p, frameCount); continue; }
+
+    if (p.kind === 'wave') {
+      // The core's shockwave: an arc rolling along the floor rather than a
+      // pellet flying through the air. Drawn as an expanding ring segment so
+      // it reads as the ground itself moving, which is what it is.
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255, 120, 170, 0.85)';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y + p.size, p.size, Math.PI, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(255, 200, 225, 0.45)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y + p.size, p.size * 0.6, Math.PI, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+      continue;
+    }
 
     // The sphere shot: a soft round pellet with a halo. Everything about it
     // is curves, which is the whole visual argument.

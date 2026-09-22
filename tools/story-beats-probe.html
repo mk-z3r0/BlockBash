@@ -109,6 +109,52 @@
       check(!blocking, 'restoring it opens the way to the edge');
     }
 
+    // --- level 7: the core, and the end of the game ---
+    state.currentLevelIndex = 6;
+    switchTo('playing', { retry: true });
+    const lv7 = getLevel();
+    lv7.cutscenes.length = 0;   // put back below, one at a time
+    state.lives = 999;
+    player.invincible = 999999;
+    out.push(`== level 7 (${lv7.name}) ==`);
+
+    const core = state.enemies.find(e => e.kind === 'core');
+    check(!!core, 'the core is there');
+    check(player.weapon === 'cornerstone' && player.ammo >= 12,
+      `arrives able to finish it (${player.weapon}, ${player.ammo} triangles)`);
+
+    if (core) {
+      check(core.restoreHits === 12, `twelve faces to put back (${core.restoreHits})`);
+      // nothing can hurt it
+      const wasWeapon = player.weapon;
+      player.weapon = 'sledgehammer';
+      swingAt(core, 3);
+      check(core.alive && !core.restored && core.restoreHits === 12,
+        'no weapon in the game can damage it');
+      player.weapon = wasWeapon;
+
+      // the core never moves, whatever it's doing to the room
+      const x0 = core.x, y0 = core.y;
+      tick(700);
+      check(core.x === x0 && core.y === y0, 'it never moves');
+
+      // twelve triangles put it back
+      player.ammo = 40;
+      fireAt(core, 12);
+      check(core.restored, `twelve triangles restore it (hits left ${core.restoreHits})`);
+      tick(4);
+      check(core.x === x0, 'and it stays where it is rather than fleeing');
+
+      // ...which ends the game
+      lv7.cutscenes.push({ id: 'l7-ending', when: { bossDefeated: true } });
+      tick(3);
+      check(isCutsceneActive() && activeCutsceneId() === 'l7-ending',
+        `restoring it starts the ending (active: ${activeCutsceneId()})`);
+      skipCutscene();
+      tick(3);
+      check(state.gameState === 'win', `and the ending wins the game (gameState: ${state.gameState})`);
+    }
+
     out.push(fails ? `*** ${fails} FAILURE(S)` : 'PASS the story beats hold together');
     out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
     document.getElementById('out').textContent = out.join('\n');

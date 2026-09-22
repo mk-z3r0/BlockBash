@@ -126,6 +126,9 @@ export function updateEnemies(player, cutsceneActive) {
     // off. That's the rescue NPC's existing exit behaviour, and the
     // decision recorded in IMPLEMENTATION_PLAN's Decisions made.
     if (enemy.restored) {
+      // The core doesn't flee. It's the planet: it stays exactly where it
+      // has always been, square again, while the ending plays over it.
+      if (enemy.kind === 'core') continue;
       if (!enemy.fleeDir) enemy.fleeDir = enemy.x < player.x ? -1 : 1;
       enemy.x += enemy.fleeDir * 3.1;
       // Counted down rather than compared against the world's width: it
@@ -143,7 +146,11 @@ export function updateEnemies(player, cutsceneActive) {
       if (Math.abs(enemy.knockback) < 0.3) enemy.knockback = 0;
     }
 
-    if (enemy.kind === 'octagon') {
+    if (enemy.kind === 'core') {
+      // Driven entirely by its own phase machine (entities/bosses.js). It
+      // never moves — the arena moves, and the player moves around it.
+      if (!cutsceneActive) updateBossBehaviour(enemy, player);
+    } else if (enemy.kind === 'octagon') {
       // Checked BEFORE the boss branches, because the Sculptor is a boss
       // AND an octagon, and what it is matters more than what rank it
       // holds: it shambles and it's beaten by being restored, exactly like
@@ -287,6 +294,66 @@ function drawOctagonBody(size, cornersLost, flash, wasQuarrick) {
   ctx.fillRect(h * 0.18, -h * 0.25, size * 0.14, size * 0.14);
 }
 
+// The core: a dodecahedron being argued back into a cube.
+//
+// GAME_DESIGN describes it as "every edge and vertex shaved off a cube, and
+// then some, leaving 12 pentagonal faces" — the octagon corruption at
+// planetary scale — and says each restoring hit "snaps one face back toward
+// square. The final hit makes it cubic again."
+//
+// So it's drawn as twelve vertices whose radius is interpolated between a
+// regular 12-gon and the outline of a square, by how much of it has been put
+// back. At full corruption the twelve points sit on a circle; at zero they
+// sit exactly on a square's edges and the shape IS a cube face-on. Nothing
+// switches over at the end — the player watches it square up, hit by hit,
+// which is the entire thesis of the game happening in one shape.
+function drawCoreBody(size, progress, frameCount, flash) {
+  const r = size / 2;
+  const POINTS = 12;
+  ctx.beginPath();
+  for (let i = 0; i < POINTS; i++) {
+    // -PI/4 so a vertex lands on each corner of the square it's becoming,
+    // rather than the square arriving rotated 15 degrees off true.
+    const a = (i / POINTS) * Math.PI * 2 - Math.PI / 4;
+    const cos = Math.cos(a), sin = Math.sin(a);
+    // Radius out to a square's edge along this angle: the square is
+    // |x| <= r and |y| <= r, so the boundary is r / max(|cos|, |sin|).
+    const squareR = r / Math.max(Math.abs(cos), Math.abs(sin));
+    const rad = r + (squareR - r) * progress;
+    const x = cos * rad, y = sin * rad;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+
+  const pulse = 0.5 + 0.5 * Math.sin(frameCount * 0.04);
+  const grad = ctx.createRadialGradient(0, 0, r * 0.15, 0, 0, r);
+  if (flash > 0) {
+    grad.addColorStop(0, '#ffffff');
+    grad.addColorStop(1, '#5ee7ff');
+  } else {
+    // Sphere pink while it's theirs, cyan as it comes back — the same cyan
+    // the cube's edges are drawn in, and the same the Cornerstone fires.
+    grad.addColorStop(0, `rgb(${255 - progress * 160}, ${150 + progress * 80}, ${200 + progress * 55})`);
+    grad.addColorStop(1, `rgb(${120 - progress * 60}, ${30 + progress * 90}, ${70 + progress * 90})`);
+  }
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.strokeStyle = flash > 0 ? '#ffffff' : `rgba(94, 231, 255, ${0.35 + 0.4 * pulse + progress * 0.25})`;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // the seams between its faces, fading as they stop being faces
+  ctx.strokeStyle = `rgba(10, 13, 28, ${0.45 * (1 - progress)})`;
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < POINTS; i++) {
+    const a = (i / POINTS) * Math.PI * 2 - Math.PI / 4;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(Math.cos(a) * r * 0.92, Math.sin(a) * r * 0.92);
+    ctx.stroke();
+  }
+}
+
 export function drawEnemies(frameCount, cutsceneDone) {
   for (const enemy of state.enemies) {
     if (!enemy.alive && enemy.squish <= 0) continue;
@@ -304,7 +371,9 @@ export function drawEnemies(frameCount, cutsceneDone) {
     ctx.scale(1, scaleY);
 
     // stick legs, reaching exactly to the ground line — tucked up mid-hop
-    if (!squashed) {
+    // The core has no legs. It has never walked anywhere; it's the thing
+    // they dug toward and it has been sitting there the whole game.
+    if (!squashed && enemy.kind !== 'core') {
       const legSwing = isHopping ? -6 : Math.sin((frameCount + enemy.x) * 0.3) * 5;
       const footY = isHopping ? hipY + 4 : groundY;
       drawStickLegs(hipY, footY, legSwing);
@@ -313,6 +382,16 @@ export function drawEnemies(frameCount, cutsceneDone) {
     // the body sits on top of the legs, shifted up rather than sunk to the ground
     ctx.save();
     ctx.translate(0, -legLength);
+
+    if (enemy.kind === 'core') {
+      const progress = enemy.restoreTotal
+        ? 1 - enemy.restoreHits / enemy.restoreTotal
+        : 0;
+      drawCoreBody(enemy.w, progress, frameCount, enemy.restoreFlash);
+      ctx.restore();
+      ctx.restore();
+      continue;
+    }
 
     if (enemy.kind === 'octagon') {
       // A shuffle rather than a roll — it leans as it walks.

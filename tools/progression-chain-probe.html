@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#000;">
+<canvas id="game" width="800" height="450"></canvas><pre id="out">running…</pre>
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true, narrative: { seenCutscenes: {}, npcStage: 0, flags: {} } })); window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERROR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  // Does every level actually lead to the next one?
+  //
+  // The single worst way this game could break: a player finishes level 4
+  // and the ending scene doesn't fire, or fires and doesn't advance. Each
+  // level's exit is a cutscene, each cutscene's payoff is in onComplete, and
+  // nothing else checks that the chain is unbroken from the first face to
+  // the last.
+  //
+  // Walks the player to each level's edge, lets whatever that level declares
+  // as its ending fire, skips it (a skip must still pay out — that's the
+  // runner's contract) and checks where they ended up.
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update, switchTo } from '../src/scenes/sceneManager.js';
+  import { getLevel } from '../src/levels/levelLoader.js';
+  import { levels } from '../src/levels/registry.js';
+  import { isCutsceneActive, activeCutsceneId, skipCutscene } from '../src/cutscenes/runner.js';
+
+  const out = [];
+  let fails = 0;
+  const check = (ok, label) => { if (!ok) fails++; out.push(`  ${ok ? 'ok  ' : 'FAIL'} ${label}`); };
+  const tick = n => { for (let i = 0; i < n; i++) update(); };
+
+  setTimeout(() => {
+    out.push(`registry has ${levels.length} levels`);
+
+    for (let i = 0; i < levels.length - 1; i++) {
+      state.currentLevelIndex = i;
+      switchTo('playing', { retry: true });
+      const lv = getLevel();
+      const name = lv.name;
+      // A boss body-blocks the walk to the edge on purpose; this probe is
+      // about the exit, and the bosses have their own.
+      state.enemies = state.enemies.filter(e => !e.boss);
+      state.lives = 999;
+      player.invincible = 999999;
+      player.x = lv.worldEdgeX - 110;
+      player.y = lv.groundY - player.height;
+      player.velocityX = 0; player.velocityY = 0;
+      // A level can have several scenes queued at this point — its arrival
+      // scene fires at levelStart, and level 3's handoff fires on reachX,
+      // which teleporting to the edge also satisfies. So work through
+      // whatever the level wants to play, skipping each, until one of them
+      // hands over to the next level. The first version of this probe
+      // checked only the first cutscene to appear and reported four false
+      // failures for exactly that reason.
+      const played = [];
+      let advanced = false;
+      for (let attempt = 0; attempt < 6 && !advanced; attempt++) {
+        tick(8);
+        if (isCutsceneActive()) {
+          played.push(activeCutsceneId());
+          skipCutscene();
+          tick(4);
+        }
+        if (state.currentLevelIndex === i + 1) advanced = true;
+      }
+      check(played.length > 0, `level ${i + 1} (${name}) plays something at its edge (${played.join(' -> ') || 'NOTHING'})`);
+      check(advanced, `...and it leads to level ${i + 2} (landed on ${state.currentLevelIndex + 1})`);
+    }
+
+    // The last level has no edge to walk to — it ends by restoring the core,
+    // which tools/story-beats-probe.html covers. What matters here is that
+    // it doesn't silently declare an exit it can't honour.
+    state.currentLevelIndex = levels.length - 1;
+    switchTo('playing', { retry: true });
+    const last = getLevel();
+    const hasEdgeExit = (last.cutscenes || []).some(c => c.when && c.when.nearWorldEdge != null);
+    check(!hasEdgeExit, `the last level (${last.name}) has no edge exit — there is nowhere left to go`);
+
+    out.push(fails ? `*** ${fails} FAILURE(S)` : 'PASS the chain is unbroken from first face to last');
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 250);
+</script></body></html>
