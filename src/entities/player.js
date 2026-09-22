@@ -292,8 +292,17 @@ export function updatePlayer(inputLocked) {
   return { fellInPit };
 }
 
-export function drawPlayer(frameCount) {
-  if (player.invincible > 0 && Math.floor(frameCount / 4) % 2 === 0) return;
+// `suppressBlink` is passed while a cutscene is running.
+//
+// The blink means "you were just hurt and are briefly safe", and it's driven
+// by a timer that only counts down inside updatePlayer — which a cutscene
+// beat with `physics: 'freeze'` doesn't call. So a conversation that starts
+// shortly after taking a hit left the player flickering in and out of
+// existence for the whole scene, with the timer frozen and frameCount still
+// running. Nothing can hurt them during a cutscene anyway, which makes the
+// blink both meaningless and actively wrong there.
+export function drawPlayer(frameCount, suppressBlink = false) {
+  if (!suppressBlink && player.invincible > 0 && Math.floor(frameCount / 4) % 2 === 0) return;
 
   const moving = player.isOnGround && Math.abs(player.velocityX) > P.minWalkSpeed;
   const legSwing = moving ? Math.sin(frameCount * 0.5) * 14 : 4;

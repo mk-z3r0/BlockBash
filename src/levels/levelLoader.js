@@ -28,7 +28,10 @@ export function loadLevel(data) {
     // is which, via the `ground` flag
     platforms: [
       ...data.ground.map(g => ({ x: g.x, y: groundY, width: g.width, height: 40, ground: true })),
-      ...data.platforms.map(p => ({ ...p }))
+      // baseY is captured here so a platform the Terraformer lifts
+      // (entities/bosses.js) always has an unmoved position to return to,
+      // however many times the fight restarts.
+      ...data.platforms.map(p => ({ ...p, baseY: p.y }))
     ],
 
     // Spikes sit on a surface: y defaults to the ground line. The hitbox is
@@ -56,6 +59,12 @@ export function loadLevel(data) {
     // handed it over, without weapons in general becoming persistent.
     startsWith: data.startsWith || null,
     startsWithAmmo: data.startsWithAmmo || 0,
+
+    // How many corners the spheres have taken off Quarrick by the time the
+    // player meets him here (0-4). Authored per level because it IS the
+    // deterioration beat of his arc, which GAME_DESIGN is explicit should
+    // be read off his body rather than narrated.
+    quarrickDamage: data.quarrickDamage || 0,
 
     // Which cutscenes this level has and what sets each one off. Evaluated
     // by cutscenes/triggers.js; the beat lists themselves are registered in

@@ -28,8 +28,12 @@ ASSERTING=(
   climb-probe coin-trio-check platform-coin-check
 )
 # One per level in the registry — the gate an authored level has to pass
-# before it counts as built. Regenerate the list when a level is added.
-for i in 0 1 2 3 4 5 6; do ASSERTING+=("level-audit-probe?level=$i"); done
+# before it counts as built. The count is read off the registry rather than
+# hardcoded, so adding a level to the game adds it to the suite and nobody
+# has to remember to widen a loop here.
+LEVEL_COUNT="$(grep -cE "^import level[0-9]+ from" "$ROOT/src/levels/registry.js")"
+for ((i = 0; i < LEVEL_COUNT; i++)); do ASSERTING+=("level-audit-probe?level=$i"); done
+ASSERTING+=(boss-fight-probe)
 REPORT_ONLY=(gap-probe walk-only-autoplay edge-transition-trace)
 
 started_server=0

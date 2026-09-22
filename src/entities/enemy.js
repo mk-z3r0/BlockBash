@@ -5,6 +5,7 @@ import { playStomp, playSurprise } from '../audio/sfx.js';
 import { pickaxeAngleAt, pickaxeFistAt, miningAngleAt, miningFistAt } from '../weapons/pickaxe.js';
 import { getWeapon } from '../weapons/registry.js';
 import { startAttack, tickWeapon, spawnSphereShot, boxOf } from '../weapons/combat.js';
+import { initBoss, updateBossBehaviour, onBossDefeated } from './bosses.js';
 import { state } from '../state.js';
 
 // --- enemy tiers (GAME_DESIGN's "Enemies evolve across levels") ---------
@@ -38,7 +39,7 @@ const OCTAGON_SPEED = 0.75;
 
 // Builds live enemies from a level's raw spawn data.
 export function spawnEnemies(spawns) {
-  return spawns.map(e => ({
+  const built = spawns.map(e => ({
     tier: 'passive',
     kind: 'sphere',
     hp: 1,
@@ -70,6 +71,10 @@ export function spawnEnemies(spawns) {
     restored: false,
     fleeing: false
   }));
+  // Fightable bosses get their phase machine primed. Level 1's Foreman
+  // isn't one — it's `mode: 'cutscene'` and driven entirely by its scene.
+  built.filter(e => e.boss && e.mode === 'fight').forEach(initBoss);
+  return built;
 }
 
 function patrol(enemy) {
@@ -104,6 +109,11 @@ function chase(enemy, player, speed) {
 export function updateEnemies(player, cutsceneActive) {
   for (const enemy of state.enemies) {
     if (!enemy.alive) {
+      // The frame a fightable boss goes down: drop what it was carrying and
+      // open the way. Idempotent, so running it every frame afterwards
+      // costs nothing and a player can never be stranded beside a dead boss
+      // with no drop.
+      if (enemy.boss && enemy.mode === 'fight') onBossDefeated(enemy);
       if (enemy.squish > 0) enemy.squish--;
       continue;
     }
@@ -133,7 +143,11 @@ export function updateEnemies(player, cutsceneActive) {
       if (Math.abs(enemy.knockback) < 0.3) enemy.knockback = 0;
     }
 
-    if (enemy.boss && enemy.mode !== 'fight') {
+    if (enemy.boss && enemy.mode === 'fight') {
+      // A real fight: the boss drives itself. Its own phase machine decides
+      // when it can be hurt (see entities/bosses.js).
+      if (!cutsceneActive) updateBossBehaviour(enemy, player);
+    } else if (enemy.boss) {
       // Level 1's Foreman: patrols until its cutscene takes over.
       if (!enemy.awake) patrol(enemy);
       if (cutsceneActive) continue;

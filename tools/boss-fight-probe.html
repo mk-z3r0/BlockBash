@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#000;">
+<canvas id="game" width="800" height="450"></canvas><pre id="out">running…</pre>
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true, narrative: { seenCutscenes: {}, npcStage: 0, flags: {} } })); window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERROR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  // Every fightable boss, driven through its own state machine by hand.
+  //
+  // What this is actually protecting: a boss that can never be hurt, or one
+  // that can be hurt at the wrong time, is a level the player cannot finish
+  // — and the boss body-blocks the way to the world's edge, so "can't beat
+  // it" and "can't leave" are the same bug. Each one is checked for having
+  // a real closed window and a real open one, and for dropping what it owes.
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update, switchTo } from '../src/scenes/sceneManager.js';
+  import { getLevel } from '../src/levels/levelLoader.js';
+  import { levels } from '../src/levels/registry.js';
+  import { startAttack } from '../src/weapons/combat.js';
+  import { getWeapon } from '../src/weapons/registry.js';
+
+  const out = [];
+  let fails = 0;
+  const check = (ok, label) => { if (!ok) fails++; out.push(`  ${ok ? 'ok  ' : 'FAIL'} ${label}`); };
+
+  // Stand the player right next to the boss and swing until the cooldown
+  // lets another one through. Returns how much hp came off.
+  function swingAt(boss, times) {
+    const before = boss.hp;
+    for (let n = 0; n < times; n++) {
+      player.x = boss.x - player.width - 6;
+      player.y = boss.y;
+      player.facing = 1;
+      player.weaponCooldown = 0;
+      startAttack(player);
+      const w = getWeapon(player.weapon);
+      for (let f = 0; f < w.duration + 2; f++) update();
+    }
+    return before - boss.hp;
+  }
+
+  function findBoss() {
+    return state.enemies.find(e => e.boss && e.mode === 'fight');
+  }
+
+  function runLevel(index, expect) {
+    state.currentLevelIndex = index;
+    switchTo('playing', { retry: true });
+    const lv = getLevel();
+    lv.cutscenes.length = 0;
+    state.lives = 999;
+    player.invincible = 99999;   // this probe is about the boss, not survival
+    const boss = findBoss();
+    out.push(`== level ${index} (${lv.name}): ${boss ? boss.bossKind : 'NO BOSS'} ==`);
+    if (!boss) { check(false, 'has a fightable boss'); return; }
+    check(!!player.weapon, `player arrives armed (${player.weapon})`);
+    expect(boss, lv);
+  }
+
+  setTimeout(() => {
+    // --- level 2: The Excavator ---
+    runLevel(1, (boss) => {
+      boss.phase = 'advance'; boss.phaseTimer = 999;
+      update();
+      check(boss.invulnerable === true, 'closed while advancing');
+      const noDamage = swingAt(boss, 2);
+      check(noDamage === 0, `takes no damage while advancing (lost ${noDamage})`);
+
+      boss.phase = 'jammed'; boss.phaseTimer = 999;
+      update();
+      check(boss.invulnerable === false, 'open once the drill jams');
+      const hp0 = boss.hp;
+      const dealt = swingAt(boss, 1);
+      check(dealt === 1, `one pickaxe hit takes exactly 1 hp (took ${dealt}, hp ${hp0} -> ${boss.hp})`);
+
+      // finish it off and check the drop
+      boss.phase = 'jammed'; boss.phaseTimer = 999;
+      swingAt(boss, 6);
+      check(!boss.alive, `dies to sustained hits while jammed (hp ${boss.hp})`);
+      for (let f = 0; f < 4; f++) update();
+      const drop = state.weaponPickups.find(p => p.type === 'sledgehammer');
+      check(!!drop, 'drops a sledgehammer');
+      if (drop) {
+        player.x = drop.x - 4; player.y = getLevel().groundY - player.height - 2;
+        for (let f = 0; f < 6; f++) update();
+        check(player.weapon === 'sledgehammer', `walking onto it arms the sledgehammer (weapon: ${player.weapon})`);
+      }
+      const blocking = state.enemies.some(e => e.boss && e.alive);
+      check(!blocking, 'no boss left alive, so the way to the edge is open');
+    });
+
+    out.push(fails ? `*** ${fails} FAILURE(S)` : 'PASS every boss opens, closes and pays out');
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 250);
+</script></body></html>

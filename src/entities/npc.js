@@ -99,6 +99,34 @@ export function updateCornerQuarrick(npc, worldEdgeX, groundY, stopAlong, speed)
   return false;
 }
 
+// Quarrick standing somewhere and talking, which is most of his
+// appearances from level 2 on. `damage` is how many corners the spheres
+// have taken off him (0-4) — GAME_DESIGN's deterioration beat is explicitly
+// wordless ("No dialogue needed: the player reads the damage"), so this is
+// the whole of that beat's delivery and it's authored per level.
+export function createQuarrick(x, groundY, opts = {}) {
+  return {
+    x,
+    y: groundY - 44,
+    width: 44, height: 44,
+    velocityX: 0, velocityY: 0, jumpVX: 0,
+    facing: opts.facing == null ? -1 : opts.facing,
+    state: opts.state || 'standing',
+    timer: 0,
+    stomped: true,
+    damage: opts.damage || 0
+  };
+}
+
+// Walk him along under a cutscene's direction. Separate from
+// updateRescueNPC's state machine, which is about the boss stomp and owns
+// its own sequencing.
+export function walkQuarrick(npc, dir, speed) {
+  npc.state = 'walking';
+  npc.facing = dir;
+  npc.x += dir * speed;
+}
+
 // Returns true once the NPC has run off-screen and should be discarded.
 export function updateRescueNPC(npc, viewWidth, cameraX) {
   const boss = state.enemies.find(e => e.boss);
@@ -187,13 +215,43 @@ export function updateRescueNPC(npc, viewWidth, cameraX) {
   return false;
 }
 
+// `damage` is how many of his four corners are gone, and how deep. Drawn as
+// one path rather than a rect plus cuts so the outline follows the damage.
+function drawQuarrickBody(hw, hh, width, height, damage) {
+  const cut = Math.min(4, damage) * 5.5;
+  ctx.beginPath();
+  if (cut <= 0.5) {
+    ctx.rect(-hw, -hh, width, height);
+  } else {
+    ctx.moveTo(-hw + cut, -hh);
+    ctx.lineTo(hw - cut, -hh);
+    ctx.lineTo(hw, -hh + cut);
+    ctx.lineTo(hw, hh - cut);
+    ctx.lineTo(hw - cut, hh);
+    ctx.lineTo(-hw + cut, hh);
+    ctx.lineTo(-hw, hh - cut);
+    ctx.lineTo(-hw, -hh + cut);
+    ctx.closePath();
+  }
+  // He dulls as he goes. Still unmistakably the gold square who saved you
+  // in level 1 — the colour is his identity in the dialogue bar too
+  // (cutscenes/speakers.js) — just less of it each time you meet him.
+  const wear = Math.min(1, damage / 4);
+  ctx.fillStyle = damage ? `rgb(${242 - wear * 40}, ${193 - wear * 45}, ${78 - wear * 10})` : '#f2c14e';
+  ctx.fill();
+  ctx.strokeStyle = '#c99a2e';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+}
+
 export function drawRescueNPC(npc, frameCount) {
   const hw = npc.width / 2;
   const hh = npc.height / 2;
   const legLength = 14;
   const groundY = hh;
   const hipY = groundY - legLength;
-  const moving = npc.state === 'running' || npc.state === 'exit' || npc.state === 'cornerWalk';
+  const moving = npc.state === 'running' || npc.state === 'exit' ||
+                 npc.state === 'cornerWalk' || npc.state === 'walking';
   // The corner walk is a climb up a wall, not a sprint across a floor — same
   // gait, slowed down, so it reads as deliberate rather than as the stomp
   // run played back at the wrong speed.
@@ -214,11 +272,11 @@ export function drawRescueNPC(npc, frameCount) {
   ctx.save();
   ctx.translate(0, -legLength);
 
-  ctx.fillStyle = '#f2c14e';
-  ctx.fillRect(-hw, -hh, npc.width, npc.height);
-  ctx.strokeStyle = '#c99a2e';
-  ctx.lineWidth = 3;
-  ctx.strokeRect(-hw, -hh, npc.width, npc.height);
+  // The same square-minus-its-corners language everything damaged in this
+  // game is drawn in — the octagons, the carved platforms, and eventually
+  // the core. On Quarrick it's the deterioration beat of his arc, and it's
+  // meant to be read without a line of dialogue explaining it.
+  drawQuarrickBody(hw, hh, npc.width, npc.height, npc.damage || 0);
 
   // muscular arm
   drawMuscleArm(0, -hh * 0.1, npc.facing * (hw + 20), -hh * 0.35);

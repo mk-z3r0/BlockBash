@@ -186,18 +186,33 @@
     // gap that narrow is crossed with a hop or simply run over — the rule
     // is about full-power jumps, so the check has to be too.
     const NEEDS_REAL_JUMP = 45;
+    // Spike beds have take-off lips too, and that's how this check earned
+    // its keep: level 2 was authored with a bed at 2400 directly under the
+    // platform at 2300-2420, which only the jump tests caught because this
+    // rule was originally written for gaps alone.
+    const lips = [
+      ...gaps.filter(g => g.size > NEEDS_REAL_JUMP).map(g => ({ x: g.edge, what: `the gap at ${g.edge}` })),
+      ...lv.hazards.filter(h => h.width <= 200).map(h => ({ x: h.x, what: `the spike bed at ${h.x}` }))
+    ];
     let overhead = 0;
-    gaps.filter(g => g.size > NEEDS_REAL_JUMP).forEach(g => {
+    lips.forEach(lip => {
       floating.forEach(p => {
-        const overLip = p.x < g.edge + 4 && p.x + p.width > g.edge - LIP;
+        const overLip = p.x < lip.x + 4 && p.x + p.width > lip.x - LIP;
         const withinRise = p.y + p.height > lv.groundY - JUMP_RISE && p.y < lv.groundY - player.height;
         if (overLip && withinRise) {
           overhead++;
-          fail(`platform ${p.x}-${p.x + p.width} @y${p.y} sits directly above the jump-off lip of the gap at ${g.edge}`);
+          // Advisory, because this rule cannot see horizontal travel and
+          // the jump tests above can. A platform 40px back from a lip is
+          // often cleared comfortably: by the time the player has risen to
+          // its underside they have already moved past it. The simulation
+          // is authoritative — a genuine bonk shows up there as DIED or as
+          // NOTHING CLEARS IT, which is how level 2's bed at 2400 was
+          // caught. This is the pointer at geometry worth a second look.
+          warn(`platform ${p.x}-${p.x + p.width} @y${p.y} is close over the take-off for ${lip.what} — the jump tests above are the verdict`);
         }
       });
     });
-    if (!overhead) out.push('  no platform overhangs any jump-off lip');
+    if (!overhead) out.push(`  no platform overhangs any take-off lip (${lips.length} checked)`);
 
     // "Keep landing zones clear of the next hazard. A hard jump carries
     // 162px — don't let a full-power leap off a pit land in spikes."

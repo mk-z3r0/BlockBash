@@ -36,6 +36,21 @@ import { pendingCutscene } from '../cutscenes/triggers.js';
 import { cutsceneLibrary } from '../cutscenes/library.js';
 import { advanceDialogue, isDialogueOpen } from '../ui/dialogue.js';
 
+// How far the view lifts while someone is talking. Conversations happen at
+// ground level and the dialogue bar covers the bottom third of the screen,
+// so without this the two characters having the conversation are behind it.
+//
+// Derived, not guessed: the panel's top edge sits at
+// VIEW_HEIGHT - PANEL_H - PANEL_MARGIN = 450 - 104 - 14 = 332 (ui/dialogue.js),
+// and a speaker standing on the ground occupies world y 388-410. Lifting by
+// 96 puts the ground line at 314, which clears the panel with room for a
+// 44px-tall Quarrick to stand there whole. A first attempt at 58 cleared
+// his head and left the player entirely behind the bar.
+//
+// Eased rather than snapped — a hard jump on the first line reads as a
+// glitch, and every scripted moment in this game is paced to be read.
+const DIALOGUE_LIFT = 96;
+
 // Pause is a flag, not a scene transition — switching away from 'playing'
 // and back would re-run enter(), which always means "start a run" or
 // "retry the level," neither of which is "resume where I was." A flag
@@ -243,7 +258,7 @@ export function drawWorldAndHUD() {
   // is the entire point of the beat. Outside the rotation but still inside
   // the camera translate, so they're positioned in ordinary world
   // coordinates exactly as before.
-  drawPlayer(state.frameCount);
+  drawPlayer(state.frameCount, isCutsceneActive());
   drawPlayerShout();
 
   ctx.restore();
@@ -340,6 +355,19 @@ export const playingScene = {
 
     if (locks.camera === 'follow') {
       updateCamera(player.x, VIEW_WIDTH, getLevel().worldWidth);
+    }
+
+    // Deliberately OUTSIDE the camera lock: say() beats lock the camera to
+    // 'scripted' so the scene stops following, and this still has to happen
+    // during them. It only ever settles back to 0 when no cutscene is
+    // running at all, so a scene that drives camera.y itself — the edge
+    // transition's look down over the drop — is never fought for control
+    // of the axis.
+    if (isDialogueOpen()) {
+      camera.y += (DIALOGUE_LIFT - camera.y) * 0.12;
+    } else if (!isCutsceneActive()) {
+      camera.y += (0 - camera.y) * 0.12;
+      if (Math.abs(camera.y) < 0.5) camera.y = 0;
     }
   },
 
