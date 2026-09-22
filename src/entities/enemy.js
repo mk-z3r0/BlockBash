@@ -37,6 +37,16 @@ const SHOT_COOLDOWN = 110;
 // Corrupted squares shamble. They are not hunting you, they're just drawn
 // toward you, and the speed says so.
 const OCTAGON_SPEED = 0.75;
+// How close the player has to be before a fightable boss starts fighting.
+// Comfortably more than a screen, so it's already going by the time it comes
+// into view and never visibly "switches on".
+//
+// Without this every boss runs its whole phase machine from the first frame
+// of the level: the Terraformer was announcing "THE ROOM IS OPEN — NOW!"
+// while the player was still at the spawn point 6000px away, and the
+// Excavator digs pits, which the player would then arrive at without ever
+// having seen anything dig them.
+const BOSS_ENGAGE_RANGE = 1100;
 
 // Timers that used to be Math.random() are derived from the enemy's own
 // position instead.
@@ -107,6 +117,12 @@ function patrol(enemy) {
   enemy.facing = enemy.speed >= 0 ? 1 : -1;
 }
 
+// A fightable boss idles until the player is near enough for the fight to be
+// something they can see happening.
+function bossEngaged(boss, player) {
+  return Math.abs((player.x + player.width / 2) - (boss.x + boss.w / 2)) < BOSS_ENGAGE_RANGE;
+}
+
 function playerIsNear(enemy, player, range) {
   const dx = (player.x + player.width / 2) - (enemy.x + enemy.w / 2);
   const dy = (player.y + player.height / 2) - (enemy.y + enemy.w / 2);
@@ -170,7 +186,7 @@ export function updateEnemies(player, cutsceneActive) {
     if (enemy.kind === 'core') {
       // Driven entirely by its own phase machine (entities/bosses.js). It
       // never moves — the arena moves, and the player moves around it.
-      if (!cutsceneActive) updateBossBehaviour(enemy, player);
+      if (!cutsceneActive && bossEngaged(enemy, player)) updateBossBehaviour(enemy, player);
     } else if (enemy.kind === 'octagon') {
       // Checked BEFORE the boss branches, because the Sculptor is a boss
       // AND an octagon, and what it is matters more than what rank it
@@ -181,7 +197,7 @@ export function updateEnemies(player, cutsceneActive) {
     } else if (enemy.boss && enemy.mode === 'fight') {
       // A real fight: the boss drives itself. Its own phase machine decides
       // when it can be hurt (see entities/bosses.js).
-      if (!cutsceneActive) updateBossBehaviour(enemy, player);
+      if (!cutsceneActive && bossEngaged(enemy, player)) updateBossBehaviour(enemy, player);
     } else if (enemy.boss) {
       // Level 1's Foreman: patrols until its cutscene takes over.
       if (!enemy.awake) patrol(enemy);

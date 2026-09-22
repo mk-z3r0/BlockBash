@@ -62,6 +62,9 @@ the edge of its cube face except the sixth, which ends by falling through it.
 
 | System | Where | Note |
 |---|---|---|
+| Terraced ground | `levels/levelLoader.js` | A ground segment may sit above the level's base line. Everything that reads ground already read `seg.y`, so this was a data change rather than a system one |
+| Moving platforms | `levels/movers.js` | Lifts and sliders on a clock. A slider hands back its delta so it carries the player; a lift doesn't need to, since it rises into them and collision resolves it |
+| Impact | `engine/impact.js` | Screen shake and hit-stop on every landed hit. Suspended during cutscenes, whose beats are timed in frames and asserted by probes |
 | Weapon registry | `weapons/registry.js` | Register by name; look up behaviour, drawing and sound by type. Three weapons |
 | Entity-agnostic combat | `weapons/combat.js` | An *owner* is anything with a position, a facing, a weapon id and three timers. A sphere swings through the same path the player does |
 | Enemy tiers | `entities/enemy.js` | passive → pursuer → aggressor, declared per spawn, defaulting to passive so level 1 never moved |
@@ -585,6 +588,8 @@ What's in it, and what each thing is actually for:
 | `story-beats-probe` | Can the player be blocked by a story beat? The handoff, the restoration, the Sculptor, the core |
 | `progression-chain-probe` | Does every level actually lead to the next one? |
 | `full-playthrough-probe` | One run, cleared save to win screen, every story scene asserted |
+| `level-data-probe` | The boring stuff, read straight off level data: weapons and cutscene ids that exist, a level that can end, spawns and checkpoints over ground, hazards that don't run off a ledge. Found three of level 6's checkpoints floating in its pits |
+| `respawn-state-probe` | What survives a death — and standing at all 21 checkpoints in the game for two seconds without touching the controls |
 | the older probes | Physics, coins, saves, cutscene contract — unchanged, and all still green |
 
 **Adding a level** means: write the data file, add it to `levels/registry.js`,
@@ -598,16 +603,39 @@ It proves **nothing is impossible**. It says nothing about whether a level is
 *fun*, or fairly paced, or the right difficulty for a seven-year-old. Those
 need a person with a controller.
 
+**Probes are deterministic.** Enemy hop and shot timers used to be seeded
+with `Math.random()` at spawn, which made "is this checkpoint survivable"
+pass alone and fail in the suite depending on the dice. They're derived from
+the enemy's own x now. A failure means something changed, not that the coin
+came up differently. What's left of `Math.random()` is particles and the
+block house's shake, neither of which anything measures.
+
 It is also calibrated against level 1, which is the only reason to trust it —
 every complaint it raised about that finished, playtested level turned out to
 be the instrument being wrong, and each fix is written up in the probe at the
-line it applies to. Four of them are worth knowing about because they'll bite
-anyone who extends it: tests must **arrive at speed** (a standing start
-measures the runway, not the obstacle), a runway must not begin **inside a
-solid block or a spike bed**, obstacles must be tested at **both walk and run**
-(some are deliberately walk-only), and the static "platform over a take-off"
-rule is **advisory** because it can't see horizontal travel and the simulation
-can.
+line it applies to. Six of them are worth knowing about because they'll bite anyone who extends
+it. Tests must **arrive at speed** — a standing start measures the runway,
+not the obstacle. A runway must not begin **inside a solid block or a spike
+bed**. Obstacles must be tested at **both walk and run**, since some are
+deliberately walk-only. The static "platform over a take-off" rule is
+**advisory**, because it can't see horizontal travel and the simulation can.
+Tests must model **jumping off blocks**, not just running along the ground —
+in a level built of columns that's the only way anyone plays, and testing the
+ground alone called all twelve of level 3's beds uncrossable. And everything
+that asks "is this on the ground" must ask about the **local** ground, not
+the level's base line, or every block on a raised shelf goes unrecognised.
+
+Two rules exist because a level shipped without them and the pair of
+obstacles was wrong even though each was fine alone:
+
+- **A bed near the end of its segment is a trap.** Clearing it at run carries
+  ~168px, so if the ledge is right there the correct answer to the hazard is
+  a death in the pit after it.
+- **A checkpoint is measured against what an enemy can REACH**, not where it
+  walks. A pursuer breaks patrol at 230px and an aggressor shoots from 330,
+  so a checkpoint 100px outside a shooter's patrol is still somewhere you
+  respawn and get shot standing still. Five checkpoints passed the old rule
+  and were fatal.
 
 ---
 
@@ -1071,14 +1099,18 @@ To add:
 GAME_DESIGN.md is the register of record for open *design* questions — this
 list is only the subset that changes what gets built, and in what order.
 
-**Blocking:** none. The game is finishable.
+**Blocking:** none. The game is finishable, and every level has a shape of
+its own rather than a shared skeleton — see GAME_DESIGN's level table for
+what each one's structural idea is.
 
 **The honest list — what a reader should not assume exists.** Everything
 below is deliberately unbuilt, not overlooked, and each has its reasoning at
 the build-order step it belongs to:
 
 - **Chamfered terrain is visual only.** Platforms are still flat-top
-  rectangles; nothing is walked up at 45°. Step 4.
+  rectangles; nothing is walked up at 45°. Step 4. Note that TERRACES are a
+  different thing and do exist: ground can sit at different heights, it's
+  just always flat where it sits.
 - **No level authoring tool.** Six levels were hand-authored without missing
   it; the audit probe answered the need it was really for. Step 3.
 - **Ordinary spheres don't reshape the world.** Bosses do. The parked trick

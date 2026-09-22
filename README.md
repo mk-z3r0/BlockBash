@@ -24,23 +24,37 @@ Level 1 — you start at your own front door, and it goes downhill from there.
 
 ![Level 1 start](assets/screenshots/level1-start.png)
 
-Coins mark the line a good jump takes. Follow the arc and you'll usually
-land somewhere sensible.
+Every face of the cube is a different shape of place, not just a different
+set of enemies. **The Quarry** is cut in terraces and you climb down into it.
 
-![A staircase in level 1](assets/screenshots/level1-staircase.png)
+![The Quarry](assets/screenshots/level2-quarry.png)
 
-The second half asks for more precision. The debris the spheres leave behind
-is not decorative.
+**What the Sanders Left** was ground into columns. You go up.
 
-![Jumping a spike bed](assets/screenshots/level1-spikes.png)
+![Columns](assets/screenshots/level3-columns.png)
 
-Level 3 — Quarrick has been losing corners since you met him, and nobody
-mentions it. He gives you the Cornerstone here, and then you find out why.
+Halfway through it, Quarrick gives you the Cornerstone. He has been losing
+corners since you met him and nobody has mentioned it.
 
-![The handoff in level 3](assets/screenshots/level3-handoff.png)
+![The handoff](assets/screenshots/level3-handoff.png)
 
-Level 7 — the middle of the world. A cube with every corner shaved off it,
-part-way back to being square.
+**Three Against One** is about sightlines. The spheres shoot now — the hot
+orange ones — and their shots stop at anything solid, so the low blocks are
+worth standing behind.
+
+![Cover](assets/screenshots/level4-cover.png)
+
+**The Room That Moves** doesn't stay where you left it.
+
+![Lifts](assets/screenshots/level5-lifts.png)
+
+Bosses tell you what they're doing. The bar says whether it can be hurt right
+now; red empties, cyan fills.
+
+![The General](assets/screenshots/level6-general.png)
+
+And at the middle of the world, a cube with every corner shaved off it —
+part of the way back to being square.
 
 ![The core](assets/screenshots/level7-core.png)
 
@@ -86,6 +100,9 @@ chop, a heavy overhead swing, or a fired triangle. From level 3 on, the
 triangles are counted: the pips at the top right are all you have, and putting
 a corrupted square back costs two of them.
 
+You carry **one weapon at a time**. There's a sledgehammer lying on a shelf
+in level 6, and picking it up means putting the Cornerstone down.
+
 Jumping on a sphere always works, and never runs out.
 
 A gamepad is picked up automatically once you press a button on it; there's
@@ -95,7 +112,13 @@ nothing to configure.
 
 **All seven levels, start to finish.** Six faces of a cube planet, then a
 descent, then the hollow centre and whatever the spheres have been digging
-toward. Three weapons, seven bosses, and an ending.
+toward. Seven bosses, none of which is a bigger version of the last one, and
+an ending that isn't a kill.
+
+Each face has its own shape — one is terraced, one is columns you climb, one
+is cover and sightlines, one won't hold still, one is four arenas and a
+fight. Enemies escalate from patrolling, to carrying tools and chasing you,
+to shooting, to chainsaws.
 
 There's an opening cutscene the first time you play — skippable, and it only
 ever plays once. From level 2 onward the characters talk; `Space` advances a

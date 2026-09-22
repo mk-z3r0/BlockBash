@@ -39,6 +39,8 @@
     return before - boss.hp;
   }
 
+  const tick = n => { for (let i = 0; i < n; i++) update(); };
+
   function findBoss() {
     return state.enemies.find(e => e.boss && e.mode === 'fight');
   }
@@ -53,11 +55,25 @@
     const boss = findBoss();
     out.push(`== level ${index} (${lv.name}): ${boss ? boss.bossKind : 'NO BOSS'} ==`);
     if (!boss) { check(false, 'has a fightable boss'); return; }
+    // Stand in the arena. Bosses idle until the player is within
+    // BOSS_ENGAGE_RANGE (entities/enemy.js) so they aren't running their
+    // whole fight — announcing openings, digging pits — from across a level
+    // the player hasn't reached yet. Testing one from the spawn point tests
+    // a boss that is correctly doing nothing.
+    player.x = boss.x - 200;
+    player.y = boss.y;
+    tick(2);
     check(!!player.weapon, `player arrives armed (${player.weapon})`);
     expect(boss, lv);
   }
 
+  // Anything that throws in here otherwise leaves the page reading
+  // "running…" forever, which says nothing about what went wrong.
+  const report = () => {
+    document.getElementById('out').textContent = out.join('\n');
+  };
   setTimeout(() => {
+   try {
     // --- level 2: The Excavator ---
     runLevel(1, (boss) => {
       boss.phase = 'advance'; boss.phaseTimer = 999;
@@ -166,7 +182,10 @@
     });
 
     out.push(fails ? `*** ${fails} FAILURE(S)` : 'PASS every boss opens, closes and pays out');
+   } catch (err) {
+    out.push('*** THREW: ' + (err && err.stack ? err.stack.split('\n').slice(0, 3).join(' | ') : err));
+   }
     out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
-    document.getElementById('out').textContent = out.join('\n');
+    report();
   }, 250);
 </script></body></html>

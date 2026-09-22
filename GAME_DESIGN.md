@@ -79,6 +79,19 @@ Target roster was **3–5 weapons total**. **Three shipped** (2026-09-21), which
 
 **One at a time.** *(Answers an open question below.)* The player carries a single weapon, not a loadout. This is what keeps the Cornerstone's scarcity honest — with a melee weapon also in hand, running out of triangles would cost nothing. **Stomping is the unarmed fallback**, so running dry is never a dead end.
 
+> **The one place it's a decision.** A sledgehammer lies on a shelf in the
+> middle of level 6. Taking it trades away the Cornerstone and every triangle
+> with it, for a heavy melee weapon that never runs out. Nothing in that level
+> has to be restored and level 7 hands the Cornerstone back at its spawn, so
+> either answer finishes the game. That's the honest version of "all weapon
+> types" for a game with one weapon slot: not a loadout screen, a cost.
+
+**Enemies carry weapons too**, through the same registry — the hit path
+doesn't care who is swinging. Tool-carrying pursuers arrive in level 2 with
+pickaxes and reappear in level 6 with **chainsaws**, which are thrust and
+held rather than swung, so the same tier of enemy becomes a different problem
+without becoming a different enemy.
+
 **Parked, not cut:** the bazooka (`weapons/bazooka.js`) and chainsaw (`weapons/chainsaw.js`) both exist in the codebase, unwired, kept for a later level. See the implementation plan's "Decisions made" for why the bazooka stopped being level 1's weapon.
 
 ### Enemies
@@ -182,15 +195,28 @@ The single biggest piece of character writing in the game, and the spine the wea
 
 **All seven are built** (2026-09-21). The framework below is what shipped; where it drifted from the original sketch, the reason is in the right-hand column.
 
-| Level | Name | What it introduces |
-|---|---|---|
-| 1 | **The First Stand** | Tutorial. Passive spheres, an unwinnable boss, no dialogue at all. |
-| 2 | **The Quarry** | The game starts talking. Spheres that carry tools and break patrol. A boss that can be fought. |
-| 3 | **What the Sanders Left** | Octagons, then the Cornerstone, then the Sculptor. The turn the game is built around. |
-| 4 | **Three Against One** | Spheres shoot back. The Demolition Crew. |
-| 5 | **The Room That Moves** | The arena itself becomes the threat. |
-| 6 | **No Tricks Left** | Everything at once, and nobody waiting for you. |
-| 7 | **The Middle of the World** | The hollow centre and the core. |
+Every face is a different **place**, not just a different population. That
+distinction is the single biggest thing separating the first pass at levels
+2-6 from what shipped: the first versions had different enemies on an
+identical floor plan (levels 3, 4 and 5 literally shared a gap sequence).
+Each level now has one structural idea and is laid out around it.
+
+| Level | Name | Its shape | What it introduces |
+|---|---|---|---|
+| 1 | **The First Stand** | Flat. The baseline everything else is read against | Tutorial. Passive spheres, an unwinnable boss, and not one word of dialogue. |
+| 2 | **The Quarry** | **Goes down.** Four terraces, 40px each, into a cut in the face | The game starts talking. Spheres that carry tools and break patrol. A boss that can be fought. |
+| 3 | **What the Sanders Left** | **Stands up.** Sanded into columns; climbed rather than crossed | Octagons, then the Cornerstone, then the Sculptor. The turn the game is built around. |
+| 4 | **Three Against One** | **Sightlines.** Long open runs and waist-high cover, on a raised shelf | Spheres shoot back, and spheres hop. The Demolition Crew. |
+| 5 | **The Room That Moves** | **Nothing holds still.** Lifts and sliders, a low route and a high one | The floor plan as the threat. The Terraformer. |
+| 6 | **No Tricks Left** | **Four arenas, three crossings.** Almost nothing to platform over | Chainsaws. A weapon you have to give something up for. The General. |
+| 7 | **The Middle of the World** | **Only goes down.** Four ledges through the crust, then the cavity | The descent, the core, and the end. |
+
+Two drifts from the original sketch, recorded rather than quietly absorbed.
+**Pursuing enemies arrived in level 2, not 4** — once tool-carrying spheres
+existed, having them ignore the player was stranger than having them chase.
+And **octagons arrived in 3 alongside the Cornerstone** rather than a level
+ahead of it, because the beat only works if the player meets something they
+cannot beat shortly before being handed the thing that answers it.
 
 Two drifts worth recording. **Pursuing enemies arrived in level 2, not 4** — once tool-carrying spheres existed, having them ignore the player was stranger than having them chase. And **octagons arrived in 3 alongside the Cornerstone rather than a level ahead of it**, because the beat only works if the player meets something they cannot beat shortly before being handed the thing that answers it.
 
@@ -325,16 +351,20 @@ Music direction is still open.
 **Still open — genuinely, not for lack of time:**
 
 - [ ] **Coins beyond lives** — the between-levels shop idea. See [Economy](#should-coins-buy-more-than-lives--candidate). Deliberately not built: the thresholds across all seven levels are tuned for lives-only, and adding a second sink means re-tuning every level rather than adding a menu.
-- [ ] **Music direction.** There IS music — one procedurally scheduled loop
-  (bass, arpeggio, hat) in `audio/audio.js`, started at the first level and
-  deliberately never restarted across level transitions so it doesn't stutter
-  at a seam. What's open is whether it should stay one loop for the whole
-  game. Seven levels that escalate from a tutorial to the middle of a hollow
-  planet arguably shouldn't share a single track, and the descent especially
-  wants something to change. Every weapon and enemy already has its own sound
-  identity (see [Sound Design](#sound-design)); the score is the part that
-  hasn't been designed.
+- [x] ~~**Music direction.**~~ → **Moods, not tracks** (2026-09-21). The one
+  loop now has seven settings: steady through levels 1-2, faster with the
+  arpeggio an octave up for 3-4, driven with the bass an octave down for 5-6,
+  and for the cavity, half speed with no hats and no arpeggio at all. They're
+  variations on the *same running loop* rather than separate pieces, because
+  `startMusic()` is deliberately idempotent so level transitions don't stutter
+  — a mood change has to be something a loop can absorb mid-phrase. Tempo and
+  register can. A new melody can't. **Still open:** whether the game wants
+  actual composed themes, which is a different and much larger question.
 - [ ] **A second NPC.** Quarrick carries the entire cast. `state.rescueNPC` is a single slot and a scene with two characters in it would need a list first.
+- [ ] **Lasers.** The enemy table says "chainsaws, lasers, etc." for the late
+  levels. Chainsaws shipped; lasers didn't, and a hitscan weapon would be the
+  first thing in the game that can't be dodged after it fires — worth thinking
+  about before building.
 - [ ] Multiplayer / co-op potential?
 
 **Deliberately not built, and worth knowing before picking any of it up:**
