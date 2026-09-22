@@ -1,80 +1,107 @@
-// Level 6 — the last outer face, and the one with nothing clever in it.
+// Level 6 — No Tricks Left. The last outer face.
 //
-// "The General. Pure combat. Fast, aggressive, no gimmick. The hardest FAIR
-// fight in the game." Fair is the operative word and it's the whole design:
-// it is open the entire time, it telegraphs every charge, and the recovery
-// after one is the window. There is nothing to solve. There is only reading
-// it and being somewhere else.
+// IDENTITY: this one is a fight, not a course. Four long open arenas joined
+// by three narrow crossings, and almost nothing to platform over — what's
+// dangerous here is the population, not the floor. GAME_DESIGN gives level 6
+// "heavy combat, all weapon types" and the General "the hardest FAIR fight
+// in the game", and a level of fiddly jumps in front of that would be two
+// different games stapled together.
 //
-// The level around it is the hardest running the game asks for — shooters
-// and pursuers together, corrupted squares in the corridors, and the
-// architecture barely square any more.
+// Only three gaps in the whole level. Every other level has six or seven.
+//
+// --- the choice in the middle ---
+// There is a sledgehammer lying in arena 2. The player is carrying the
+// Cornerstone and can only hold one weapon, so taking it means trading every
+// triangle they have for a heavy melee weapon that never runs out — and
+// giving up the ability to restore anything for the rest of the level.
+//
+// That's the honest version of "all weapon types": not a loadout screen, a
+// decision with a cost. Nothing in this level REQUIRES restoring — the
+// corrupted squares here can all be walked past — so either answer finishes
+// it, and level 7 hands the Cornerstone back at its spawn regardless.
+//
+// The architecture is barely square any more. Almost every platform is
+// chewed; this is the end of the degradation arc before the descent.
 
 const GROUND_Y = 410;
+const cover = (x, w, h) => ({ x, y: GROUND_Y - h, width: w, height: h, chewed: true });
 
 export default {
   id: 'level6',
   name: 'No Tricks Left',
-  worldWidth: 7500,
+  worldWidth: 7600,
   groundY: GROUND_Y,
-  playerSpawn: { x: 90, y: 300 },
+  playerSpawn: { x: 80, y: 300 },
 
   startsWith: 'cornerstone',
   startsWithAmmo: 12,
   quarrickDamage: 2,
 
   ground: [
-    { x: 0,    width: 800 },
-    { x: 870,  width: 520 },    // 70
-    { x: 1480, width: 540 },    // 90
-    { x: 2075, width: 640 },    // 55
-    { x: 2865, width: 740 },    // 150 — run only
-    { x: 3705, width: 630 },    // 100
-    { x: 4425, width: 600 },    // 90
-    { x: 5185, width: 2015 }    // 160 — run only
+    { x: 0,    width: 1800 },   // arena 1
+    { x: 1890, width: 1610 },   // 90  — arena 2, and the hammer
+    { x: 3650, width: 1550 },   // 150 — arena 3, run only
+    { x: 5360, width: 1940 }    // 160 — arena 4 and the General, run only
   ],
 
   platforms: [
-    { x: 160,  y: 330, width: 110, height: 18, chewed: true },
-    { x: 450,  y: 285, width: 100, height: 18, chewed: true },
-    { x: 880,  y: 320, width: 90,  height: 18, chewed: true },
-    { x: 1180, y: 265, width: 90,  height: 18, chewed: true },
-    { x: 1510, y: 310, width: 90,  height: 18, chewed: true },
-    { x: 1810, y: 235, width: 90,  height: 18, chewed: true },
-    { x: 2110, y: 320, width: 90,  height: 18, chewed: true },
-    { x: 2480, y: 255, width: 90,  height: 18, chewed: true },
-    { x: 2885, y: 310, width: 70,  height: 18, chewed: true },
-    { x: 3380, y: 280, width: 90,  height: 18, chewed: true },
-    { x: 3850, y: 340, width: 100, height: 18 },   // stones over the long bed
-    { x: 4000, y: 340, width: 100, height: 18 },
-    { x: 4200, y: 250, width: 70,  height: 18, chewed: true },
-    { x: 4620, y: 250, width: 70,  height: 18, chewed: true },
-    { x: 4880, y: 225, width: 80,  height: 18, chewed: true },
-    { x: 5280, y: 300, width: 90,  height: 18, chewed: true },
-    { x: 5760, y: 265, width: 90,  height: 18, chewed: true },
-    { x: 6120, y: 300, width: 90,  height: 18, chewed: true }
-    // 6300 onward: the General's ground. Deliberately bare — nothing to
-    // hide behind, and nothing for it to get stuck on.
+    // --- arena 1: learn the room. Cover, and one high perch. ---
+    cover(380, 120, 44),
+    { x: 700, y: 270, width: 110, height: 18, chewed: true },
+    cover(1020, 110, 66),
+    cover(1400, 120, 44),
+
+    // --- arena 2: the hammer is on the high shelf, in plain sight ---
+    cover(2050, 110, 66),
+    { x: 2300, y: 250, width: 120, height: 18, chewed: true },
+    cover(2700, 120, 44),
+    { x: 3000, y: 280, width: 110, height: 18, chewed: true },
+    cover(3280, 110, 66),
+
+    // --- arena 3: the widest, the emptiest, the worst to be caught in ---
+    cover(3820, 120, 44),
+    { x: 4150, y: 260, width: 110, height: 18, chewed: true },
+    cover(4500, 110, 66),
+    { x: 4800, y: 240, width: 110, height: 18, chewed: true },
+    // 4950, not 5050: at 5050 this block spanned 5050-5170 and the spike
+    // bed at 5100-5155 sat INSIDE it, so there was nothing to jump and
+    // nowhere to jump from. The audit reported the bed as having no
+    // solution, which was exactly right.
+    cover(4950, 120, 44),
+
+    // --- arena 4: the run-in, then the General's ground ---
+    cover(5520, 110, 66),
+    { x: 5800, y: 270, width: 110, height: 18, chewed: true },
+    cover(6100, 120, 44)
+    // 6300 onward is bare. The General needs room to charge and the player
+    // needs to see it coming — nothing to hide behind is the point of it.
   ],
 
   hazards: [
-    { type: 'spikes', x: 1060, width: 50 },
-    { type: 'spikes', x: 1700, width: 50 },
-    { type: 'spikes', x: 2330, width: 55 },
-    { type: 'spikes', x: 3020, width: 50 },
-    { type: 'spikes', x: 3220, width: 55 },
-    { type: 'spikes', x: 3810, width: 350 },   // crossed on the two stones
-    { type: 'spikes', x: 4530, width: 55 },
-    { type: 'spikes', x: 4770, width: 60 },
-    { type: 'spikes', x: 5420, width: 50 },
-    { type: 'spikes', x: 5620, width: 55 }
+    // Furniture, not the main event. One per arena, plus one on each
+    // crossing's approach so the chokepoints aren't free.
+    { type: 'spikes', x: 880,  width: 60 },
+    { type: 'spikes', x: 1600, width: 55 },
+    { type: 'spikes', x: 2500, width: 60 },
+    { type: 'spikes', x: 3180, width: 55 },
+    { type: 'spikes', x: 4350, width: 60 },
+    // No bed here. It sat 25px from the end of the arena, so clearing it
+    // carried the player straight off the ledge into the crossing — a
+    // hazard whose correct solution is a death. Arena 3 already has one at
+    // 4350, and this level's danger is meant to be its population.
+    { type: 'spikes', x: 5950, width: 60 }
   ],
 
   ammo: [
-    { x: 1225, y: 250,           amount: 4 },
-    { x: 2920, y: GROUND_Y - 34, amount: 4 },
-    { x: 4655, y: 235,           amount: 5 },
-    { x: 6160, y: 285,           amount: 5 }
+    { x: 2350, y: 230, amount: 4 },
+    { x: 4190, y: 240, amount: 5 },
+    { x: 5840, y: 250, amount: 5 }
+  ],
+
+  // The choice. Sitting on the shelf in arena 2, impossible to miss and
+  // impossible to take by accident — it has to be climbed to.
+  weapons: [
+    { x: 3050, y: 280, type: 'sledgehammer' }
   ],
 
   cutscenes: [
@@ -85,70 +112,82 @@ export default {
   ],
 
   enemies: [
-    { x: 330,  y: GROUND_Y - 22, w: 22, minX: 280,  maxX: 570,  speed: 1.8,
+    // --- arena 1 ---
+    { x: 300,  y: GROUND_Y - 22, w: 22, minX: 200,  maxX: 360,  speed: 1.8,
       tier: 'pursuer', weapon: 'pickaxe' },
-    { x: 920,  y: 300,           w: 20, minX: 880,  maxX: 970,  speed: 1.3 },
-    { x: 1600, y: GROUND_Y - 22, w: 22, minX: 1500, maxX: 1860, speed: 1.6,
+    { x: 620,  y: GROUND_Y - 22, w: 22, minX: 560,  maxX: 690,  speed: 1.7, canHop: true },
+    { x: 750,  y: 250,           w: 20, minX: 700,  maxX: 790,  speed: 1.3 },
+    { x: 1150, y: GROUND_Y - 22, w: 22, minX: 1000, maxX: 1300, speed: 1.6,
       tier: 'aggressor', shoots: true },
-    { x: 1850, y: 215,           w: 20, minX: 1810, maxX: 1900, speed: 1.3 },
-    { x: 2200, y: GROUND_Y - 22, w: 22, minX: 2100, maxX: 2420, speed: 1.7,
-      tier: 'pursuer', weapon: 'pickaxe' },
-    { x: 2530, y: GROUND_Y - 26, w: 26, minX: 2490, maxX: 2700, speed: 0.85,
+    { x: 1500, y: GROUND_Y - 26, w: 26, minX: 1440, maxX: 1590, speed: 0.85,
       kind: 'octagon', restoreHits: 2 },
-    { x: 2960, y: GROUND_Y - 22, w: 22, minX: 2900, maxX: 3000, speed: 1.6,
-      tier: 'aggressor', shoots: true },
-    { x: 3420, y: GROUND_Y - 22, w: 22, minX: 3300, maxX: 3580, speed: 1.6,
-      tier: 'aggressor', shoots: true },
-    { x: 3900, y: 320,           w: 20, minX: 3850, maxX: 3950, speed: 1.2 },
-    { x: 4480, y: GROUND_Y - 22, w: 22, minX: 4435, maxX: 4520, speed: 1.7,
+
+    // --- arena 2 ---
+    { x: 1980, y: GROUND_Y - 22, w: 22, minX: 1900, maxX: 2040, speed: 1.8,
       tier: 'pursuer', weapon: 'pickaxe' },
-    { x: 4920, y: 205,           w: 20, minX: 4880, maxX: 4960, speed: 1.3 },
-    { x: 5370, y: GROUND_Y - 26, w: 26, minX: 5300, maxX: 5490, speed: 0.85,
-      kind: 'octagon', restoreHits: 2 },
-    { x: 5820, y: GROUND_Y - 22, w: 22, minX: 5700, maxX: 6020, speed: 1.6,
+    { x: 2300, y: GROUND_Y - 22, w: 22, minX: 2150, maxX: 2400, speed: 1.7,
       tier: 'aggressor', shoots: true },
+    { x: 2350, y: 230,           w: 20, minX: 2300, maxX: 2410, speed: 1.4 },
+    { x: 2850, y: GROUND_Y - 22, w: 22, minX: 2790, maxX: 2980, speed: 1.7, canHop: true },
+    { x: 3150, y: GROUND_Y - 26, w: 26, minX: 3080, maxX: 3260, speed: 0.85,
+      kind: 'octagon', restoreHits: 2 },
+
+    // --- arena 3: the hardest stretch of the level ---
+    { x: 3750, y: GROUND_Y - 22, w: 22, minX: 3680, maxX: 3810, speed: 1.8,
+      tier: 'pursuer', weapon: 'pickaxe' },
+    { x: 4050, y: GROUND_Y - 22, w: 22, minX: 3950, maxX: 4130, speed: 1.7,
+      tier: 'aggressor', shoots: true },
+    { x: 4250, y: GROUND_Y - 22, w: 22, minX: 4200, maxX: 4330, speed: 1.7, canHop: true },
+    { x: 4620, y: GROUND_Y - 22, w: 22, minX: 4560, maxX: 4760, speed: 1.8,
+      tier: 'pursuer', weapon: 'pickaxe' },
+    { x: 4900, y: GROUND_Y - 22, w: 22, minX: 4820, maxX: 5040, speed: 1.7,
+      tier: 'aggressor', shoots: true },
+    { x: 5150, y: GROUND_Y - 26, w: 26, minX: 5090, maxX: 5190, speed: 0.85,
+      kind: 'octagon', restoreHits: 2 },
+
+    // --- arena 4 ---
+    { x: 5450, y: GROUND_Y - 22, w: 22, minX: 5380, maxX: 5510, speed: 1.8,
+      tier: 'pursuer', weapon: 'pickaxe' },
+    { x: 5750, y: GROUND_Y - 22, w: 22, minX: 5650, maxX: 5900, speed: 1.7,
+      tier: 'aggressor', shoots: true },
+    { x: 6150, y: GROUND_Y - 22, w: 22, minX: 6090, maxX: 6220, speed: 1.7, canHop: true },
 
     // --- The General ---
     // Bigger than the Foreman and faster than anything else in the game.
-    // hp 6, open the whole time, and it tells you before every charge.
-    { x: 6800, y: GROUND_Y - 36, w: 36, minX: 6350, maxX: 7120, speed: 1.9,
-      boss: true, mode: 'fight', bossKind: 'general', hp: 6,
-      stompProof: true, dropsAmmo: 8 }
+    // Open the whole time, and it tells you before every charge.
+    { x: 6850, y: GROUND_Y - 36, w: 36, minX: 6400, maxX: 7220, speed: 1.9,
+      boss: true, mode: 'fight', bossKind: 'general', bossName: 'THE GENERAL',
+      hp: 6, stompProof: true, dropsAmmo: 8 }
   ],
 
   coins: [
-    [200, 316], [245, 316],
-    [490, 271],
-    [660, 396], [720, 396],
-    [915, 306],
-    [1215, 251],
-    [1330, 396],
-    [1545, 296],
-    [1845, 221],
-    [1970, 396],
-    [2145, 306],
-    [2515, 241],
-    [2640, 396],
-    [2915, 296],
-    [3410, 266],
+    [420, 352], [465, 352],
+    [740, 256], [785, 256],
+    [1055, 330],
+    [1250, 396], [1310, 396],
+    [1440, 352],
+    [1750, 396],
+    [2085, 330],
+    [2340, 236], [2385, 236],
+    [2740, 352],
+    [3040, 266],
+    [3315, 330],
     [3560, 396],
-    [3770, 330], [3890, 326], [4040, 326],
-    [4230, 236],
-    [4350, 396],
-    [4650, 236],
-    [4910, 211],
-    [5100, 396],
-    [5315, 286],
-    [5540, 396],
-    [5795, 251],
-    [6060, 396],
-    [6150, 286],
-    [6300, 396], [6360, 396]
+    [3860, 352],
+    [4190, 246], [4235, 246],
+    [4535, 330],
+    [4840, 226], [4885, 226],
+    [4990, 352],
+    [5280, 396],
+    [5555, 330],
+    [5840, 256], [5885, 256],
+    [6140, 352],
+    [6350, 396], [6410, 396], [6470, 396]
   ],
 
   checkpoints: [
-    { x: 2050, y: GROUND_Y - 70, width: 8, height: 70 },
-    { x: 3675, y: GROUND_Y - 70, width: 8, height: 70 },
-    { x: 5205, y: GROUND_Y - 70, width: 8, height: 70 }
+    { x: 1830, y: GROUND_Y - 70, width: 8, height: 70 },
+    { x: 3600, y: GROUND_Y - 70, width: 8, height: 70 },
+    { x: 5310, y: GROUND_Y - 70, width: 8, height: 70 }
   ]
 };

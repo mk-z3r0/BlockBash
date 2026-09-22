@@ -10,7 +10,7 @@ import { initBoss } from '../entities/bosses.js';
 import { updateRescueNPC, drawRescueNPC } from '../entities/npc.js';
 import { updateParticles, drawParticles, resetParticles, spawnExplosion, spawnDust } from '../entities/particles.js';
 import { resetCoins, updateCoins, drawCoins } from '../entities/coins.js';
-import { updateWeaponPickups, drawWeaponPickups, spawnAmmoPickup } from '../entities/weaponPickup.js';
+import { updateWeaponPickups, drawWeaponPickups, spawnAmmoPickup, spawnWeaponPickup } from '../entities/weaponPickup.js';
 import {
   updatePlayerWeapon, updateProjectiles, drawProjectiles,
   resetProjectiles, consumePlayerHit
@@ -203,6 +203,7 @@ function startLevel(index) {
   resetCoins();
   state.weaponPickups = [];
   level.ammoSpawns.forEach(a => spawnAmmoPickup(a.x, a.y == null ? level.groundY - 30 : a.y, a.amount || 4));
+  level.weaponSpawns.forEach(w => spawnWeaponPickup(w.x, w.y == null ? level.groundY : w.y, w.type));
   state.missiles = []; // unused while the bazooka is parked — see weapons/bazooka.js
   resetProjectiles();
   state.restoredCount = 0;
@@ -274,7 +275,7 @@ export function drawWorldAndHUD() {
   const level = getLevel();
   if (level.house) drawBlockHouse(level.house.x, level.groundY, 1.1);
   drawPlatforms();
-  drawWorldEdge(state.frameCount);
+  if (!level.noWorldEdge) drawWorldEdge(state.frameCount);
   drawHazards();
   drawCheckpoints();
   drawCoins(state.frameCount);

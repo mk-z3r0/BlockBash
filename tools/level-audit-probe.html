@@ -81,6 +81,14 @@
       player.velocityX = primedSpeed;
       player.pMeter = P.pMeterSegments;
       state.lives = 99;
+      // Nudge the clock by a prime between tests so successive attempts at
+      // the same obstacle meet any moving platform at a different phase.
+      // A level's movers are somewhere different every frame, and an
+      // obstacle near one would otherwise be judged against a single
+      // arbitrary snapshot of the room. Sampling across the matrix is also
+      // the honest test: the player can stand on the ledge and wait for the
+      // platform, so "clearable at some phase" is what clearable means.
+      state.frameCount += 53;
     }
     let primedSpeed = P.runMax;
     const clearEnemies = () => state.enemies.forEach(e => { e.alive = false; });
@@ -319,6 +327,25 @@
       if (hz) { badLanding++; fail(`spikes at ${hz.x} sit only ${hz.x - g.landing}px past the landing of the gap at ${g.edge}-${g.landing}`); }
     });
     if (!badLanding) out.push('  every gap landing is clear of the next hazard');
+
+    // ...and the mirror of that rule, which cost two diagnosis passes on
+    // level 6 before it existed. A jumpable bed near the END of its ground
+    // segment is a trap: clearing it at run carries ~168px, so if the ledge
+    // is right there the correct answer to the hazard is a death in the pit
+    // after it. The bed reads as fine in isolation and the gap reads as fine
+    // in isolation; only the pair is wrong.
+    let bedOffLedge = 0;
+    lv.hazards.forEach(h => {
+      if (h.width > 200) return;
+      const seg = ground.find(p => h.x >= p.x && h.x <= p.x + p.width);
+      if (!seg) return;
+      const runOut = (seg.x + seg.width) - (h.x + h.width);
+      if (runOut < 90) {
+        bedOffLedge++;
+        fail(`spike bed ${h.x}-${h.x + h.width} leaves only ${runOut}px of ground before the ledge at ${seg.x + seg.width} — clearing it lands in the pit`);
+      }
+    });
+    if (!bedOffLedge) out.push('  every spike bed has ground to land on after it');
 
     // A checkpoint inside an enemy's patrol span means respawning into a
     // sphere, which the design rules call a cheap death.

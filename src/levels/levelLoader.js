@@ -89,6 +89,12 @@ export function loadLevel(data) {
     // be read off his body rather than narrated.
     quarrickDamage: data.quarrickDamage || 0,
 
+    // The bright cube-corner seam at worldEdgeX is drawn on every level,
+    // because every level is the surface of a cube face. Level 7 is not —
+    // it's the hollow middle — and a corner of the planet glowing at the
+    // back of its own cavity would be nonsense.
+    noWorldEdge: !!data.noWorldEdge,
+
     // Which cutscenes this level has and what sets each one off. Evaluated
     // by cutscenes/triggers.js; the beat lists themselves are registered in
     // cutscenes/library.js. Cloned per entry so a level reload can't
@@ -102,7 +108,13 @@ export function loadLevel(data) {
     // Triangles for the Cornerstone, placed in the world. Scarcity is
     // supposed to make each rescue a decision, not to strand a player who
     // spent the lot on the first corrupted square they met.
-    ammoSpawns: data.ammo || []
+    ammoSpawns: data.ammo || [],
+    // Weapons the LEVEL puts somewhere, as opposed to ones a boss drops.
+    // Level 6's sledgehammer is the only one: the player holds one weapon at
+    // a time, so picking it up trades away the Cornerstone and every
+    // triangle with it. That's a decision, and it needs to be lying
+    // somewhere visible rather than falling out of a fight.
+    weaponSpawns: data.weapons || []
   };
 
   return current;

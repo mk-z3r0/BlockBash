@@ -59,7 +59,7 @@ export default {
     pillar(1780, 60, 132, { chewed: true }),
     pillar(1900, 60, 66),
     { x: 2060, y: 210, width: 110, height: 18 },
-    pillar(2240, 54, 154, { chewed: true }),
+    pillar(2090, 54, 154, { chewed: true }),
 
     // --- approaching the clearing: the stacks thin out ---
     pillar(2560, 60, 88),
@@ -98,13 +98,13 @@ export default {
     // rather than the bed, because that's where the player actually dies.
     { type: 'spikes', x: 1380, width: 55 },
     { type: 'spikes', x: 1980, width: 60 },
-    { type: 'spikes', x: 2320, width: 55 },
+    { type: 'spikes', x: 2180, width: 55 },
     { type: 'spikes', x: 2800, width: 50 },
     // clearing: no hazards 3000-3800
     { type: 'spikes', x: 3980, width: 55 },
     { type: 'spikes', x: 4310, width: 60 },
     { type: 'spikes', x: 4800, width: 55 },
-    { type: 'spikes', x: 5200, width: 55 },
+    { type: 'spikes', x: 5120, width: 55 },
     { type: 'spikes', x: 5660, width: 55 },
     { type: 'spikes', x: 6060, width: 60 }
   ],
@@ -167,7 +167,7 @@ export default {
     [1810, 264],
     [1930, 330],
     [2100, 196], [2145, 196],
-    [2267, 242],
+    [2117, 242], [2300, 396],
     [2420, 396],
     [2590, 308],
     [2730, 352],
