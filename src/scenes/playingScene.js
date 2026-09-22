@@ -10,7 +10,10 @@ import { updateRescueNPC, drawRescueNPC } from '../entities/npc.js';
 import { updateParticles, drawParticles, resetParticles, spawnExplosion, spawnDust } from '../entities/particles.js';
 import { resetCoins, updateCoins, drawCoins } from '../entities/coins.js';
 import { updateWeaponPickups, drawWeaponPickups } from '../entities/weaponPickup.js';
-import { updateWeaponInput } from '../weapons/pickaxe.js';
+import {
+  updatePlayerWeapon, updateProjectiles, drawProjectiles,
+  resetProjectiles, consumePlayerHit
+} from '../weapons/combat.js';
 import { loadLevel, getLevel } from '../levels/levelLoader.js';
 import { drawPlatforms, drawCheckpoints, drawHazards, drawWorldEdge } from '../levels/levelRenderer.js';
 import { restoreCarvedGaps } from '../levels/terrain.js';
@@ -156,12 +159,24 @@ function startLevel(index) {
   resetCoins();
   state.weaponPickups = [];
   state.missiles = []; // unused while the bazooka is parked — see weapons/bazooka.js
+  resetProjectiles();
+  state.restoredCount = 0;
+  state.playerTouchedHazard = false;
   resetParticles();
   resetDustTimer();
   resetBossAndCutscene();
   setRespawnPoint(level.playerSpawn.x, level.playerSpawn.y);
   resetPlayer();
-  player.hasWeapon = false; // starts unarmed every fresh level load
+  // Starts unarmed every fresh level load — a weapon is earned per level,
+  // it doesn't carry over. The one exception is the Cornerstone, which is
+  // story equipment rather than a level drop: once Quarrick hands it over
+  // it stays handed over, so levels that come after the handoff give it
+  // back at spawn (see `startsWith` in the level data).
+  player.weapon = level.startsWith || null;
+  player.hasWeapon = !!player.weapon;
+  player.ammo = level.startsWithAmmo || 0;
+  player.weaponTimer = 0;
+  player.weaponCooldown = 0;
   resetCamera();
   state.gameState = 'playing';
   showToast(level.name.toUpperCase(), 100);
@@ -214,6 +229,7 @@ export function drawWorldAndHUD() {
   drawCoins(state.frameCount);
   drawWeaponPickups(state.frameCount);
   drawEnemies(state.frameCount, hasCompleted('boss-showdown'));
+  drawProjectiles(state.frameCount);
   drawParticles();
   if (state.rescueNPC) drawRescueNPC(state.rescueNPC, state.frameCount);
   // Anything a cutscene puppets — drawn inside the rotation, so a character
@@ -261,7 +277,7 @@ export const playingScene = {
 
     if (locks.physics === 'run') {
       const { fellInPit } = updatePlayer(locks.input === 'locked');
-      updateWeaponInput(player, locks.input === 'locked');
+      updatePlayerWeapon(locks.input === 'locked');
 
       if (fellInPit) {
         playHit();
@@ -290,8 +306,12 @@ export const playingScene = {
     updateRescueNPCEntity();
 
     if (locks.physics === 'run') {
-      const { hitPlayer } = updateEnemies(player, isCutsceneActive());
-      if (hitPlayer) {
+      updateEnemies(player, isCutsceneActive());
+      updateProjectiles();
+      // One read, after everything that can hurt the player has run —
+      // contact, a sphere's swing, and a sphere's shot all raise the same
+      // flag (see weapons/combat.js).
+      if (consumePlayerHit()) {
         playHit();
         loseLife();
         if (state.gameState !== 'playing') return;

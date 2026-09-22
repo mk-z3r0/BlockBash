@@ -4,7 +4,7 @@ import { P, isColliding } from '../engine/physics.js';
 import { getLevel } from '../levels/levelLoader.js';
 import { spawnDust } from './particles.js';
 import { playJump } from '../audio/sfx.js';
-import { drawHeldPickaxe, pickaxeFistTarget } from '../weapons/pickaxe.js';
+import { getWeapon } from '../weapons/registry.js';
 
 export const player = {
   x: 100, y: 0, width: 22, height: 22,
@@ -12,11 +12,18 @@ export const player = {
   isOnGround: false,
   facing: 1,
   invincible: 0,
-  // Starts unarmed — see weapons/pickaxe.js and entities/weaponPickup.js.
-  // Set true only by collecting what the level 1 boss drops; reset per
-  // level in scenes/playingScene.js's startLevel(), never on a mid-level
-  // death (resetPlayer(), below) since dying shouldn't un-earn it.
+  // Starts unarmed — see weapons/registry.js and entities/weaponPickup.js.
+  // Set only by collecting what a boss drops; reset per level in
+  // scenes/playingScene.js's startLevel(), never on a mid-level death
+  // (resetPlayer(), below) since dying shouldn't un-earn it.
+  //
+  // `weapon` is the registry id of whatever is in hand, or null. `hasWeapon`
+  // is kept alongside it as the plain "is the player armed at all" boolean
+  // that the HUD, the probes and the level-1 gating already read.
+  weapon: null,
+  ammo: 0,
   hasWeapon: false,
+  hitThisSwing: null,   // targets already struck by the current swing
   weaponTimer: 0,
   weaponCooldown: 0,
   bazookaCooldown: 0, // unused while the bazooka is parked — see weapons/bazooka.js
@@ -318,16 +325,22 @@ export function drawPlayer(frameCount) {
   // pickaxe is earned, the fist aims at a carry/swing target instead of the
   // fixed unarmed reach, so the arm itself moves with the weapon rather
   // than holding one static pose while only the axe rotates in its hand.
-  const fist = player.hasWeapon
-    ? pickaxeFistTarget(hw, hh, player.facing, player.weaponTimer)
+  // Whatever is in hand drives both the arm's target and the tool's pose,
+  // looked up by id — the arm moves with the weapon rather than holding one
+  // static pose while only the tool rotates in it. A weapon the registry
+  // doesn't know falls back to the unarmed reach instead of throwing.
+  const weapon = getWeapon(player.weapon);
+  const progress = weapon && player.weaponTimer > 0
+    ? 1 - player.weaponTimer / weapon.duration
+    : 0;
+  const fist = weapon
+    ? weapon.fistAt(hw, hh, player.facing, progress)
     : { x: player.facing * (hw + 17), y: -hh * 0.35 };
   const hand = drawMuscleArm(0, -hh * 0.1, fist.x, fist.y);
 
-  // persistent once earned — drawn every frame, not just during the 16-frame
-  // swing window, so it doesn't flicker in and out of view
-  if (player.hasWeapon) {
-    drawHeldPickaxe(hand, player.facing, player.weaponTimer);
-  }
+  // persistent once earned — drawn every frame, not just during the swing
+  // window, so it doesn't flicker in and out of view
+  if (weapon) weapon.drawHeld(hand, player.facing, progress);
   ctx.restore();
   ctx.restore();
 }

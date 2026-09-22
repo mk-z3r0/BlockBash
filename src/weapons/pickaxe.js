@@ -149,7 +149,15 @@ export function miningFistAt(hw, hh, facing, progress) {
 // way they face, so the same angle looks right both ways instead of
 // swinging into their own body on one side.
 export function drawHeldPickaxe(hand, facing, weaponTimer) {
-  const progress = weaponTimer > 0 ? 1 - weaponTimer / SWING_DURATION : 0;
+  drawHeldPickaxeAt(hand, facing, weaponTimer > 0 ? 1 - weaponTimer / SWING_DURATION : 0);
+}
+
+// The same thing, taking progress directly. The weapon registry
+// (weapons/registry.js) drives every weapon from a 0..1 progress value so
+// they're interchangeable in a hand; this is the pickaxe's entry point for
+// that. drawHeldPickaxe above is kept as the timer-taking form its existing
+// callers use.
+export function drawHeldPickaxeAt(hand, facing, progress) {
   ctx.save();
   ctx.translate(hand.x, hand.y);
   ctx.scale(facing, 1);

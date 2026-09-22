@@ -145,3 +145,88 @@ export function drawBackground(cameraX, cameraY = 0) {
   }
   ctx.restore();
 }
+
+// A sledgehammer, drawn to the same contract as drawPickaxeIcon(): grip end
+// of the handle AT the origin, head extending toward +x/-y, so the two are
+// interchangeable in any hand that holds a weapon.
+//
+// Deliberately blunter and heavier-looking than the pickaxe — a thicker
+// handle and a squared-off steel head instead of a tapered spike. The
+// silhouette has to say "slow but it hurts" before the player has swung it
+// once, because that's exactly how it plays (see weapons/sledgehammer.js).
+export function drawSledgehammerIcon() {
+  ctx.strokeStyle = '#7d5730';
+  ctx.lineWidth = 5;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(20, -15);
+  ctx.stroke();
+
+  // the head: a solid block across the end of the handle
+  ctx.save();
+  ctx.translate(21, -16);
+  ctx.rotate(Math.atan2(-15, 20) + Math.PI / 2);
+  ctx.fillStyle = '#8f9ab0';
+  ctx.strokeStyle = '#464e5e';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.rect(-6, -13, 12, 26);
+  ctx.fill();
+  ctx.stroke();
+  // a lighter band down the striking face, so the block reads as metal
+  // rather than as a plain rectangle
+  ctx.fillStyle = 'rgba(232, 238, 248, 0.45)';
+  ctx.fillRect(-6, -13, 3, 26);
+  ctx.restore();
+}
+
+// The Cornerstone — the restoration weapon. Same grip-at-origin contract.
+//
+// It is the one weapon that doesn't destroy anything, so it's drawn as a
+// mason's tool rather than a striking one: a short haft with an open
+// triangular frame at the end, lit in the same cyan the cube-edge seam uses
+// (levels/levelRenderer.js). That colour already means "the world, intact"
+// everywhere else in the game, which is the whole idea.
+export function drawCornerstoneIcon(glow = 1) {
+  ctx.strokeStyle = '#6b5b45';
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(15, -11);
+  ctx.stroke();
+
+  ctx.save();
+  ctx.translate(16, -12);
+  ctx.rotate(Math.atan2(-11, 15));
+  // the frame: an outlined triangle, point forward — the shape it fires
+  ctx.strokeStyle = `rgba(94, 231, 255, ${0.55 + 0.45 * glow})`;
+  ctx.lineWidth = 2.4;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(18, 0);
+  ctx.lineTo(-2, -11);
+  ctx.lineTo(-2, 11);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.fillStyle = `rgba(94, 231, 255, ${0.12 * glow})`;
+  ctx.fill();
+  ctx.restore();
+}
+
+// One restoration triangle in flight, and the same shape used for the
+// ammo pips on the HUD. Points along +x before rotation.
+export function drawRestoreTriangle(size, alpha = 1) {
+  ctx.fillStyle = `rgba(94, 231, 255, ${0.85 * alpha})`;
+  ctx.strokeStyle = `rgba(215, 250, 255, ${alpha})`;
+  ctx.lineWidth = 1.5;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(size, 0);
+  ctx.lineTo(-size * 0.7, -size * 0.85);
+  ctx.lineTo(-size * 0.7, size * 0.85);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+}

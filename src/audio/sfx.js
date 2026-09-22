@@ -164,3 +164,65 @@ export function playDialogueBlip(freq) {
   const t = audioCtx.currentTime;
   tone(freq, t, 0.03, 'square', 0.045, sfxGain, 2600);
 }
+
+// --- weapon identities (see GAME_DESIGN's Sound Design) ---------------
+// The rule there is that every weapon gets an audio signature written WITH
+// the weapon, not bolted on later, and that the player should know which
+// one is out with their eyes shut. These three are deliberately separated
+// on pitch, attack and texture, not just loudness.
+
+// Heavy and low, with the noise arriving slightly AFTER the tone — the
+// sound of something massive landing rather than a blade cutting. That
+// small delay is most of what distinguishes it from the pickaxe's chop.
+export function playSledgeSwing() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  tone(90, t, 0.28, 'sawtooth', 0.3, sfxGain, 420, 45);
+  noiseBurst(t + 0.05, 0.22, 0.3, sfxGain, 'lowpass', 900);
+}
+
+// The Cornerstone is the one weapon that isn't destroying anything, so it
+// gets a crystalline chime instead of an impact: a clean rising pair with
+// no noise component at all. Nothing else in the game is pure tone.
+export function playCornerstoneFire() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  tone(1046.5, t, 0.12, 'triangle', 0.18, sfxGain, 6000);
+  tone(1568, t + 0.05, 0.16, 'triangle', 0.14, sfxGain, 6000);
+}
+
+// A corner going back on. The same chime family as firing, but resolving
+// upward across three notes and lasting long enough to register as an
+// event — this is the game's thesis sound and it should feel like relief.
+export function playRestore() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  [659.25, 987.77, 1318.5].forEach((f, i) =>
+    tone(f, t + i * 0.09, 0.3, 'triangle', 0.2, sfxGain, 6000));
+}
+
+// What the spheres fire back. Round and airy on purpose — a filtered puff
+// rather than a click, so it can never be mistaken for the Cornerstone's
+// chime. GAME_DESIGN's hard constraint is that the sphere projectile reads
+// as sphere-shaped thinking; this is that constraint in sound.
+export function playSphereShot() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  tone(220, t, 0.16, 'sine', 0.16, sfxGain, 1400, 520);
+  noiseBurst(t, 0.14, 0.1, sfxGain, 'bandpass', 700);
+}
+
+// A weapon bouncing off a corrupted square. Dull, wrong, and deliberately
+// unsatisfying — it's the sound of doing the wrong thing to a victim.
+export function playOctagonThud() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  tone(130, t, 0.12, 'square', 0.14, sfxGain, 380, 110);
+}
+
+export function playAmmoPickup() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  tone(880, t, 0.1, 'triangle', 0.18, sfxGain, 6000);
+  tone(1174.7, t + 0.07, 0.14, 'triangle', 0.16, sfxGain, 6000);
+}

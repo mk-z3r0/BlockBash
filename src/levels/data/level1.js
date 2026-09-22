@@ -195,7 +195,12 @@ export default {
     // room between its right edge and the protected walk-up to the world's
     // edge to put one — the dig silently no-op'd whenever it woke on the
     // right half of its old patrol.
-    { x: 6980, y: GROUND_Y - 33, w: 33, minX: 6900, maxX: 7010, speed: 1.37, boss: true }
+    { x: 6980, y: GROUND_Y - 33, w: 33, minX: 6900, maxX: 7010, speed: 1.37,
+      // `invulnerable` is what makes this one unwinnable, stated in the data
+      // rather than inferred from `boss` — every boss from level 2 on CAN be
+      // fought, so "is a boss" and "can't be hurt" stopped being the same
+      // thing the moment a second one existed (see weapons/combat.js).
+      boss: true, invulnerable: true }
   ],
 
   // Two tiers, by how they're actually reached: no-jump-needed (walking on

@@ -50,6 +50,13 @@ export function loadLevel(data) {
     // above and the transition trigger in scenes/playingScene.js.
     boss: data.boss ? { ...data.boss } : null,
 
+    // Story equipment the player arrives already holding. Every level
+    // otherwise starts them unarmed and makes them earn a drop; this is
+    // how the Cornerstone survives the level boundary once Quarrick has
+    // handed it over, without weapons in general becoming persistent.
+    startsWith: data.startsWith || null,
+    startsWithAmmo: data.startsWithAmmo || 0,
+
     // Which cutscenes this level has and what sets each one off. Evaluated
     // by cutscenes/triggers.js; the beat lists themselves are registered in
     // cutscenes/library.js. Cloned per entry so a level reload can't
