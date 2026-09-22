@@ -28,6 +28,7 @@ import { switchTo } from './sceneManager.js';
 import { recordProgress } from '../save.js';
 import { markCutsceneSeen } from '../narrative.js';
 import { drawOverlay } from '../ui/overlays.js';
+import { updatePopups, drawPopups, resetPopups } from '../ui/popups.js';
 import { hitHazard, checkCheckpoints } from './playing/collisions.js';
 import {
   startCutscene, updateCutscene, drawCutsceneWorld, drawCutsceneScreen,
@@ -218,6 +219,7 @@ function startLevel(index) {
   state.restoredCount = 0;
   state.playerTouchedHazard = false;
   resetParticles();
+  resetPopups();
   resetImpact();
   resetDustTimer();
   resetBossAndCutscene();
@@ -292,6 +294,7 @@ export function drawWorldAndHUD() {
   drawEnemies(state.frameCount, hasCompleted('boss-showdown'));
   drawProjectiles(state.frameCount);
   drawParticles();
+  drawPopups();
   if (state.rescueNPC) drawRescueNPC(state.rescueNPC, state.frameCount);
   // Anything a cutscene puppets — drawn inside the rotation, so a character
   // standing on the face that's turning turns with it.
@@ -394,6 +397,7 @@ export const playingScene = {
       }
 
       updateParticles();
+      updatePopups();
       updateCoins(player);
       updateWeaponPickups(player);
     }

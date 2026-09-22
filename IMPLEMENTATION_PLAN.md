@@ -592,6 +592,15 @@ What's in it, and what each thing is actually for:
 | `respawn-state-probe` | What survives a death — and standing at all 21 checkpoints in the game for two seconds without touching the controls |
 | the older probes | Physics, coins, saves, cutscene contract — unchanged, and all still green |
 
+Not a probe, but in the same spirit: **`python3 tools/pressure-profile.py`**
+prints how much can reach the player every 100px of every level — enemy
+patrol spans widened by what each tier can actually do, plus beds and pits.
+It cannot tell you whether a level is fun. It can tell you where one suddenly
+gets three times busier than the rest of itself, which is usually a mistake
+rather than a design. The current curve ramps 0.51 → 0.83 → 0.75 → 1.21 →
+1.23 → 1.52 and then eases to 1.01 for level 7, where the core is the event
+rather than the population.
+
 **Adding a level** means: write the data file, add it to `levels/registry.js`,
 run `python3 tools/gen-module-probe.py`, and run the suite. The audit list and
 the module list both size themselves off the repo, so nothing else needs

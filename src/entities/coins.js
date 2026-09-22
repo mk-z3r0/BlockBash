@@ -3,6 +3,7 @@ import { isColliding } from '../engine/physics.js';
 import { getLevel } from '../levels/levelLoader.js';
 import { playCoin, playExtraLife } from '../audio/sfx.js';
 import { showToast } from '../ui/hud.js';
+import { addPopup } from '../ui/popups.js';
 import { state } from '../state.js';
 
 // Coins accumulate across a whole run, not just one level — reset alongside
@@ -27,6 +28,7 @@ export function updateCoins(player) {
       coin.collected = true;
       state.score += 10;
       state.coinsCollected++;
+      addPopup(coin.x, coin.y - 6, '+10', '#5ee7ff');
       playCoin();
 
       if (state.coinsCollected % COINS_PER_LIFE === 0 && state.lives < MAX_LIVES) {

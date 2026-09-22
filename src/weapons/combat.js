@@ -28,6 +28,7 @@ import {
 } from './cornerstone.js';
 import { ctx } from '../engine/renderer.js';
 import { addShake, addHitStop } from '../engine/impact.js';
+import { addPopup } from '../ui/popups.js';
 
 // Enemies carry `w` (they're circles, one dimension); the player carries
 // width/height. One box shape for the hit tests either way.
@@ -173,7 +174,9 @@ export function damageEnemy(enemy, weapon, dir = 1) {
 
   enemy.alive = false;
   enemy.squish = 14;
-  state.score += weapon.score || 100;
+  const worth = weapon.score || 100;
+  state.score += worth;
+  addPopup(enemy.x + enemy.w / 2, enemy.y, `+${worth}`, '#8effc0');
   spawnExplosion(enemy.x + enemy.w / 2, enemy.y + enemy.w / 2, '#8effc0');
   addShake(enemy.boss ? 9 : 3);
   addHitStop(enemy.boss ? 8 : 4);
@@ -202,6 +205,9 @@ export function restoreTarget(target) {
   target.restored = true;
   target.fleeing = true;
   state.score += 300;
+  // Cyan, and worth three times a kill. Both of those are the game saying
+  // which verb it actually cares about.
+  addPopup(target.x + target.w / 2, target.y, '+300  RESTORED', '#5ee7ff');
   // A restoration gets a bigger, softer beat than a kill: longer stop, less
   // shake. It should land like relief rather than like an explosion.
   addShake(target.boss ? 6 : 2);

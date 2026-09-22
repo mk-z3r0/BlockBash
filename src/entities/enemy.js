@@ -7,6 +7,7 @@ import { getWeapon } from '../weapons/registry.js';
 import { startAttack, tickWeapon, spawnSphereShot, boxOf } from '../weapons/combat.js';
 import { initBoss, updateBossBehaviour, onBossDefeated } from './bosses.js';
 import { addShake, addHitStop } from '../engine/impact.js';
+import { addPopup } from '../ui/popups.js';
 import { state } from '../state.js';
 
 // --- enemy tiers (GAME_DESIGN's "Enemies evolve across levels") ---------
@@ -276,6 +277,7 @@ export function updateEnemies(player, cutsceneActive) {
             enemy.alive = false;
             enemy.squish = 14;
             state.score += 100;
+            addPopup(enemy.x + enemy.w / 2, enemy.y, '+100', '#8effc0');
             addShake(2.5);
             addHitStop(3);
           } else {
