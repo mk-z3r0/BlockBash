@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#0a0d1c;"><canvas id="game" width="800" height="450"></canvas>
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true }));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  // Frames the long spike bed (4920-5260) and the two stepping stones over
+  // it (4960 and 5120, top y340) — the one place level 1 puts the player on
+  // top of a slab that sits above spikes, which is what the carved-underside
+  // rendering in levels/levelRenderer.js is for.
+  import { player } from '../src/entities/player.js';
+  import { camera } from '../src/engine/camera.js';
+  import { update, draw } from '../src/scenes/sceneManager.js';
+  const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+  setTimeout(() => {
+    key('keydown', ' '); key('keyup', ' ');   // title -> playing
+    update();
+    player.x = 4990; player.y = 318;          // standing on the first stone
+    player.velocityX = 0; player.velocityY = 0;
+    // the camera eases at 0.12/frame, so it needs a while to travel 4700px
+    for (let i = 0; i < 90; i++) update();
+    draw();
+    document.title = `player ${Math.round(player.x)},${Math.round(player.y)} camera ${Math.round(camera.x)}`;
+  }, 250);
+</script></body></html>

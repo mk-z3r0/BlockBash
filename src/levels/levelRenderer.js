@@ -45,8 +45,115 @@ function drawHazardStripes(platforms) {
   }
 }
 
+// --- Carved undersides ---------------------------------------------------
+//
+// Visual texture, nothing more. A floating platform sitting over a spike bed
+// gets its underside bitten away and its bottom corners cut off, in the same
+// square-minus-its-corners language the spheres use elsewhere.
+//
+// Deliberately NOT a story about where the spikes came from: spikes are just
+// an obstacle (see the "Spikes" row in Decisions made). An earlier pass had
+// them as debris carved out of the surface overhead, which only ever applied
+// to two platforms in one level and wanted more scaffolding than it repaid.
+//
+// Derived from level data rather than authored per platform, the way hazard
+// stripes and the world edge are, so it costs nothing in a later level.
+const CARVE_SCOOP = 22;   // target width of one bite; the real one divides evenly
+const CARVE_DEPTH = 8;    // how far the deepest bite eats up into the slab
+const CARVE_CHAMFER = 5;  // how much of each bottom corner is gone
+
+function isOverSpikes(p, hazards) {
+  if (p.ground) return false;
+  return hazards.some(h =>
+    h.type === 'spikes' &&
+    h.y > p.y + p.height &&                      // genuinely below the slab
+    h.x < p.x + p.width && h.x + h.width > p.x   // and overlapping it
+  );
+}
+
+// Deterministic per-bite variation, so a slab always chews the same way
+// instead of shimmering frame to frame. Keyed off the platform's ORIGINAL x
+// (`baseX` on anything that slides) so a moving ledge carries its damage with
+// it rather than re-rolling the pattern as it travels.
+function hash(seed, i) {
+  const n = Math.sin(seed * 12.9898 + i * 78.233) * 43758.5453;
+  return n - Math.floor(n);            // 0..1
+}
+
+function scoopDepth(g, i) {
+  return CARVE_DEPTH * (0.35 + hash(g.seed, i) * 0.65);
+}
+
+// Where bite `i` starts. The interior boundaries jitter sideways, because
+// evenly spaced bites read as decorative scalloping rather than as something
+// having eaten the rock. The two ends stay put so the chamfers stay clean.
+function boundary(g, i) {
+  if (i === 0) return g.spanL;
+  if (i === g.count) return g.spanR;
+  return g.spanL + i * g.w + (hash(g.seed + 101, i) - 0.5) * g.w * 0.55;
+}
+
+function carveGeometry(p) {
+  const spanL = p.x + CARVE_CHAMFER;
+  const spanR = p.x + p.width - CARVE_CHAMFER;
+  const count = Math.max(2, Math.round((spanR - spanL) / CARVE_SCOOP));
+  return {
+    spanL, spanR, count,
+    w: (spanR - spanL) / count,
+    bottom: p.y + p.height,
+    seed: Math.round(p.baseX ?? p.x)
+  };
+}
+
+// The bitten edge, traced right-to-left from the current point. Each bite is
+// a scoop pushed up into the slab; the control point sits at twice the depth
+// because a quadratic peaks halfway to it.
+function scoopPath(g) {
+  for (let i = g.count - 1; i >= 0; i--) {
+    const x0 = boundary(g, i), x1 = boundary(g, i + 1);
+    ctx.quadraticCurveTo((x0 + x1) / 2, g.bottom - scoopDepth(g, i) * 2, x0, g.bottom);
+  }
+}
+
+// Drawing only — collision still uses the full rect (engine/physics.js never
+// looks at this), so a slab stays exactly as solid as it looks from above,
+// which is the surface that matters. The bites are shallow enough that the
+// difference is invisible on a head-bonk from below.
+function drawCarvedPlatform(p) {
+  const g = carveGeometry(p);
+
+  ctx.beginPath();
+  ctx.moveTo(p.x, p.y);
+  ctx.lineTo(p.x + p.width, p.y);
+  ctx.lineTo(p.x + p.width, g.bottom - CARVE_CHAMFER);
+  ctx.lineTo(g.spanR, g.bottom);
+  scoopPath(g);
+  ctx.lineTo(p.x, g.bottom - CARVE_CHAMFER);
+  ctx.closePath();
+
+  ctx.fillStyle = '#232f5c';
+  ctx.fill();
+  ctx.strokeStyle = '#3a4a82';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Freshly exposed material along the bitten edge only, clipped to the slab
+  // so it reads as inside-the-rock rather than as a glow hanging under it.
+  // Deliberately the same pale tone the spikes below are drawn in — that's
+  // the point of the whole detail: this is where they came from.
+  ctx.save();
+  ctx.clip();
+  ctx.beginPath();
+  ctx.moveTo(g.spanR, g.bottom);
+  scoopPath(g);
+  ctx.strokeStyle = 'rgba(232, 238, 248, 0.26)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+}
+
 export function drawPlatforms() {
-  const { platforms } = getLevel();
+  const { platforms, hazards } = getLevel();
 
   // Fills first. Ground segments are filled without their own outline so that
   // two flush segments read as one continuous surface.
@@ -55,6 +162,8 @@ export function drawPlatforms() {
     if (p.ground) {
       ctx.fillStyle = '#1c2547';
       ctx.fillRect(p.x, p.y, p.width, p.height);
+    } else if (isOverSpikes(p, hazards)) {
+      drawCarvedPlatform(p);
     } else {
       ctx.fillStyle = '#232f5c';
       ctx.fillRect(p.x, p.y, p.width, p.height);

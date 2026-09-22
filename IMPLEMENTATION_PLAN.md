@@ -43,9 +43,9 @@ the real level 1. It diverges freely once created; nothing keeps it in sync.
 |---|---|
 | 0 — module split + scene manager | done |
 | 1 — data-driven levels, loader, transitions | steps 1–4 done — loader, renderer, spikes, level 1 extended |
-| **Milestone: Level 1 complete** | **not yet reached** — progression + versioned save are done; 4 of 5 retrofit items done (intro cutscene, coin thresholds, skybox, weapon gating resolved); carved platform damage remains |
+| **Milestone: Level 1 complete** | **reached (2026-09-21)** — progression + versioned save done, and all 5 retrofit items now done (intro cutscene, coin thresholds, skybox, weapon gating resolved, carved platform damage) |
 | 2+ (level tool, chamfers, enemies, weapons, octagons, world manipulation, polish) | not started, re-scoped by the design doc, blocked on the milestone |
-| *out of band* — SMB3 physics rewrite + tuning lab, level-1 retune, level-edge transition | done on `physics-lab`, unmerged. None of these were in the numbered order; they came up because the game needed to *feel* right and needed a way to leave a level before level 2 was worth building |
+| *out of band* — SMB3 physics rewrite + tuning lab, level-1 retune, level-edge transition | done, merged to `main` in a74db2f. None of these were in the numbered order; they came up because the game needed to *feel* right and needed a way to leave a level before level 2 was worth building |
 
 Level 1 runs 0–7200px: pits and passive spheres, a staircase and a tall wall,
 then a spike half, then an unwinnable boss (50% larger than a normal sphere,
@@ -75,7 +75,7 @@ below it starts until that's checked off.
 | How does terrain get "rounded"? | **Chamfers — corners cut at 45°, not curves.** Discrete damage states, progressively deeper | Curves would force a collision rewrite. A diagonal is the classic slope problem and stays tractable |
 | The bazooka vs. "player starts unarmed" | **Parked, not converted.** Level 1's retrofit (2026-09-19) got to "player starts unarmed, earns a weapon from a defeated enemy" first, via a melee pickaxe dropped by the boss (`weapons/pickaxe.js`) — the bazooka isn't the player's level 1 weapon anymore. It still exists in the codebase (`weapons/bazooka.js`), just not wired into any scene right now: confirmed (2026-09-19) it's planned to reappear later in the game, so it's parked rather than deleted or converted. The triangle-shooter idea is still the plan for whatever *that* eventually becomes, whenever it's actually built | Triangles *are* the missing corners, so restoring an octagon is literal geometry, not metaphor — that reasoning still holds whenever the triangle shooter actually gets built |
 | Level 1 | **Keep it, retrofit it.** Good concept test | Passive enemies, foreshadowing boss and rescue NPC already fit the story |
-| Spikes (absent from the design doc) | **Debris from the world being carved** | Folds an orphan mechanic into the narrative |
+| Spikes (absent from the design doc) | **Just an obstacle** (2026-09-21). Briefly decided as debris from the carved world; reversed — too few platforms sit over spikes for that reading to land, and the plain one (the spheres put them there to slow you down) needs no scaffolding | An obstacle doesn't have to earn a narrative justification before it's allowed to exist |
 | What a restored octagon does | **Becomes a square again and flees** — an ally, not a recruit | Restoration is a *rescue* verb. Keeps freed squares out of the combat math |
 | Does the triangle shooter still kill? | **Yes — it still pops spheres** | It's the main gun with a second verb, not a niche tool |
 | Trick platforms | Parked in `levels/trickPlatforms.js`, out of level 1, returning later | Level 1 is the beginner level; trolling escalates in later levels |
@@ -560,10 +560,11 @@ way to simulate more than a frame or two.
   level rather than deleted, since the animation/timing code still works
   fine. A level opts a specific enemy back in with `canHop: true` in its
   spawn data.
-- **Debris reads as damage from above,** so spikes want a carved surface
-  overhead — but that fights the no-platforms-overhead rule. Resolution: use it
-  where the player crosses *on top* (the stepping-stone section is already this
-  shape); elsewhere put the damage source beside the corridor, not over it.
+- **Spikes don't need a reason to be there** (rule retired 2026-09-21). It
+  used to read "debris reads as damage from above, so spikes want a carved
+  surface overhead" — which fought the no-platforms-overhead rule and only
+  ever applied to level 1's stepping stones. Place spikes where they make a
+  crossing interesting; that's the whole constraint.
 - **A boss/cutscene trigger keyed only on player position can fire while the
   boss is still off-screen.** The camera eases toward the player rather than
   snapping to them, so it lags — position-only triggers (`player.x` past some
@@ -909,7 +910,15 @@ To add:
   toast) instead of a ranged shot — see the "bazooka vs. unarmed" row in
   Decisions made above
 - [x] Coin→life thresholds tuned against its ~47 coins
-- [ ] Carved damage on elevated platform undersides above the spike debris
+- [x] Carved damage on elevated platform undersides above the spike beds —
+  `levels/levelRenderer.js`. Any floating platform overlapping a spike bed
+  below it gets its underside bitten away (irregular scoops, both bottom
+  corners chamfered, a faint pale edge). Derived from level data the way
+  hazard stripes and the world edge already are, so a later level gets it
+  free. Drawing only — collision still uses the full rect. In level 1 that's
+  the two stepping stones over the 4920–5260 bed. Kept as plain visual
+  texture after the debris rationale behind it was dropped the same day;
+  screenshot via tools/carved-underside-shot.html
 - [x] ~~The blown-off planet corner visible in the skyline~~ — resolved by
   *not* doing this: it's shown once, in the opening cutscene, and deliberately
   not repeated as a gameplay-background reminder (see the cutscene-style
