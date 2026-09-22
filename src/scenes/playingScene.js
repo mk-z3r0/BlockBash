@@ -9,7 +9,7 @@ import { updateEnemies, drawEnemies, spawnEnemies } from '../entities/enemy.js';
 import { updateRescueNPC, drawRescueNPC } from '../entities/npc.js';
 import { updateParticles, drawParticles, resetParticles, spawnExplosion, spawnDust } from '../entities/particles.js';
 import { resetCoins, updateCoins, drawCoins } from '../entities/coins.js';
-import { updateWeaponPickups, drawWeaponPickups } from '../entities/weaponPickup.js';
+import { updateWeaponPickups, drawWeaponPickups, spawnAmmoPickup } from '../entities/weaponPickup.js';
 import {
   updatePlayerWeapon, updateProjectiles, drawProjectiles,
   resetProjectiles, consumePlayerHit
@@ -104,7 +104,10 @@ function finishLevel() {
 // The boss blocks the way to the edge until its cutscene has resolved.
 function bossActive() {
   if (hasCompleted('boss-showdown')) return false;
-  return state.enemies.some(e => e.boss && e.alive);
+  // A restored boss is no longer in anyone's way — the Sculptor is beaten by
+  // being turned back into a square, not by being killed, so it stays
+  // `alive` (and walks off under its own steam) after the fight is won.
+  return state.enemies.some(e => e.boss && e.alive && !e.restored);
 }
 
 function resetBossAndCutscene() {
@@ -173,6 +176,7 @@ function startLevel(index) {
   state.enemies = spawnEnemies(level.enemySpawns);
   resetCoins();
   state.weaponPickups = [];
+  level.ammoSpawns.forEach(a => spawnAmmoPickup(a.x, a.y == null ? level.groundY - 30 : a.y, a.amount || 4));
   state.missiles = []; // unused while the bazooka is parked — see weapons/bazooka.js
   resetProjectiles();
   state.restoredCount = 0;

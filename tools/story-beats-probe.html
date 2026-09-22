@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#000;">
+<canvas id="game" width="800" height="450"></canvas><pre id="out">running…</pre>
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true, narrative: { seenCutscenes: {}, npcStage: 0, flags: {} } })); window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERROR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  // The story beats that a player can be BLOCKED by, driven end to end.
+  //
+  // Geometry has its own gate (level-audit-probe). This is the other way a
+  // level becomes unfinishable: a scene that doesn't fire, a weapon that
+  // isn't actually handed over, or a boss that can't be beaten by the verb
+  // it's supposed to be beaten by. Level 3 is the one that matters most —
+  // the Cornerstone arrives there, and the Sculptor at the end of it cannot
+  // be hurt by anything else.
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update, switchTo } from '../src/scenes/sceneManager.js';
+  import { getLevel } from '../src/levels/levelLoader.js';
+  import { startAttack } from '../src/weapons/combat.js';
+  import { isCutsceneActive, activeCutsceneId, skipCutscene } from '../src/cutscenes/runner.js';
+
+  const out = [];
+  let fails = 0;
+  const check = (ok, label) => { if (!ok) fails++; out.push(`  ${ok ? 'ok  ' : 'FAIL'} ${label}`); };
+
+  const tick = n => { for (let i = 0; i < n; i++) update(); };
+
+  // Stand next to the target and fire, however many times it takes.
+  function fireAt(target, shots) {
+    for (let n = 0; n < shots; n++) {
+      player.x = target.x - 90;
+      player.y = target.y;
+      player.facing = 1;
+      player.weaponCooldown = 0;
+      startAttack(player);
+      tick(30);
+    }
+  }
+
+  function swingAt(target, times) {
+    for (let n = 0; n < times; n++) {
+      player.x = target.x - player.width - 6;
+      player.y = target.y;
+      player.facing = 1;
+      player.weaponCooldown = 0;
+      startAttack(player);
+      tick(26);
+    }
+  }
+
+  setTimeout(() => {
+    state.currentLevelIndex = 2;
+    switchTo('playing', { retry: true });
+    const lv = getLevel();
+    state.lives = 999;
+    player.invincible = 999999;   // this probe is about the story, not survival
+    out.push(`== level 3 (${lv.name}) ==`);
+    check(player.weapon === 'sledgehammer', `arrives with the sledgehammer (${player.weapon})`);
+
+    // 1. a corrupted square cannot be beaten, only restored
+    const octagon = state.enemies.find(e => e.kind === 'octagon' && !e.boss);
+    check(!!octagon, 'the level has a corrupted square before the handoff');
+    if (octagon) {
+      const hp0 = octagon.hp;
+      swingAt(octagon, 3);
+      check(octagon.alive && octagon.hp === hp0,
+        `the sledgehammer does nothing to it (alive ${octagon.alive}, hp ${octagon.hp})`);
+    }
+
+    // 2. walking past 3400 starts the handoff
+    player.x = 3402;
+    player.y = lv.groundY - player.height;
+    tick(2);
+    check(isCutsceneActive() && activeCutsceneId() === 'l3-handoff',
+      `the handoff fires at 3400 (active: ${activeCutsceneId()})`);
+
+    // 3. and skipping it still leaves the player armed and the target there
+    skipCutscene();
+    tick(2);
+    check(player.weapon === 'cornerstone', `skipping still hands over the Cornerstone (${player.weapon})`);
+    check(player.ammo >= 10, `arrives loaded (${player.ammo} triangles)`);
+    const corrupted = state.enemies.find(e => e.quarrick);
+    check(!!corrupted, 'a corrupted Quarrick is there to use it on');
+
+    // 4. three triangles put him back
+    if (corrupted) {
+      fireAt(corrupted, 3);
+      check(corrupted.restored, `three triangles restore him (hits left ${corrupted.restoreHits})`);
+      tick(3);
+      check(isCutsceneActive() && activeCutsceneId() === 'l3-restored',
+        `restoring him fires the follow-up (active: ${activeCutsceneId()})`);
+      skipCutscene();
+    }
+
+    // 5. the Sculptor: immune to the weapon, beaten by the verb
+    const sculptor = state.enemies.find(e => e.boss);
+    check(!!sculptor, 'the Sculptor is present');
+    if (sculptor) {
+      const wasCornerstone = player.weapon;
+      player.weapon = 'sledgehammer';
+      swingAt(sculptor, 3);
+      check(sculptor.alive && !sculptor.restored, 'the sledgehammer does nothing to the Sculptor');
+      player.weapon = wasCornerstone;
+      player.ammo = 20;
+      fireAt(sculptor, 6);
+      check(sculptor.restored, `six triangles restore it (hits left ${sculptor.restoreHits})`);
+      tick(2);
+      const blocking = state.enemies.some(e => e.boss && e.alive && !e.restored);
+      check(!blocking, 'restoring it opens the way to the edge');
+    }
+
+    out.push(fails ? `*** ${fails} FAILURE(S)` : 'PASS the story beats hold together');
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 250);
+</script></body></html>

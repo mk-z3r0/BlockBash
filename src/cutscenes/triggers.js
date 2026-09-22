@@ -47,8 +47,19 @@ const CONDITIONS = {
     return fullyOnScreen && player.x + player.width > level.boss.wakeX;
   },
 
-  // Every boss in the level is down.
-  bossDefeated: () => !state.enemies.some(e => e.boss && e.alive),
+  // Every boss in the level is down — killed, or restored, depending on
+  // what kind of boss it was.
+  bossDefeated: () => !state.enemies.some(e => e.boss && e.alive && !e.restored),
+
+  // The corrupted Quarrick has been put back together. Spawned by the
+  // handoff cutscene and the only thing in the game flagged `quarrick`, so
+  // this reads as "the player has used the weapon he just gave them, on
+  // him". Deliberately false while no such enemy exists, so it can't fire
+  // before the handoff has happened.
+  quarrickRestored: () => {
+    const q = state.enemies.find(e => e.quarrick);
+    return !!q && q.restored;
+  },
 
   // Never fires on its own — for cutscenes another system starts by hand.
   manual: () => false

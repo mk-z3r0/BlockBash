@@ -75,7 +75,11 @@ export function loadLevel(data) {
 
     // raw spawn data — the entity modules build their own run state from these
     enemySpawns: data.enemies || [],
-    coinSpawns: data.coins || []
+    coinSpawns: data.coins || [],
+    // Triangles for the Cornerstone, placed in the world. Scarcity is
+    // supposed to make each rescue a decision, not to strand a player who
+    // spent the lot on the first corrupted square they met.
+    ammoSpawns: data.ammo || []
   };
 
   return current;

@@ -143,7 +143,14 @@ export function updateEnemies(player, cutsceneActive) {
       if (Math.abs(enemy.knockback) < 0.3) enemy.knockback = 0;
     }
 
-    if (enemy.boss && enemy.mode === 'fight') {
+    if (enemy.kind === 'octagon') {
+      // Checked BEFORE the boss branches, because the Sculptor is a boss
+      // AND an octagon, and what it is matters more than what rank it
+      // holds: it shambles and it's beaten by being restored, exactly like
+      // every other corrupted square.
+      if (playerIsNear(enemy, player, 200)) chase(enemy, player, OCTAGON_SPEED);
+      else patrol(enemy);
+    } else if (enemy.boss && enemy.mode === 'fight') {
       // A real fight: the boss drives itself. Its own phase machine decides
       // when it can be hurt (see entities/bosses.js).
       if (!cutsceneActive) updateBossBehaviour(enemy, player);
@@ -151,10 +158,6 @@ export function updateEnemies(player, cutsceneActive) {
       // Level 1's Foreman: patrols until its cutscene takes over.
       if (!enemy.awake) patrol(enemy);
       if (cutsceneActive) continue;
-    } else if (enemy.kind === 'octagon') {
-      // shambles toward the player when they're close, otherwise drifts
-      if (playerIsNear(enemy, player, 200)) chase(enemy, player, OCTAGON_SPEED);
-      else patrol(enemy);
     } else {
       const range = AGGRO_RANGE[enemy.tier] || 0;
       const hunting = range > 0 && !cutsceneActive && playerIsNear(enemy, player, range);
@@ -243,7 +246,7 @@ export function updateEnemies(player, cutsceneActive) {
 // drives how deep the cuts are, so restoring one visibly squares it back up
 // corner by corner rather than flipping shape at the end. This is the
 // game's whole visual argument in one function — see "The unifying idea".
-function drawOctagonBody(size, cornersLost, flash) {
+function drawOctagonBody(size, cornersLost, flash, wasQuarrick) {
   const h = size / 2;
   const cut = (size * 0.3) * (cornersLost / 4);
   ctx.beginPath();
@@ -263,8 +266,15 @@ function drawOctagonBody(size, cornersLost, flash) {
   const grad = ctx.createLinearGradient(0, -h, 0, h);
   // Sickly green-grey: visibly a block character, visibly wrong. Not pink
   // (that's the spheres) and not the player's gold.
-  grad.addColorStop(0, flash > 0 ? '#d8faff' : '#8fa08c');
-  grad.addColorStop(1, flash > 0 ? '#5ee7ff' : '#4a5a52');
+  //
+  // Except for Quarrick, who keeps his gold, drained. The player has to be
+  // able to tell that the thing shambling at them is him — that's the
+  // entire weight of the beat, and a generic corrupted square would throw
+  // it away.
+  const sick = wasQuarrick ? '#8a7434' : '#8fa08c';
+  const sicker = wasQuarrick ? '#4a3d1c' : '#4a5a52';
+  grad.addColorStop(0, flash > 0 ? '#d8faff' : sick);
+  grad.addColorStop(1, flash > 0 ? '#5ee7ff' : sicker);
   ctx.fillStyle = grad;
   ctx.fill();
   ctx.strokeStyle = flash > 0 ? '#d7faff' : '#33403a';
@@ -307,7 +317,7 @@ export function drawEnemies(frameCount, cutsceneDone) {
     if (enemy.kind === 'octagon') {
       // A shuffle rather than a roll — it leans as it walks.
       ctx.rotate(Math.sin((frameCount + enemy.x) * 0.12) * 0.07);
-      drawOctagonBody(enemy.w, enemy.cornersLost, enemy.restoreFlash);
+      drawOctagonBody(enemy.w, enemy.cornersLost, enemy.restoreFlash, enemy.quarrick);
       ctx.restore();
       ctx.restore();
       continue;
