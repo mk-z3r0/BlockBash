@@ -14,8 +14,14 @@ import { bossShowdown } from './level1/bossShowdown.js';
 import { edgeTransition } from './level1/edgeTransition.js';
 import { l2Arrival } from './level2/arrival.js';
 import { l3Handoff, l3Restored } from './level3/handoff.js';
+import { l4Arrival, l5Arrival, l6Arrival } from './faces.js';
 import { sandboxChat } from './sandbox/sandboxChat.js';
 
-const all = [bossShowdown, edgeTransition, l2Arrival, l3Handoff, l3Restored, sandboxChat];
+const all = [
+  bossShowdown, edgeTransition,
+  l2Arrival, l3Handoff, l3Restored,
+  l4Arrival, l5Arrival, l6Arrival,
+  sandboxChat
+];
 
 export const cutsceneLibrary = Object.fromEntries(all.map(c => [c.id, c]));

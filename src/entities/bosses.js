@@ -18,7 +18,7 @@
 import { state } from '../state.js';
 import { getLevel } from '../levels/levelLoader.js';
 import { carveGap } from '../levels/terrain.js';
-import { spawnWeaponPickup } from './weaponPickup.js';
+import { spawnWeaponPickup, spawnAmmoPickup } from './weaponPickup.js';
 import { spawnExplosion, spawnDust } from './particles.js';
 import { spawnSphereShot } from '../weapons/combat.js';
 import { playExplosion, playRumble, playSphereShot } from '../audio/sfx.js';
@@ -225,5 +225,11 @@ export function onBossDefeated(boss) {
   playExplosion();
   if (boss.drops) {
     spawnWeaponPickup(boss.x + boss.w / 2, level.groundY, boss.drops);
+  }
+  // Later bosses have no new weapon to give — the player is carrying the
+  // Cornerstone by then and it's the last one. They pay out in triangles
+  // instead, which matters more at that point than another tool would.
+  if (boss.dropsAmmo) {
+    spawnAmmoPickup(boss.x + boss.w / 2, level.groundY - 30, boss.dropsAmmo);
   }
 }

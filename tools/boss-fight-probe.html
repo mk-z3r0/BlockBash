@@ -89,6 +89,82 @@
       check(!blocking, 'no boss left alive, so the way to the edge is open');
     });
 
+    // --- level 4: The Demolition Crew ---
+    runLevel(3, () => {
+      const crew = state.enemies.filter(e => e.crew === 'demo');
+      check(crew.length === 3, `three of them (${crew.length})`);
+      const shooter = crew.find(e => e.role === 'shooter');
+      const bruiser = crew.find(e => e.role === 'bruiser');
+      update();
+      check(bruiser.invulnerable === true, 'a bruiser is shielded while the crew is linked');
+      check(shooter.invulnerable === false, 'the shooter is the one you can reach');
+
+      const noDamage = swingAt(bruiser, 2);
+      check(noDamage === 0, `the bruiser takes nothing while linked (lost ${noDamage})`);
+
+      // break the link
+      swingAt(shooter, 4);
+      check(!shooter.alive, `the shooter can be killed (hp ${shooter.hp})`);
+      update();
+      check(bruiser.invulnerable === false, 'killing the shooter drops the shield on the others');
+      const nowDealt = swingAt(bruiser, 3);
+      check(nowDealt > 0 || !bruiser.alive, 'and then they can be fought');
+
+      state.enemies.filter(e => e.crew === 'demo').forEach(e => { e.alive = false; });
+      update();
+      check(!state.enemies.some(e => e.boss && e.alive && !e.restored), 'clearing the crew opens the way');
+    });
+
+    // --- level 5: The Terraformer ---
+    runLevel(4, (boss, lv) => {
+      const mover = lv.platforms.find(p => p.mover);
+      check(!!mover, 'the arena has platforms it lifts');
+      let sawOpen = false, sawClosed = false, minY = Infinity, maxY = -Infinity;
+      for (let f = 0; f < 340; f++) {
+        update();
+        if (boss.invulnerable) sawClosed = true; else sawOpen = true;
+        minY = Math.min(minY, mover.y);
+        maxY = Math.max(maxY, mover.y);
+      }
+      check(sawClosed && sawOpen, `it closes and opens across its cycle (closed ${sawClosed}, open ${sawOpen})`);
+      check(maxY - minY > 100, `the platforms really travel (${Math.round(maxY - minY)}px)`);
+      // The ledge is only reachable from a raised mover — that IS the fight.
+      check(minY < lv.platforms.find(p => p.y === 150 || p.baseY === 150).y + 60,
+        'the lifted platform rises to near the boss ledge');
+
+      // And it can be finished once you're up there. Modelled the way a
+      // player actually fights it — stand level with it on the ledge and
+      // shoot whenever it opens — rather than by forcing the flag, which
+      // the boss's own cycle overwrites on the very next tick. That was
+      // this probe's first version, and it reported the Terraformer as
+      // unkillable when the real problem was the test.
+      const hp0 = boss.hp;
+      for (let f = 0; f < 1400 && boss.alive; f++) {
+        update();
+        if (!boss.invulnerable && player.weaponCooldown === 0) {
+          player.x = boss.x - 80;
+          player.y = boss.y;
+          player.facing = 1;
+          player.ammo = 99;
+          startAttack(player);
+        }
+      }
+      check(!boss.alive, `it can be beaten from the raised platform (hp ${hp0} -> ${boss.hp})`);
+    });
+
+    // --- level 6: The General ---
+    runLevel(5, (boss) => {
+      update();
+      check(boss.invulnerable === false, 'open the whole time — no gimmick');
+      const phases = new Set();
+      for (let f = 0; f < 400; f++) { update(); phases.add(boss.phase); }
+      check(phases.has('charge') && phases.has('recover'),
+        `it charges and then has to recover (saw: ${[...phases].join(', ')})`);
+      const hp0 = boss.hp;
+      swingAt(boss, 8);
+      check(!boss.alive, `it can be beaten by out-playing it (hp ${hp0} -> ${boss.hp})`);
+    });
+
     out.push(fails ? `*** ${fails} FAILURE(S)` : 'PASS every boss opens, closes and pays out');
     out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
     document.getElementById('out').textContent = out.join('\n');
