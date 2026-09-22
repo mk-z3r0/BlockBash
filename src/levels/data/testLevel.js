@@ -89,7 +89,12 @@ export default {
     { x: 4550, y: 290 - 20,      w: 20, minX: 4500, maxX: 4610, speed: 1.26 },
     { x: 6150, y: 300 - 20,      w: 20, minX: 6100, maxX: 6220, speed: 1.37 },
     // maxX pulled back to leave room for the cutscene dig — see level1.js
-    { x: 6980, y: GROUND_Y - 33, w: 33, minX: 6900, maxX: 7010, speed: 1.37, boss: true }
+    { x: 6980, y: GROUND_Y - 33, w: 33, minX: 6900, maxX: 7010, speed: 1.37,
+      // Matches level 1: unwinnable, stated in the data. This file is free to
+      // diverge and mostly does, but without the flag the sandbox's boss is
+      // stompable and its showdown cutscene stops behaving like the real
+      // one's — which defeats the point of having a sandbox for it.
+      boss: true, invulnerable: true }
   ],
 
   coins: [
