@@ -44,12 +44,21 @@ function give(pickup, player) {
   }
   const weapon = getWeapon(pickup.type);
   if (!weapon) return;
+
+  // Say what it COST, not just what it gave. The player carries one weapon,
+  // so picking up level 6's sledgehammer puts the Cornerstone down and takes
+  // every triangle with it — and a toast reading "SLEDGEHAMMER ACQUIRED!"
+  // tells a seven-year-old they gained something, which is half the story.
+  const had = getWeapon(player.weapon);
+  const tradedAway = had && had.id !== weapon.id && had.ammo != null && player.ammo > 0;
+
   player.weapon = weapon.id;
   player.hasWeapon = true;
   // A weapon with its own ammo arrives loaded. Picking the same one up
   // again tops it back up rather than resetting it downward.
   if (weapon.ammo != null) player.ammo = Math.max(player.ammo, weapon.ammo);
-  showToast(`${weapon.label} ACQUIRED!`, 120);
+
+  showToast(tradedAway ? `${weapon.label} — ${had.label} PUT DOWN` : `${weapon.label} ACQUIRED!`, 150);
   playWeaponPickup();
 }
 

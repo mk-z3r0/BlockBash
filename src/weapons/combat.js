@@ -27,6 +27,7 @@ import {
   TRIANGLE_SPEED, TRIANGLE_SIZE, TRIANGLE_LIFE, drawRestoreProjectile
 } from './cornerstone.js';
 import { ctx } from '../engine/renderer.js';
+import { showToast } from '../ui/hud.js';
 import { addShake, addHitStop } from '../engine/impact.js';
 import { addPopup } from '../ui/popups.js';
 
@@ -142,11 +143,25 @@ export function updatePlayerWeapon(inputLocked) {
 // it. Swinging at one thuds and accomplishes nothing, which is the point.
 // See GAME_DESIGN's octagon section and the "restoration, not combat" note
 // on the Sculptor.
+// Said once, the first time in a run that a player swings at something that
+// cannot be swung at. The thud and the lack of damage say it too, but a
+// seven-year-old's reading of "nothing happened" is usually "I missed", and
+// they'll try the same thing twenty more times.
+let explainedOctagon = false;
+
+export function resetOctagonHint() {
+  explainedOctagon = false;
+}
+
 function rebuffOctagon(octagon) {
   if (octagon.thudTimer > 0) return;
   octagon.thudTimer = 18;
   playOctagonThud();
   spawnDust(octagon.x + octagon.w / 2, octagon.y + octagon.w / 2, 4, { spread: 2, size: 5, life: 16 });
+  if (!explainedOctagon) {
+    explainedOctagon = true;
+    showToast(octagon.kind === 'core' ? "IT CAN'T BE BROKEN" : "IT WON'T BREAK — IT'S A SQUARE", 150);
+  }
 }
 
 export function damageEnemy(enemy, weapon, dir = 1) {

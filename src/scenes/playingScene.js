@@ -13,7 +13,7 @@ import { resetCoins, updateCoins, drawCoins } from '../entities/coins.js';
 import { updateWeaponPickups, drawWeaponPickups, spawnAmmoPickup, spawnWeaponPickup } from '../entities/weaponPickup.js';
 import {
   updatePlayerWeapon, updateProjectiles, drawProjectiles,
-  resetProjectiles, consumePlayerHit
+  resetProjectiles, consumePlayerHit, resetOctagonHint
 } from '../weapons/combat.js';
 import { loadLevel, getLevel } from '../levels/levelLoader.js';
 import { drawPlatforms, drawCheckpoints, drawHazards, drawWorldEdge } from '../levels/levelRenderer.js';
@@ -216,6 +216,7 @@ function startLevel(index) {
   level.weaponSpawns.forEach(w => spawnWeaponPickup(w.x, w.y == null ? level.groundY : w.y, w.type, false));
   state.missiles = []; // unused while the bazooka is parked — see weapons/bazooka.js
   resetProjectiles();
+  resetOctagonHint();
   state.restoredCount = 0;
   state.playerTouchedHazard = false;
   resetParticles();
