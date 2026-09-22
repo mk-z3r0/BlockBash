@@ -37,7 +37,7 @@ import {
 import { pendingCutscene } from '../cutscenes/triggers.js';
 import { cutsceneLibrary } from '../cutscenes/library.js';
 import { advanceDialogue, isDialogueOpen } from '../ui/dialogue.js';
-import { updateImpact, isHitStopped, shakeOffset, resetImpact } from '../engine/impact.js';
+import { updateImpact, isHitStopped, shakeOffset, resetImpact, addShake } from '../engine/impact.js';
 
 // How far the view lifts while someone is talking. Conversations happen at
 // ground level and the dialogue bar covers the bottom third of the screen,
@@ -160,6 +160,12 @@ function resetBossAndCutscene() {
 }
 
 function loseLife() {
+  // The one moment the game takes something away from the player, and until
+  // now it looked exactly like nothing: a sound, and the avatar somewhere
+  // else. A burst where they were standing and a hard jolt make it land as
+  // an event rather than a teleport.
+  spawnExplosion(player.x + player.width / 2, player.y + player.height / 2, '#f2c14e');
+  addShake(10);
   state.lives--;
   if (state.lives <= 0) {
     recordProgress(state.currentLevelIndex, state.score);

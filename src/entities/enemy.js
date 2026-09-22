@@ -453,6 +453,22 @@ export function drawEnemies(frameCount, cutsceneDone) {
       ctx.fill();
     }
 
+    // A boss gathering itself. Same language as a shooter's wind-up, bigger
+    // and redder: the General before a charge, the Excavator before the
+    // drill binds. Both are moments the player has to read, and neither is
+    // readable from the boss's ordinary idle.
+    if (enemy.telegraph > 0 && !squashed) {
+      const r = enemy.w / 2;
+      const t = enemy.telegraph;
+      const ring = ctx.createRadialGradient(0, 0, r * 0.7, 0, 0, r * (1.4 + t * 1.1));
+      ring.addColorStop(0, `rgba(255, 90, 90, ${0.15 + t * 0.55})`);
+      ring.addColorStop(1, 'rgba(255, 60, 40, 0)');
+      ctx.fillStyle = ring;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * (1.5 + t * 1.2), 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     const grad = ctx.createRadialGradient(-enemy.w * 0.2, -enemy.w * 0.2, 2, 0, 0, enemy.w * 0.7);
     if (enemy.hitFlash > 0) {
       grad.addColorStop(0, '#ffffff');

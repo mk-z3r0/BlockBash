@@ -26,6 +26,9 @@
     const lv = getLevel();
     if (!q.has('keepscenes')) lv.cutscenes.length = 0;
 
+    // Screenshots are about what the game LOOKS like; dying mid-shot just
+    // photographs a cloud of particles.
+    player.invincible = 999999;
     if (q.has('x')) {
       const x = parseFloat(q.get('x'));
       player.x = x;
@@ -42,7 +45,18 @@
       const core = state.enemies.find(e => e.kind === 'core');
       if (core) core.restoreHits = parseInt(q.get('restore'), 10);
     }
+    // ?phase=name forces the boss into a phase, for shooting a specific
+    // moment of a fight — a telegraph, an open window — instead of ticking
+    // and hoping to catch one.
+    if (q.has('phase')) {
+      const boss = state.enemies.find(e => e.boss && e.mode === 'fight');
+      if (boss) { boss.phase = q.get('phase'); boss.phaseTimer = parseInt(q.get('phaseTimer') || '10', 10); }
+    }
     for (let i = 0; i < frames; i++) update();
+    // Invincibility makes the player BLINK (entities/player.js), so half the
+    // frames photograph an empty space where they're standing. Clear it just
+    // before drawing — deaths all happen during update, which is over.
+    player.invincible = 0;
     draw();
     document.title = `L${levelIndex} x=${Math.round(player.x)} cam=${Math.round(camera.x)}`;
   }, 250);

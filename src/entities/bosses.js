@@ -66,6 +66,8 @@ function updateExcavator(boss, player) {
   if (boss.phase === 'drill') {
     boss.invulnerable = true;
     boss.mining = true;
+    // gathering toward the moment the drill binds and it opens up
+    boss.telegraph = Math.max(0, 1 - boss.phaseTimer / 30);
     boss.swingPhase += 3;   // fast, mechanical — a rig, not a swing
     if (boss.phaseTimer % 7 === 0) {
       spawnDust(boss.x + boss.w / 2 + boss.facing * boss.w, boss.y + boss.w, 5, { spread: 3, size: 6, life: 22 });
@@ -90,6 +92,7 @@ function updateExcavator(boss, player) {
   // jammed: the whole fight happens here
   boss.invulnerable = false;
   boss.mining = false;
+  boss.telegraph = 0;
   if (boss.phaseTimer <= 0) setPhase(boss, 'advance', EXCAVATOR.advance);
 }
 
@@ -166,25 +169,35 @@ function updateTerraformer(boss) {
 function updateGeneral(boss, player) {
   boss.invulnerable = false;
   const dir = Math.sign((player.x + player.width / 2) - (boss.x + boss.w / 2)) || 1;
-  boss.facing = dir;
   boss.phaseTimer--;
 
   if (boss.phase === 'charge') {
+    boss.telegraph = 0;
     boss.x = Math.max(boss.minX, Math.min(boss.x + boss.chargeDir * Math.abs(boss.speed) * 2.6, boss.maxX - boss.w));
     if (boss.phaseTimer <= 0) setPhase(boss, 'recover', 55);
     return;
   }
   if (boss.phase === 'recover') {
-    // The tell. It stops dead, and this is the window to close in.
+    // Stopped dead. This is the window, and the only thing the whole fight
+    // is asking the player to read.
+    boss.telegraph = 0;
+    boss.facing = dir;
     if (boss.phaseTimer <= 0) setPhase(boss, 'stalk', 90);
     return;
   }
+
   // stalk: pressure, then commit
+  boss.facing = dir;
   boss.x = Math.max(boss.minX, Math.min(boss.x + dir * Math.abs(boss.speed), boss.maxX - boss.w));
   if (--boss.shotTimer <= 0) {
     boss.shotTimer = 150;
     spawnSphereShot(boss);
   }
+  // The wind-up. "The hardest FAIR fight in the game" is the whole brief, and
+  // fair means the charge is something the player saw coming — it stops
+  // turning to track them and visibly gathers for the last third of the
+  // stalk, which is also the moment to stop being in front of it.
+  boss.telegraph = Math.max(0, 1 - boss.phaseTimer / 30);
   if (boss.phaseTimer <= 0) {
     boss.chargeDir = dir;
     setPhase(boss, 'charge', 46);
@@ -274,6 +287,7 @@ export function initBoss(boss) {
   boss.cycle = 0;
   boss.chargeDir = -1;
   boss.shotTimer = 90;
+  boss.telegraph = 0;
   boss.invulnerable = true;
   boss.defeatHandled = false;
 }

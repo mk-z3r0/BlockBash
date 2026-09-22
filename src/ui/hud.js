@@ -99,8 +99,12 @@ function drawBossBar() {
     // untouched and currently closed — still worth naming, see below
   }
 
+  // At the TOP, not the bottom. The bottom is where the ground is, and a
+  // boss bar there sits directly on the fight it's describing — obscuring
+  // the two things the player most needs to watch. Up here it's clear of
+  // the score (y26), the coin count (y49) and the level-name toast (y46).
   const w = 260, h = 9;
-  const x = (VIEW_WIDTH - w) / 2, y = VIEW_HEIGHT - 26;
+  const x = (VIEW_WIDTH - w) / 2, y = 76;
 
   ctx.save();
   ctx.textAlign = 'center';
@@ -108,7 +112,7 @@ function drawBossBar() {
   ctx.font = 'bold 11px Trebuchet MS, Arial, sans-serif';
   const label = boss.bossName || BOSS_LABELS[boss.bossKind] ||
                 (boss.kind === 'octagon' ? 'THE SCULPTOR' : 'BOSS');
-  ctx.fillText(label, VIEW_WIDTH / 2, y - 5);
+  ctx.fillText(label, VIEW_WIDTH / 2, y - 6);
 
   ctx.fillStyle = 'rgba(10, 13, 28, 0.75)';
   ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
