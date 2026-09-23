@@ -371,25 +371,43 @@ reset cleanly instead of trusting bad data, and a simulated storage failure
 See the checklist below. This is what turns "concept test" into "finished
 level."
 
-**~~3. Level authoring tool~~ — not built, and the need turned out to be
-something else.**
+**~~3. Level authoring tool~~ — BUILT 2026-09-22, for a different reason than
+this section gives.**
 
-Six levels were hand-authored after this was written, and the loop it was
-meant to kill never hurt the way it was expected to. Typing coordinates is
-fast. What was actually slow and dangerous was *not knowing whether a layout
-was playable* — and the thing that answers that is not a canvas with a jump
-arc drawn on it, it's a machine that tries the jump.
+The original case was killing the hand-type-coordinates loop, and that case
+was weak: six levels were hand-authored without it and typing coordinates
+turned out to be fast. What was slow and dangerous was not knowing whether a
+layout was *playable*, and the thing that answers that is not a canvas with a
+jump arc on it — it's `tools/level-audit-probe.html`, a machine that tries
+the jump. That probe caught a platform over a spike bed's take-off in level 2
+within an hour of that level being written.
 
-`tools/level-audit-probe.html?level=N` does that: every gap and every jumpable
-spike bed, at both speeds across three timings, from a clean runway, plus the
-structural rules checked statically. A level that fails it doesn't ship. It
-caught a platform sitting over a spike bed's take-off in level 2 — the exact
-class of bug this section calls "the worst bug in level 1" — within an hour of
-that level being written, which is faster than a placement guide would have.
+The case that actually earned the tool is the one this section didn't
+anticipate: **nudging levels that already exist**, and laying out bonus
+levels. Once seven levels are built, "move that platform 20px and see" is a
+different job from "author a level", and it's the job a canvas is good at.
 
-A visual editor would still be nice for *shaping* a level rather than
-validating one, and if hand-authoring ever does start hurting, this is the
-thing to build. It just isn't blocking anything today.
+`tools/level-editor.html` — click to select, drag or arrow to move (shift for
+10px), add and delete, edit numbers directly, with the game's own
+`levels/levelRenderer.js` doing the drawing so terrain looks exactly like
+terrain looks in play. The jump arc this section asked for is in there
+(`?arc=1`), drawn at both carry distances, and labelled as the approximation
+it is — the arc is asymmetric and the probe is the authority.
+
+**It does not write level files, and that is the whole design.** About a
+quarter of every level file is comments explaining why a number is what it
+is. A tool that round-tripped the data would delete all of it. So editing an
+existing level exports a *change list* instead — `platforms[4].x 1520 ->
+1540` — which for a nudge is one number to change by hand, and every comment
+survives. Added objects are printed as literals ready to paste, which is also
+what makes laying out a bonus level workable.
+
+It runs the cheap half of the audit live while you drag (gap widths against
+the carry numbers, beds that end too near a ledge, enemies standing inside
+terrain, checkpoints inside an enemy's reach) and says out loud that the
+probe is the real verdict. `tools/level-editor-probe.html` drives real
+pointer and key events at it and checks that a drag moves the right thing by
+the right amount and that the change list round-trips.
 
 **4. Chamfer rendering + collision — HALF BUILT, and the half that shipped is
 the visual one.**
@@ -588,6 +606,7 @@ What's in it, and what each thing is actually for:
 | `story-beats-probe` | Can the player be blocked by a story beat? The handoff, the restoration, the Sculptor, the core |
 | `progression-chain-probe` | Does every level actually lead to the next one? |
 | `full-playthrough-probe` | One run, cleared save to win screen, every story scene asserted |
+| `level-editor-probe` | That the editor edits: a drag moves the right object by the right amount, and its change list round-trips |
 | `level-data-probe` | The boring stuff, read straight off level data: weapons and cutscene ids that exist, a level that can end, spawns and checkpoints over ground, hazards that don't run off a ledge. Found three of level 6's checkpoints floating in its pits |
 | `respawn-state-probe` | What survives a death — and standing at all 21 checkpoints in the game for two seconds without touching the controls |
 | the older probes | Physics, coins, saves, cutscene contract — unchanged, and all still green |

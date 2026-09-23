@@ -33,7 +33,7 @@ ASSERTING=(
 # has to remember to widen a loop here.
 LEVEL_COUNT="$(grep -cE "^import level[0-9]+ from" "$ROOT/src/levels/registry.js")"
 for ((i = 0; i < LEVEL_COUNT; i++)); do ASSERTING+=("level-audit-probe?level=$i"); done
-ASSERTING+=(level-data-probe level-select-probe enemy-collision-probe boss-fight-probe story-beats-probe progression-chain-probe respawn-state-probe full-playthrough-probe)
+ASSERTING+=(level-data-probe level-select-probe enemy-collision-probe level-editor-probe boss-fight-probe story-beats-probe progression-chain-probe respawn-state-probe full-playthrough-probe)
 REPORT_ONLY=(gap-probe walk-only-autoplay edge-transition-trace)
 
 started_server=0

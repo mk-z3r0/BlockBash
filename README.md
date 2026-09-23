@@ -169,7 +169,7 @@ are the most useful thing anyone could send.
 |---|---|
 | `index.html` | the page the game runs in |
 | `src/` | all game code, plain ES modules (`engine/`, `entities/`, `levels/`, `scenes/`, `weapons/`, `cutscenes/`, `ui/`, `audio/`) |
-| `tools/` | dev-only probe pages — single-purpose test harnesses, each answering one question. `bash tools/run-probes.sh` runs the lot; `tools/physics-lab.html` is a live movement-tuning rig |
+| `tools/` | dev-only pages. `bash tools/run-probes.sh` runs the test suite; `tools/level-editor.html` is a visual editor for the levels; `tools/physics-lab.html` is a live movement-tuning rig |
 | `GAME_DESIGN.md` | what the game is: story, mechanics, open questions |
 | `IMPLEMENTATION_PLAN.md` | how it gets built, in what order, and why each decision went the way it did |
 

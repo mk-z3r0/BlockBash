@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Block Bash — level editor</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #0a0d1c; color: #e8ecf7;
+         font: 13px "Trebuchet MS", Arial, sans-serif; display: flex; flex-direction: column; height: 100vh; }
+  #bar { display: flex; gap: 10px; align-items: center; padding: 8px 12px;
+         background: #12172b; border-bottom: 1px solid #232f5c; flex: none; flex-wrap: wrap; }
+  #bar b { color: #f2c14e; letter-spacing: 1px; }
+  select, button, input { background: #1c2547; color: #e8ecf7; border: 1px solid #3a4a82;
+                          border-radius: 3px; padding: 4px 8px; font: inherit; }
+  button { cursor: pointer; }
+  button:hover { background: #26325e; }
+  button.on { background: #3a4a82; border-color: #5ee7ff; }
+  #main { display: flex; flex: 1; min-height: 0; }
+  #game { background: #10162c; cursor: crosshair; display: block; flex: none; }
+  #side { width: 330px; flex: none; background: #12172b; border-left: 1px solid #232f5c;
+          overflow-y: auto; padding: 10px; }
+  h3 { margin: 12px 0 6px; font-size: 11px; letter-spacing: 1px; color: #7a84a8; text-transform: uppercase; }
+  h3:first-child { margin-top: 0; }
+  .row { display: flex; gap: 6px; align-items: center; margin-bottom: 5px; }
+  .row label { width: 58px; color: #7a84a8; font-size: 11px; }
+  .row input { width: 70px; }
+  pre { background: #0a0d1c; border: 1px solid #232f5c; padding: 8px; font: 11px monospace;
+        white-space: pre-wrap; max-height: 260px; overflow: auto; border-radius: 3px; }
+  .warn { color: #f2c14e; } .bad { color: #ff7a9c; } .good { color: #8effc0; }
+  #hint { color: #7a84a8; font-size: 11px; }
+</style></head>
+<body>
+  <div id="bar">
+    <b>LEVEL EDITOR</b>
+    <select id="levelPick"></select>
+    <button id="addPlatform">+ platform</button>
+    <button id="addSpikes">+ spikes</button>
+    <button id="addEnemy">+ enemy</button>
+    <button id="addCoin">+ coin</button>
+    <button id="addCheckpoint">+ checkpoint</button>
+    <button id="del">delete</button>
+    <button id="arcBtn">jump arc</button>
+    <button id="zoomBtn">zoom out</button>
+    <button id="revert">revert all</button>
+    <span id="hint">drag to move · arrows nudge (shift = 10) · drag empty space to pan</span>
+  </div>
+  <div id="main">
+    <canvas id="game" width="1180" height="620"></canvas>
+    <div id="side">
+      <h3>selected</h3><div id="props">nothing selected</div>
+      <h3>checks</h3><div id="checks">—</div>
+      <h3>changes to apply</h3><pre id="out">no changes yet</pre>
+      <button id="copy">copy changes</button>
+    </div>
+  </div>
+<script type="module" src="./level-editor.js"></script>
+</body></html>

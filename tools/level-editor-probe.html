@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#000;color:#e8ecf7;font:13px monospace">
+<pre id="out">running…</pre>
+<iframe id="ed" src="./level-editor.html" style="width:1200px;height:700px;border:0"></iframe>
+<script>window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERROR: '+(e.message||e.error)));</script>
+<script type="module">
+  // Does the editor actually edit?
+  //
+  // It renders through the game's own code, so "does it look right" is
+  // answered by looking. What isn't answered that way is whether dragging a
+  // platform moves the right platform by the right amount, and whether the
+  // change list it produces is something you could apply by hand and get the
+  // level you were looking at. Both of those are how an editor silently
+  // becomes a liability.
+  //
+  // Drives real pointer and key events at the canvas inside an iframe.
+  const out = [];
+  let fails = 0;
+  const check = (ok, label) => { if (!ok) fails++; out.push(`  ${ok ? 'ok  ' : 'FAIL'} ${label}`); };
+  const done = () => { document.getElementById('out').textContent = out.join('\n'); };
+
+  setTimeout(() => {
+   try {
+    const frame = document.getElementById('ed');
+    const win = frame.contentWindow;
+    const ed = win.__editor;
+    if (!ed) { out.push('*** editor did not boot'); done(); return; }
+    const canvas = win.document.getElementById('game');
+    const rect = canvas.getBoundingClientRect();
+
+    const at = (wx, wy) => {
+      const s = ed.toScreen(wx, wy);
+      return { clientX: rect.left + s.x, clientY: rect.top + s.y };
+    };
+    const send = (type, pt) => canvas.dispatchEvent(
+      new win.MouseEvent(type, { ...pt, bubbles: true, view: win }));
+    const key = k => win.dispatchEvent(new win.KeyboardEvent('keydown', { key: k, bubbles: true }));
+    const changes = () => win.document.getElementById('out').textContent;
+
+    out.push(`editor booted on level ${ed.state.levelIndex + 1} (${ed.state.data.name})`);
+    check(changes().startsWith('no changes'), 'starts with no changes');
+
+    // --- pick a platform by clicking where it actually is ---
+    const p0 = ed.state.data.platforms[0];
+    const startX = p0.x;
+    // put it in view first
+    ed.state.cam.x = p0.x - 200;
+    ed.state.cam.y = p0.y - 150;
+
+    send('mousedown', at(p0.x + 10, p0.y + 5));
+    check(ed.state.sel && ed.state.sel.list === 'platforms' && ed.state.sel.index === 0,
+      `clicking a platform selects it (${JSON.stringify(ed.state.sel)})`);
+
+    // --- drag it 40px right ---
+    send('mousemove', at(p0.x + 50, p0.y + 5));
+    win.dispatchEvent(new win.MouseEvent('mouseup', { bubbles: true, view: win }));
+    const moved = ed.state.data.platforms[0].x - startX;
+    check(Math.abs(moved - 40) <= 2, `dragging moves it by the drag distance (${moved}px of 40)`);
+    check(/platforms\[0\]\.x/.test(changes()), 'and the change list names platforms[0].x');
+
+    // --- arrow keys nudge, shift nudges further ---
+    const beforeNudge = ed.state.data.platforms[0].x;
+    key('ArrowRight');
+    check(ed.state.data.platforms[0].x === beforeNudge + 1, 'right arrow nudges 1px');
+    win.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowLeft', shiftKey: true, bubbles: true }));
+    check(ed.state.data.platforms[0].x === beforeNudge - 9, 'shift+left nudges 10px');
+
+    // --- the change list has to round-trip ---
+    // Apply what it says, by hand, to a fresh copy of the original and see
+    // whether you end up with what the editor is showing.
+    const line = changes().split('\n').find(l => l.includes('platforms[0].x'));
+    const m = line && line.match(/platforms\[0\]\.x\s+(-?\d+) -> (-?\d+)/);
+    check(!!m, `the change is stated as a number pair (${(line || '').trim()})`);
+    if (m) {
+      check(parseInt(m[1], 10) === startX, `  from = the original value (${m[1]} vs ${startX})`);
+      check(parseInt(m[2], 10) === ed.state.data.platforms[0].x, `  to = what's on screen now (${m[2]})`);
+    }
+
+    // --- revert puts everything back ---
+    win.document.getElementById('revert').click();
+    check(ed.state.data.platforms[0].x === startX, 'revert restores the original');
+    check(changes().startsWith('no changes'), 'and clears the change list');
+
+    // --- adding and deleting ---
+    const before = ed.state.data.hazards.length;
+    win.document.getElementById('addSpikes').click();
+    check(ed.state.data.hazards.length === before + 1, 'add spikes appends one');
+    check(/hazards\[\+\]\s+add/.test(changes()), 'and the change list says to add it');
+    key('Delete');
+    check(ed.state.data.hazards.length === before, 'delete removes it again');
+
+    // --- every level opens without throwing ---
+    for (let i = 0; i < 7; i++) {
+      ed.loadIndex(i);
+      check(!!ed.state.data && ed.state.data.ground.length > 0, `level ${i + 1} opens (${ed.state.data.name})`);
+    }
+
+    out.push(fails ? `*** ${fails} FAILURE(S)` : 'PASS the editor edits, and says what it did');
+   } catch (err) {
+    out.push('*** THREW: ' + (err && err.stack ? err.stack.split('\n').slice(0, 3).join(' | ') : err));
+   }
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    done();
+  }, 1200);
+</script></body></html>
