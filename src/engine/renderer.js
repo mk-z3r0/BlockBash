@@ -183,35 +183,100 @@ export function drawSledgehammerIcon() {
 
 // The Cornerstone — the restoration weapon. Same grip-at-origin contract.
 //
-// It is the one weapon that doesn't destroy anything, so it's drawn as a
-// mason's tool rather than a striking one: a short haft with an open
-// triangular frame at the end, lit in the same cyan the cube-edge seam uses
-// (levels/levelRenderer.js). That colour already means "the world, intact"
-// everywhere else in the game, which is the whole idea.
+// A LAUNCHER, not a wand. IMPLEMENTATION_PLAN's Decisions made has carried
+// the line "the triangle-shooter idea is still the plan for whatever that
+// eventually becomes" since the bazooka was parked, and this is what it
+// became — so it should look like the thing it replaced: a tube on the
+// shoulder with a flared muzzle, held and aimed rather than waved.
+//
+// The first version drew an open triangular frame on a short haft, which
+// read as a wand. The triangle survives as what's loaded in the muzzle,
+// which is also the only place it needs to be: it's what the weapon fires.
 export function drawCornerstoneIcon(glow = 1) {
-  ctx.strokeStyle = '#6b5b45';
-  ctx.lineWidth = 4;
-  ctx.lineCap = 'round';
+  const cyan = (a) => `rgba(94, 231, 255, ${a})`;
+
+  // Drawn at 0.68.
+  //
+  // A launcher needs more parts than a pickaxe to read as a launcher — tube,
+  // vent, sight, flared muzzle — and drawn at the size those parts wanted it
+  // spanned 52px against a 22px player and hid him behind it. The pickaxe is
+  // 30px end to end and the sledgehammer 34; this lands in the same range
+  // without any of the pieces having to be redrawn smaller.
+  ctx.save();
+  ctx.scale(0.68, 0.68);
+
+  // grip, under the tube
+  ctx.fillStyle = '#6b5b45';
+  ctx.strokeStyle = '#3b3122';
+  ctx.lineWidth = 1.2;
   ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(15, -11);
+  ctx.rect(7, 2, 6, 11);
+  ctx.fill();
   ctx.stroke();
 
-  ctx.save();
-  ctx.translate(16, -12);
-  ctx.rotate(Math.atan2(-11, 15));
-  // the frame: an outlined triangle, point forward — the shape it fires
-  ctx.strokeStyle = `rgba(94, 231, 255, ${0.55 + 0.45 * glow})`;
-  ctx.lineWidth = 2.4;
-  ctx.lineJoin = 'round';
+  // the tube
+  ctx.fillStyle = '#7d8798';
+  ctx.strokeStyle = '#3d4552';
   ctx.beginPath();
-  ctx.moveTo(18, 0);
-  ctx.lineTo(-2, -11);
-  ctx.lineTo(-2, 11);
-  ctx.closePath();
-  ctx.stroke();
-  ctx.fillStyle = `rgba(94, 231, 255, ${0.12 * glow})`;
+  ctx.rect(-3, -7, 36, 11);
   ctx.fill();
+  ctx.stroke();
+
+  // a band, so it reads as built rather than as a bar
+  ctx.fillStyle = '#5d6676';
+  ctx.fillRect(12, -7, 4, 11);
+
+  // rear vent
+  ctx.fillStyle = '#4a5260';
+  ctx.beginPath();
+  ctx.moveTo(-3, -7);
+  ctx.lineTo(-9, -10);
+  ctx.lineTo(-9, 7);
+  ctx.lineTo(-3, 4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // sight
+  ctx.fillStyle = '#9aa6bb';
+  ctx.fillRect(18, -11, 5, 4);
+
+  // flared muzzle
+  ctx.fillStyle = '#8f9ab0';
+  ctx.beginPath();
+  ctx.moveTo(33, -8);
+  ctx.lineTo(43, -11);
+  ctx.lineTo(43, 8);
+  ctx.lineTo(33, 5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // what's loaded: a triangle sitting in the mouth, lit by however much
+  // charge the caller passed
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(43, -10);
+  ctx.lineTo(43, 7);
+  ctx.lineTo(34, 4);
+  ctx.lineTo(34, -7);
+  ctx.closePath();
+  ctx.clip();
+  ctx.fillStyle = cyan(0.25 + 0.5 * glow);
+  ctx.fillRect(33, -11, 11, 20);
+  ctx.restore();
+
+  ctx.fillStyle = cyan(0.7 + 0.3 * glow);
+  ctx.strokeStyle = `rgba(215, 250, 255, ${0.6 + 0.4 * glow})`;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(42, -1.5);
+  ctx.lineTo(35, -6);
+  ctx.lineTo(35, 3);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
   ctx.restore();
 }
 

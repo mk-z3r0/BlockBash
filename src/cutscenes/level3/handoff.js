@@ -139,10 +139,13 @@ export const l3Restored = {
         if (q) {
           q.alive = false;
           c.spawnExplosion(q.x + q.w / 2, q.y + q.w / 2, '#5ee7ff');
-          // He comes back scarred, not new. The corners the spheres took
-          // are still gone — restoring someone isn't the same as undoing
-          // what was done to them.
-          c.state.rescueNPC = createQuarrick(q.x, surfaceYAt(q.x), { facing: -1, damage: 2 });
+          // damage 1: chipped, but SQUARE. He says "I'm square. That'll do."
+          // four lines from now and the player has to be able to see that
+          // it's true — this is the payoff of the whole game's central
+          // mechanic and it cannot end with him still the shape of the
+          // thing they just cured. The corners the spheres took are still
+          // visibly gone, which is what the ending calls back to.
+          c.state.rescueNPC = createQuarrick(q.x, surfaceYAt(q.x), { facing: -1, damage: 1 });
         }
       }
     },

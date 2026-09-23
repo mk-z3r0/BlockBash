@@ -222,7 +222,18 @@ export function updateRescueNPC(npc, viewWidth, cameraX) {
 // `damage` is how many of his four corners are gone, and how deep. Drawn as
 // one path rather than a rect plus cuts so the outline follows the damage.
 function drawQuarrickBody(hw, hh, width, height, damage) {
-  const cut = Math.min(4, damage) * 5.5;
+  // 3.2px per level of damage, not 5.5.
+  //
+  // At 5.5 a damage of 2 cut 11px off each corner of a 44px body, which is
+  // not "scarred" — it is the octagon silhouette, the exact shape the game
+  // uses to mean CORRUPTED. So the scene where the player restores him
+  // ended with him still looking like the thing they just cured, and his
+  // own next line is "I'm square. That'll do."
+  //
+  // At 3.2 the low end reads as chips and the high end (damage 3, just
+  // before the handoff) still reads as badly gone without tipping over into
+  // the corruption shape.
+  const cut = Math.min(4, damage) * 3.2;
   ctx.beginPath();
   if (cut <= 0.5) {
     ctx.rect(-hw, -hh, width, height);

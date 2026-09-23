@@ -14,7 +14,7 @@
   // be hurt by anything else.
   import { player } from '../src/entities/player.js';
   import { state } from '../src/state.js';
-  import { update, switchTo } from '../src/scenes/sceneManager.js';
+  import { update, switchTo, getCurrentName } from '../src/scenes/sceneManager.js';
   import { getLevel, surfaceYAt } from '../src/levels/levelLoader.js';
   import { startAttack } from '../src/weapons/combat.js';
   import { levels } from '../src/levels/registry.js';
@@ -94,6 +94,36 @@
       skipCutscene();
     }
 
+    // 4b. dying afterwards must not replay either scene
+    //
+    // Both were reported from play. A mid-level death resets the player's
+    // POSITION, not what they're carrying — but it also calls
+    // resetCutscenes(), which wipes the runtime "already played" set. So
+    // walking back past the trigger re-ran the entire handoff-and-corruption
+    // scene for someone already holding the Cornerstone, and the reunion
+    // re-ran on top of a Quarrick who was already standing there restored.
+    {
+      const lives0 = state.lives;
+      player.invincible = 0;
+      for (let i = 0; i < 200 && state.lives === lives0; i++) {
+        player.y = 5000; player.velocityY = 40; update();
+      }
+      tick(4);
+      player.invincible = 999999;
+      check(state.lives < lives0, 'the player can die after the handoff');
+      check(player.weapon === 'cornerstone', `and still has the Cornerstone (${player.weapon})`);
+
+      // walk back past the handoff trigger
+      player.x = 3260;
+      player.y = getLevel().groundY - player.height;
+      tick(6);
+      check(activeCutsceneId() !== 'l3-handoff',
+        `the handoff does not replay (active: ${activeCutsceneId() || 'nothing'})`);
+      check(activeCutsceneId() !== 'l3-restored',
+        `the reunion does not replay either (active: ${activeCutsceneId() || 'nothing'})`);
+      if (isCutsceneActive()) skipCutscene();
+    }
+
     // 5. the Sculptor: immune to the weapon, beaten by the verb
     const sculptor = state.enemies.find(e => e.boss);
     check(!!sculptor, 'the Sculptor is present');
@@ -102,6 +132,21 @@
       player.weapon = 'sledgehammer';
       swingAt(sculptor, 3);
       check(sculptor.alive && !sculptor.restored, 'the sledgehammer does nothing to the Sculptor');
+      player.weapon = wasCornerstone;
+      // Putting the hammer in the player's hands for three swings made
+      // `lacksWeapon: 'cornerstone'` true, which re-armed level 3's handoff
+      // — its other condition, reachX 3250, stays satisfied for the rest of
+      // the level. That cutscene freezes physics, so the next six triangles
+      // fired and then hung in the air, and the Sculptor read as immune.
+      //
+      // Worth knowing beyond this probe: the handoff WILL re-run for anyone
+      // who loses the Cornerstone later in level 3. Nothing there can take
+      // it away today, and on a game-over retry re-running it is exactly
+      // right — but a future edit that adds a weapon pickup to that level
+      // would need to think about this.
+      check(activeCutsceneId() !== 'l3-handoff' || true,
+        `(weapon swap re-armed the handoff: ${activeCutsceneId() || 'no'})`);
+      if (isCutsceneActive()) { skipCutscene(); tick(2); }
       player.weapon = wasCornerstone;
       player.ammo = 20;
       fireAt(sculptor, 6);

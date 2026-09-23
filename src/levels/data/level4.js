@@ -33,7 +33,7 @@ export default {
 
   startsWith: 'cornerstone',
   startsWithAmmo: 10,
-  quarrickDamage: 2,
+  quarrickDamage: 1,   // restored in level 3: chipped, but square
 
   ground: [
     { x: 0,    width: 1200 },

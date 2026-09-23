@@ -33,7 +33,7 @@ export const l7Arrival = {
       enter(c) {
         const at = c.player.x + 150;
         c.state.rescueNPC = createQuarrick(at, surfaceYAt(at),
-          { facing: -1, damage: c.level.quarrickDamage || 2 });
+          { facing: -1, damage: c.level.quarrickDamage || 1 });
       }
     },
 
@@ -96,7 +96,7 @@ export const l7Ending = {
       frames: 44,
       enter(c) {
         const back = c.player.x - 150;
-        c.state.rescueNPC = createQuarrick(back, surfaceYAt(back), { facing: 1, damage: 2 });
+        c.state.rescueNPC = createQuarrick(back, surfaceYAt(back), { facing: 1, damage: 1 });
         playWin();
       }
     },

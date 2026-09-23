@@ -56,10 +56,26 @@ const CONDITIONS = {
   // this reads as "the player has used the weapon he just gave them, on
   // him". Deliberately false while no such enemy exists, so it can't fire
   // before the handoff has happened.
+  //
+  // `alive` matters. The follow-up scene's first beat clears it, which is
+  // what stops this firing again — a death anywhere later in the level
+  // calls resetCutscenes(), wiping the runtime "already played" set, and
+  // without this the whole reunion replayed every time the player died.
   quarrickRestored: () => {
-    const q = state.enemies.find(e => e.quarrick);
+    const q = state.enemies.find(e => e.quarrick && e.alive);
     return !!q && q.restored;
   },
+
+  // The player does NOT currently hold this weapon.
+  //
+  // Exists for level 3's handoff, which is deliberately not `once` — a
+  // player who dies and respawns holding the level's starting weapon has to
+  // be able to get the Cornerstone again, or the Sculptor is unbeatable.
+  // But they usually DO still have it: a mid-level death resets position,
+  // not inventory. Without this the entire handoff-and-corruption scene
+  // replayed on every death after it, for a weapon the player was already
+  // carrying.
+  lacksWeapon: id => player.weapon !== id,
 
   // Never fires on its own — for cutscenes another system starts by hand.
   manual: () => false

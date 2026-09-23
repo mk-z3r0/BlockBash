@@ -36,7 +36,7 @@ export default {
   // Twelve faces to put back and a room actively trying to stop you. More
   // triangles than any other level carries, and it still isn't generous.
   startsWithAmmo: 14,
-  quarrickDamage: 2,
+  quarrickDamage: 1,   // restored in level 3: chipped, but square
 
   // Four ledges down through the crust, then the cavity floor.
   ground: [

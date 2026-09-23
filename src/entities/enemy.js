@@ -548,8 +548,24 @@ export function drawEnemies(frameCount, cutsceneDone) {
         carried.drawHeld(hand, facing, progress);
       } else if (tool) {
         const facing = enemy.facing >= 0 ? 1 : -1;
-        if (enemy.mining) {
-          // Driving it into the floor. Same mining pose level 1's Foreman
+        if (enemy.mining && tool.bracedMining) {
+          // A drill is HELD against the work. It doesn't wind up and it
+          // doesn't arc — it points down into the floor, leans in, and
+          // shakes. Two different machines were sharing one animation
+          // before this, and the rig swinging like a pickaxe was the tell.
+          const shove = 0.5 + 0.5 * Math.sin(enemy.swingPhase * 0.12);
+          const jitter = Math.sin(enemy.swingPhase * 1.7) * 1.1;
+          const fist = { x: facing * (r + 6 + shove * 5), y: r * 0.55 + jitter };
+          const hand = drawMuscleArm(0, -r * 0.1, fist.x, fist.y);
+          ctx.save();
+          ctx.translate(hand.x, hand.y + jitter);
+          ctx.scale(facing, 1);
+          // straight down with a slight forward lean, held there
+          ctx.rotate(1.32 + shove * 0.1);
+          tool.drawIcon();
+          ctx.restore();
+        } else if (enemy.mining) {
+          // Everything else swings. Same mining pose level 1's Foreman
           // uses, driven by the phase machine's swingPhase, so the pit that
           // opens is a pit something visibly dug.
           const p = (Math.sin(enemy.swingPhase * 0.24) + 1) / 2;

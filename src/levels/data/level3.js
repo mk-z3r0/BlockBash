@@ -120,7 +120,11 @@ export default {
     // the level's starting weapon, so a scene marked as seen and never re-run
     // would leave the Sculptor — which can only be beaten with the
     // Cornerstone — unbeatable.
-    { id: 'l3-handoff',  when: { reachX: 3250 } },
+    // `lacksWeapon` is what stops it replaying on every death after it: a
+    // mid-level death resets the player's position, not what they're
+    // carrying, so the scene that hands over the Cornerstone has no business
+    // running for someone who already has one.
+    { id: 'l3-handoff',  when: { reachX: 3250, lacksWeapon: 'cornerstone' } },
     { id: 'l3-restored', when: { quarrickRestored: true } },
     { id: 'edge-transition', when: { nearWorldEdge: 100 } }
   ],

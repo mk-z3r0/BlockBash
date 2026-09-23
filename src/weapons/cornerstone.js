@@ -18,15 +18,17 @@
 
 import { ctx, drawCornerstoneIcon, drawRestoreTriangle } from '../engine/renderer.js';
 
-// Held level and forward — it's aimed, not wound up.
-const IDLE_FIST = (hw, hh, facing) => ({ x: facing * (hw + 8), y: -hh * 0.45 });
-const IDLE_ANGLE = -0.35;
+// Shouldered and level — it's aimed, not wound up. Slightly higher and
+// flatter than the first pass, because it's a launcher now and a launcher
+// sits against the shoulder rather than out at arm's length.
+const IDLE_FIST = (hw, hh, facing) => ({ x: facing * (hw + 4), y: -hh * 0.55 });
+const IDLE_ANGLE = -0.12;
 
 // Recoil is backward and up, the opposite direction to every melee weapon's
 // follow-through, which is most of what makes it read as "fired" rather
 // than "swung" at a glance.
-const FIRED_FIST = (hw, hh, facing) => ({ x: facing * (hw + 1), y: -hh * 0.8 });
-const FIRED_ANGLE = -0.62;
+const FIRED_FIST = (hw, hh, facing) => ({ x: facing * (hw - 3), y: -hh * 0.78 });
+const FIRED_ANGLE = -0.38;
 
 export function cornerstoneAngleAt(progress) {
   // A kick out and back: peaks early, settles. Unlike a swing, this isn't a

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#12172b;"><canvas id="game" width="800" height="450"></canvas>
+<script>
+  // Quarrick at every stage of his arc, side by side.
+  //
+  // His deterioration is deliberately never narrated — GAME_DESIGN says the
+  // player reads it off his body — so the only way to check it is to look at
+  // it. The number that matters is how far a given damage level is from the
+  // OCTAGON silhouette, because that shape already means "corrupted"
+  // everywhere else in the game. It got too close once: the scene where the
+  // player restores him left him at a damage that read as an octagon, right
+  // before his line "I'm square. That'll do."
+</script>
+<script type="module">
+  import { ctx } from '../src/engine/renderer.js';
+  import { createQuarrick, drawRescueNPC } from '../src/entities/npc.js';
+
+  const LABELS = [
+    '0  whole (level 1)',
+    '1  chipped — RESTORED, and levels 4-7',
+    '2  worn',
+    '3  going (level 3, the handoff)',
+    '4  nearly gone'
+  ];
+
+  setTimeout(() => {
+    ctx.fillStyle = '#12172b';
+    ctx.fillRect(0, 0, 800, 450);
+    LABELS.forEach((label, d) => {
+      const cx = 90 + d * 150;
+      const npc = createQuarrick(cx - 22, 300, { facing: -1, damage: d });
+      drawRescueNPC(npc, 0);
+
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.fillStyle = d === 1 ? '#8effc0' : '#7a84a8';
+      ctx.font = 'bold 10px monospace';
+      label.split(' ').reduce((y, word, i) => {
+        if (i % 3 === 0) ctx.fillText(label.split(' ').slice(i, i + 3).join(' '), cx, y + 14);
+        return i % 3 === 0 ? y + 14 : y;
+      }, 320);
+      ctx.restore();
+    });
+    document.title = 'drawn';
+  }, 200);
+</script></body></html>

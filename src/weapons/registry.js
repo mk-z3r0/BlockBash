@@ -96,6 +96,12 @@ const WEAPONS = {
     duration: 30,
     reach: 60,
     activeFrom: 0.2,
+    // Held against the work, not swung through it. Without this the
+    // Excavator drove its rig into the ground with a pickaxe's chopping
+    // arc, which is not what a drill does and read as the wrong tool
+    // playing the right animation. See the mining branch in
+    // entities/enemy.js.
+    bracedMining: true,
     damage: 1,
     knockback: 6,
     score: 150,
