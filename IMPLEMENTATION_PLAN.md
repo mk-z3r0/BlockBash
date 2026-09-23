@@ -388,11 +388,25 @@ levels. Once seven levels are built, "move that platform 20px and see" is a
 different job from "author a level", and it's the job a canvas is good at.
 
 `tools/level-editor.html` — click to select, drag or arrow to move (shift for
-10px), add and delete, edit numbers directly, with the game's own
-`levels/levelRenderer.js` doing the drawing so terrain looks exactly like
-terrain looks in play. The jump arc this section asked for is in there
-(`?arc=1`), drawn at both carry distances, and labelled as the approximation
-it is — the arc is asymmetric and the probe is the authority.
+10px), drag the square handles to resize, add and delete, edit numbers
+directly, with the game's own `levels/levelRenderer.js` doing the drawing so
+terrain looks exactly like terrain looks in play. The jump arc this section
+asked for is in there (`?arc=1`), drawn at both carry distances, and labelled
+as the approximation it is — the arc is asymmetric and the probe is the
+authority.
+
+Every edit is undoable (`Ctrl+Z`, `Ctrl+Shift+Z`/`Ctrl+Y`, 120 deep), because
+the tool's job is experimenting and an experiment you can't back out of is a
+commitment. A burst of arrow-key nudges within 700ms collapses into one undo
+entry so that eight taps of a key cost eight taps of Ctrl+Z; separate mouse
+drags never collapse, which is a distinction the probe checks because the
+first implementation got it wrong.
+
+The handles are the only place the editor draws something the game doesn't.
+Platforms get left/right/bottom, ground and spike beds get left/right, and
+**enemies get handles at each end of their patrol** — `minX`/`maxX` are
+invisible in play, are the thing most often wrong by a hundred pixels, and
+were previously only editable by typing a number and guessing.
 
 **It does not write level files, and that is the whole design.** About a
 quarter of every level file is comments explaining why a number is what it
@@ -407,7 +421,9 @@ the carry numbers, beds that end too near a ledge, enemies standing inside
 terrain, checkpoints inside an enemy's reach) and says out loud that the
 probe is the real verdict. `tools/level-editor-probe.html` drives real
 pointer and key events at it and checks that a drag moves the right thing by
-the right amount and that the change list round-trips.
+the right amount, that the change list round-trips, that resizing from the
+left edge leaves the right edge where it was, and that undo depth matches
+what a human would expect from the gesture they just made.
 
 **4. Chamfer rendering + collision — HALF BUILT, and the half that shipped is
 the visual one.**
@@ -606,7 +622,7 @@ What's in it, and what each thing is actually for:
 | `story-beats-probe` | Can the player be blocked by a story beat? The handoff, the restoration, the Sculptor, the core |
 | `progression-chain-probe` | Does every level actually lead to the next one? |
 | `full-playthrough-probe` | One run, cleared save to win screen, every story scene asserted |
-| `level-editor-probe` | That the editor edits: a drag moves the right object by the right amount, and its change list round-trips |
+| `level-editor-probe` | That the editor edits: a drag moves the right object by the right amount, resize handles keep the opposite edge fixed, undo/redo counts match the gesture, and its change list round-trips |
 | `level-data-probe` | The boring stuff, read straight off level data: weapons and cutscene ids that exist, a level that can end, spawns and checkpoints over ground, hazards that don't run off a ledge. Found three of level 6's checkpoints floating in its pits |
 | `respawn-state-probe` | What survives a death — and standing at all 21 checkpoints in the game for two seconds without touching the controls |
 | the older probes | Physics, coins, saves, cutscene contract — unchanged, and all still green |

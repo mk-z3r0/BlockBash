@@ -70,6 +70,82 @@ const state = {
   mouse: { x: 0, y: 0 }
 };
 
+// --- undo ---------------------------------------------------------------
+//
+// Snapshots of the whole working copy. A level's data is small enough
+// (a few hundred numbers) that diffing edits to save memory would be
+// effort spent on the wrong problem, and whole snapshots can't get out of
+// step with the thing they're meant to restore.
+//
+// The subtlety is GROUPING, and it cuts both ways.
+//
+// A held arrow key repeats, so without grouping one press-and-hold buries
+// the stack in fifty entries and undo feels broken — you press it and the
+// platform moves a single pixel. Snapshots carry a tag, and a new snapshot
+// with the same tag inside COALESCE_MS is dropped, because the first one
+// already holds the state from before the burst began.
+//
+// But only CONTINUOUS input groups. A mouse gesture is its own boundary —
+// mousedown means "a new thing is happening" — so drags and resizes pass no
+// tag and always push. Grouping them by time was the first version and it
+// meant two quick resizes collapsed into one undo, which loses an edit the
+// user watched themselves make.
+const UNDO_LIMIT = 120;
+const COALESCE_MS = 700;
+const undoStack = [];
+const redoStack = [];
+let lastTag = null;
+let lastTagAt = 0;
+
+function snapshot(tag) {
+  const now = Date.now();
+  if (tag && tag === lastTag && now - lastTagAt < COALESCE_MS) { lastTagAt = now; return; }
+  // A click that selects something but doesn't move it shouldn't cost an
+  // undo press later. If nothing has changed since the last snapshot, there
+  // is nothing to go back to.
+  const top = undoStack[undoStack.length - 1];
+  if (top && JSON.stringify(top) === JSON.stringify(state.data)) { lastTag = tag; lastTagAt = now; return; }
+  lastTag = tag;
+  lastTagAt = now;
+  undoStack.push(clone(state.data));
+  if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+  redoStack.length = 0;
+  refreshUndoButtons();
+}
+
+function undo() {
+  if (!undoStack.length) return;
+  redoStack.push(clone(state.data));
+  state.data = undoStack.pop();
+  lastTag = null;
+  clampSelection();
+  sync(); refreshProps(); refreshUndoButtons();
+}
+
+function redo() {
+  if (!redoStack.length) return;
+  undoStack.push(clone(state.data));
+  state.data = redoStack.pop();
+  lastTag = null;
+  clampSelection();
+  sync(); refreshProps(); refreshUndoButtons();
+}
+
+// An undo can restore a level with fewer objects than the selection points
+// at — undoing an "add" is the obvious case.
+function clampSelection() {
+  const s = state.sel;
+  if (!s) return;
+  const list = state.data[s.list];
+  if (!list || s.index >= list.length) state.sel = null;
+}
+
+function refreshUndoButtons() {
+  const u = document.getElementById('undo'), r = document.getElementById('redo');
+  if (u) u.disabled = !undoStack.length;
+  if (r) r.disabled = !redoStack.length;
+}
+
 // --- coordinate helpers ------------------------------------------------
 const toScreen = (wx, wy) => ({ x: (wx - state.cam.x) * state.zoom, y: (wy - state.cam.y) * state.zoom });
 const toWorld = (sx, sy) => ({ x: sx / state.zoom + state.cam.x, y: sy / state.zoom + state.cam.y });
@@ -79,8 +155,12 @@ function loadIndex(i) {
   state.original = clone(levels[i]);
   state.data = clone(levels[i]);
   state.sel = null;
+  undoStack.length = 0;
+  redoStack.length = 0;
+  lastTag = null;
   state.cam = { x: 0, y: state.data.groundY - H() / state.zoom + 90 };
   sync();
+  refreshUndoButtons();
   // Panels too, or a revert leaves the change list still listing changes
   // that no longer exist — which is the one thing a change list must never
   // do, since the whole point is that you trust it enough to apply it.
@@ -152,6 +232,90 @@ function moveSelected(dx, dy) {
     }
   }
   sync();
+}
+
+// --- resize handles ----------------------------------------------------
+//
+// What can be resized, and by dragging which edge. Enemies get handles on
+// the ENDS OF THEIR PATROL rather than on their body: minX/maxX are the
+// numbers that actually matter about an enemy and the only ones that are
+// completely invisible in the running game.
+const HANDLE_R = 7;   // screen px
+
+function handlesFor() {
+  const s = state.sel;
+  if (!s) return [];
+  const d = state.data;
+  const b = selBox();
+  if (!b) return [];
+
+  if (s.list === 'enemies') {
+    const e = d.enemies[s.index];
+    if (e.minX == null) return [];
+    const y = e.y + e.w + 5;
+    return [{ id: 'patrolL', wx: e.minX, wy: y }, { id: 'patrolR', wx: e.maxX, wy: y }];
+  }
+  if (s.list === 'coins') return [];
+  if (s.list === 'checkpoints') {
+    return [{ id: 'bottom', wx: b.x + b.w / 2, wy: b.y + b.h }];
+  }
+  const h = [
+    { id: 'left', wx: b.x, wy: b.y + b.h / 2 },
+    { id: 'right', wx: b.x + b.w, wy: b.y + b.h / 2 }
+  ];
+  // Only things with a real height of their own — a ground segment's height
+  // is derived from the level's base line, and a spike bed's is the art.
+  if (s.list === 'platforms') h.push({ id: 'bottom', wx: b.x + b.w / 2, wy: b.y + b.h });
+  return h;
+}
+
+function hitHandle(wx, wy) {
+  const r = HANDLE_R / state.zoom;
+  return handlesFor().find(h => Math.abs(wx - h.wx) <= r && Math.abs(wy - h.wy) <= r) || null;
+}
+
+const MIN_SIZE = 8;
+
+function applyHandle(id, wx, wy) {
+  const s = state.sel;
+  const d = state.data;
+  const o = s.list === 'coins' ? null : d[s.list][s.index];
+  if (!o) return;
+  const x = Math.round(wx), y = Math.round(wy);
+
+  if (id === 'patrolL') { o.minX = Math.min(x, o.maxX - o.w - 2); return; }
+  if (id === 'patrolR') { o.maxX = Math.max(x, o.minX + o.w + 2); return; }
+
+  if (id === 'left') {
+    // Dragging a left edge moves the origin AND changes the size, which is
+    // the bit that's easy to get wrong: the right edge has to stay put.
+    const right = o.x + (o.width == null ? 0 : o.width);
+    const nx = Math.min(x, right - MIN_SIZE);
+    o.width = right - nx;
+    o.x = nx;
+    return;
+  }
+  if (id === 'right') { o.width = Math.max(MIN_SIZE, x - o.x); return; }
+  if (id === 'bottom') {
+    const top = o.y == null ? surfaceYAt(o.x) : o.y;
+    o.height = Math.max(MIN_SIZE, y - top);
+  }
+}
+
+function drawHandles() {
+  const hs = handlesFor();
+  if (!hs.length) return;
+  const r = HANDLE_R / state.zoom;
+  hs.forEach(h => {
+    const patrol = h.id.startsWith('patrol');
+    ctx.fillStyle = patrol ? '#ff9fc4' : '#8effc0';
+    ctx.strokeStyle = '#0a0d1c';
+    ctx.lineWidth = 1.5 / state.zoom;
+    ctx.beginPath();
+    ctx.rect(h.wx - r, h.wy - r, r * 2, r * 2);
+    ctx.fill();
+    ctx.stroke();
+  });
 }
 
 // --- drawing -----------------------------------------------------------
@@ -271,6 +435,7 @@ function draw() {
   drawEntities();
   drawArc();
   drawSelection();
+  drawHandles();
   ctx.restore();
   requestAnimationFrame(draw);
 }
@@ -406,6 +571,7 @@ function refreshProps() {
     inp.onchange = () => {
       const v = parseFloat(inp.value);
       if (!Number.isFinite(v)) return;
+      snapshot('field:' + inp.dataset.k);
       const k = inp.dataset.k;
       if (s.list === 'coins') d.coins[s.index][k === 'x' ? 0 : 1] = v;
       else d[s.list][s.index][k] = v;
@@ -422,9 +588,19 @@ let panning = null;
 canvas.addEventListener('mousedown', e => {
   const r = canvas.getBoundingClientRect();
   const w = toWorld(e.clientX - r.left, e.clientY - r.top);
+  // A handle on the current selection wins over anything underneath it —
+  // otherwise the left edge of a platform is unreachable whenever something
+  // else overlaps it, which on a terrace is most of the time.
+  const handle = hitHandle(w.x, w.y);
+  if (handle) {
+    snapshot();   // a mouse gesture is its own undo step
+    state.drag = { wx: w.x, wy: w.y, handle: handle.id };
+    return;
+  }
   const hit = pick(w.x, w.y);
   if (hit) {
     state.sel = hit;
+    snapshot();   // ...as is this one
     state.drag = { wx: w.x, wy: w.y };
     refreshProps();
   } else {
@@ -443,8 +619,14 @@ canvas.addEventListener('mousemove', e => {
     return;
   }
   if (state.drag && state.sel) {
-    moveSelected(state.mouse.x - state.drag.wx, state.mouse.y - state.drag.wy);
-    state.drag = { wx: state.mouse.x, wy: state.mouse.y };
+    if (state.drag.handle) {
+      applyHandle(state.drag.handle, state.mouse.x, state.mouse.y);
+      sync();
+    } else {
+      moveSelected(state.mouse.x - state.drag.wx, state.mouse.y - state.drag.wy);
+      state.drag.wx = state.mouse.x;
+      state.drag.wy = state.mouse.y;
+    }
     refreshProps();
   }
 });
@@ -455,13 +637,26 @@ window.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   const step = e.shiftKey ? 10 : 1;
   const nudges = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
-  if (nudges[e.key] && state.sel) { e.preventDefault(); moveSelected(...nudges[e.key]); refreshProps(); return; }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+    e.preventDefault();
+    if (e.shiftKey) redo(); else undo();
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) { e.preventDefault(); redo(); return; }
+  if (nudges[e.key] && state.sel) {
+    e.preventDefault();
+    snapshot('nudge');
+    moveSelected(...nudges[e.key]);
+    refreshProps();
+    return;
+  }
   if ((e.key === 'Delete' || e.key === 'Backspace') && state.sel) { e.preventDefault(); removeSelected(); }
 });
 
 function removeSelected() {
   const s = state.sel;
   if (!s) return;
+  snapshot();
   state.data[s.list].splice(s.index, 1);
   state.sel = null;
   sync(); refreshProps();
@@ -475,6 +670,7 @@ function centreWorld() {
 
 function add(list, make) {
   const c = centreWorld();
+  snapshot();
   state.data[list] = state.data[list] || [];
   state.data[list].push(make(c));
   state.sel = { list, index: state.data[list].length - 1 };
@@ -495,6 +691,8 @@ on('addCheckpoint', () => add('checkpoints', c => {
   return { x: c.x, y, width: 8, height: 70 };
 }));
 on('del', removeSelected);
+on('undo', undo);
+on('redo', redo);
 on('revert', () => loadIndex(state.levelIndex));
 
 on('arcBtn', e => {
@@ -553,5 +751,7 @@ window.__editor = {
   state,
   toScreen,
   loadIndex,
+  handles: () => handlesFor(),
+  undoDepth: () => undoStack.length,
   select: (list, index) => { state.sel = { list, index }; refreshProps(); }
 };

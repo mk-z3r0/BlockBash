@@ -89,6 +89,85 @@
     key('Delete');
     check(ed.state.data.hazards.length === before, 'delete removes it again');
 
+    // --- undo, which is the whole reason a person feels free to experiment ---
+    ed.loadIndex(0);
+    ed.select('platforms', 0);
+    const base = ed.state.data.platforms[0].x;
+    const ctrlZ = (shift = false) => win.dispatchEvent(
+      new win.KeyboardEvent('keydown', { key: 'z', ctrlKey: true, shiftKey: shift, bubbles: true }));
+
+    send('mousedown', at(ed.state.data.platforms[0].x + 10, ed.state.data.platforms[0].y + 5));
+    send('mousemove', at(ed.state.data.platforms[0].x + 40, ed.state.data.platforms[0].y + 5));
+    win.dispatchEvent(new win.MouseEvent('mouseup', { bubbles: true, view: win }));
+    const afterDrag = ed.state.data.platforms[0].x;
+    check(afterDrag !== base, `a drag changed something (${base} -> ${afterDrag})`);
+    ctrlZ();
+    check(ed.state.data.platforms[0].x === base, `ctrl+Z puts it back (${ed.state.data.platforms[0].x})`);
+    ctrlZ(true);
+    check(ed.state.data.platforms[0].x === afterDrag, 'ctrl+shift+Z redoes it');
+    ctrlZ();
+
+    // A burst of nudges must be ONE undo, not thirty. Otherwise undo feels
+    // broken: you press it and the thing moves a single pixel.
+    ed.select('platforms', 0);
+    const beforeBurst = ed.state.data.platforms[0].x;
+    const depth0 = ed.undoDepth();
+    for (let i = 0; i < 8; i++) key('ArrowRight');
+    check(ed.state.data.platforms[0].x === beforeBurst + 8, `eight nudges moved 8px`);
+    check(ed.undoDepth() === depth0 + 1, `and cost one undo entry, not eight (${ed.undoDepth() - depth0})`);
+    ctrlZ();
+    check(ed.state.data.platforms[0].x === beforeBurst, 'one ctrl+Z undoes the whole burst');
+
+    // --- resize handles ---
+    ed.select('platforms', 0);
+    const p = ed.state.data.platforms[0];
+    ed.state.cam.x = p.x - 200;
+    ed.state.cam.y = p.y - 150;
+    const hs = ed.handles();
+    check(hs.length >= 3, `a platform offers left/right/bottom handles (${hs.map(h => h.id).join(',')})`);
+
+    const right0 = p.x + p.width;
+    const leftH = hs.find(h => h.id === 'left');
+    send('mousedown', at(leftH.wx, leftH.wy));
+    send('mousemove', at(leftH.wx + 30, leftH.wy));
+    win.dispatchEvent(new win.MouseEvent('mouseup', { bubbles: true, view: win }));
+    check(ed.state.data.platforms[0].x === Math.round(leftH.wx + 30),
+      `dragging the left edge moves it (x ${ed.state.data.platforms[0].x})`);
+    check(ed.state.data.platforms[0].x + ed.state.data.platforms[0].width === right0,
+      `and the RIGHT edge stays put (${ed.state.data.platforms[0].x + ed.state.data.platforms[0].width} vs ${right0})`);
+
+    const w0 = ed.state.data.platforms[0].width;
+    const rightH = ed.handles().find(h => h.id === 'right');
+    send('mousedown', at(rightH.wx, rightH.wy));
+    send('mousemove', at(rightH.wx + 25, rightH.wy));
+    win.dispatchEvent(new win.MouseEvent('mouseup', { bubbles: true, view: win }));
+    check(ed.state.data.platforms[0].width === w0 + 25, `dragging the right edge resizes (${w0} -> ${ed.state.data.platforms[0].width})`);
+    ctrlZ();
+    check(ed.state.data.platforms[0].width === w0, 'and a resize can be undone');
+
+    // an enemy's handles are on its PATROL, which is the invisible part
+    ed.select('enemies', 0);
+    const e0 = ed.state.data.enemies[0];
+    ed.state.cam.x = e0.minX - 150;
+    ed.state.cam.y = e0.y - 200;
+    const eh = ed.handles();
+    check(eh.length === 2 && eh.every(h => h.id.startsWith('patrol')),
+      `an enemy offers patrol handles (${eh.map(h => h.id).join(',')})`);
+    const minX0 = e0.minX;
+    send('mousedown', at(eh[0].wx, eh[0].wy));
+    send('mousemove', at(eh[0].wx - 40, eh[0].wy));
+    win.dispatchEvent(new win.MouseEvent('mouseup', { bubbles: true, view: win }));
+    check(ed.state.data.enemies[0].minX === Math.round(minX0 - 40),
+      `dragging it widens the patrol (${minX0} -> ${ed.state.data.enemies[0].minX})`);
+
+    // undoing an ADD must not leave the selection pointing past the end
+    ed.loadIndex(0);
+    win.document.getElementById('addPlatform').click();
+    const added = ed.state.data.platforms.length;
+    ctrlZ();
+    check(ed.state.data.platforms.length === added - 1, 'undo removes an added platform');
+    check(ed.state.sel === null, 'and drops the selection that pointed at it');
+
     // --- every level opens without throwing ---
     for (let i = 0; i < 7; i++) {
       ed.loadIndex(i);
