@@ -16,7 +16,7 @@
 // Everything else — hp, speed, patrol bounds — is ordinary enemy data.
 
 import { state } from '../state.js';
-import { getLevel, surfaceYAt } from '../levels/levelLoader.js';
+import { getLevel, surfaceYAt, isBlocked } from '../levels/levelLoader.js';
 import { carveGap } from '../levels/terrain.js';
 import { spawnWeaponPickup, spawnAmmoPickup } from './weaponPickup.js';
 import { spawnExplosion, spawnDust } from './particles.js';
@@ -31,6 +31,17 @@ import { showToast } from '../ui/hud.js';
 function setPhase(boss, phase, frames) {
   boss.phase = phase;
   boss.phaseTimer = frames;
+}
+
+// Bosses move by direct assignment rather than through the patrol helpers,
+// so they need the same wall test. They ignore hazards — the Excavator is
+// busy taking the floor apart and has no business being fenced in by its
+// own side's spikes.
+function stepTo(boss, x) {
+  const next = Math.max(boss.minX, Math.min(x, boss.maxX - boss.w));
+  if (!isBlocked({ x: next, y: boss.y, width: boss.w, height: boss.w }, { hazards: false })) {
+    boss.x = next;
+  }
 }
 
 // --- level 2: The Excavator -------------------------------------------
@@ -58,7 +69,7 @@ function updateExcavator(boss, player) {
     boss.invulnerable = true;
     const dir = Math.sign((player.x + player.width / 2) - (boss.x + boss.w / 2)) || 1;
     boss.facing = dir;
-    boss.x = Math.max(boss.minX, Math.min(boss.x + dir * Math.abs(boss.speed), boss.maxX - boss.w));
+    stepTo(boss, boss.x + dir * Math.abs(boss.speed));
     if (boss.phaseTimer <= 0) setPhase(boss, 'drill', EXCAVATOR.drill);
     return;
   }
@@ -119,7 +130,7 @@ function updateCrew(boss, player) {
   if (boss.role === 'shooter') {
     // hangs back and fires — reachable, which is the point
     const wanted = player.x + player.width / 2 - dir * 260;
-    boss.x = Math.max(boss.minX, Math.min(boss.x + Math.sign(wanted - boss.x) * Math.abs(boss.speed) * 0.7, boss.maxX - boss.w));
+    stepTo(boss, boss.x + Math.sign(wanted - boss.x) * Math.abs(boss.speed) * 0.7);
     if (--boss.shotTimer <= 0) {
       boss.shotTimer = 95;
       spawnSphereShot(boss);
@@ -128,7 +139,7 @@ function updateCrew(boss, player) {
   }
 
   // the other two crowd the player
-  boss.x = Math.max(boss.minX, Math.min(boss.x + dir * Math.abs(boss.speed) * 1.25, boss.maxX - boss.w));
+  stepTo(boss, boss.x + dir * Math.abs(boss.speed) * 1.25);
 }
 
 // --- level 5: The Terraformer ------------------------------------------
@@ -173,7 +184,7 @@ function updateGeneral(boss, player) {
 
   if (boss.phase === 'charge') {
     boss.telegraph = 0;
-    boss.x = Math.max(boss.minX, Math.min(boss.x + boss.chargeDir * Math.abs(boss.speed) * 2.6, boss.maxX - boss.w));
+    stepTo(boss, boss.x + boss.chargeDir * Math.abs(boss.speed) * 2.6);
     if (boss.phaseTimer <= 0) setPhase(boss, 'recover', 55);
     return;
   }
@@ -188,7 +199,7 @@ function updateGeneral(boss, player) {
 
   // stalk: pressure, then commit
   boss.facing = dir;
-  boss.x = Math.max(boss.minX, Math.min(boss.x + dir * Math.abs(boss.speed), boss.maxX - boss.w));
+  stepTo(boss, boss.x + dir * Math.abs(boss.speed));
   if (--boss.shotTimer <= 0) {
     boss.shotTimer = 150;
     spawnSphereShot(boss);

@@ -33,7 +33,7 @@ ASSERTING=(
 # has to remember to widen a loop here.
 LEVEL_COUNT="$(grep -cE "^import level[0-9]+ from" "$ROOT/src/levels/registry.js")"
 for ((i = 0; i < LEVEL_COUNT; i++)); do ASSERTING+=("level-audit-probe?level=$i"); done
-ASSERTING+=(level-data-probe level-select-probe boss-fight-probe story-beats-probe progression-chain-probe respawn-state-probe full-playthrough-probe)
+ASSERTING+=(level-data-probe level-select-probe enemy-collision-probe boss-fight-probe story-beats-probe progression-chain-probe respawn-state-probe full-playthrough-probe)
 REPORT_ONLY=(gap-probe walk-only-autoplay edge-transition-trace)
 
 started_server=0
@@ -53,7 +53,7 @@ run_one() {
   # needs a much longer virtual-time budget than a probe that ticks a few
   # hundred frames once.
   local budget=13000
-  case "$page" in level-audit-probe|full-playthrough-probe) budget=90000 ;; esac
+  case "$page" in level-audit-probe|full-playthrough-probe|enemy-collision-probe) budget=120000 ;; esac
   "$BROWSER" --headless=new --disable-gpu --no-sandbox \
     --virtual-time-budget=$budget --dump-dom "http://localhost:$PORT/tools/$page.html$query" 2>/dev/null \
     | python3 "$ROOT/tools/probe-extract.py"

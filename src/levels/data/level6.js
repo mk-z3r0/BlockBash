@@ -124,7 +124,9 @@ export default {
     { x: 750,  y: 250,           w: 20, minX: 700,  maxX: 790,  speed: 1.3 },
     { x: 1150, y: GROUND_Y - 22, w: 22, minX: 1000, maxX: 1300, speed: 1.6,
       tier: 'aggressor', shoots: true },
-    { x: 1500, y: GROUND_Y - 26, w: 26, minX: 1440, maxX: 1590, speed: 0.85,
+    // Between the cover at 1130 and the cover at 1400 — the only clear
+    // stretch of arena 1 that keeps the checkpoint at 1920 out of reach.
+    { x: 1200, y: GROUND_Y - 26, w: 26, minX: 1190, maxX: 1320, speed: 0.85,
       kind: 'octagon', restoreHits: 2 },
 
     // --- arena 2 ---
@@ -140,7 +142,7 @@ export default {
     // --- arena 3: the hardest stretch of the level ---
     { x: 3990, y: GROUND_Y - 22, w: 22, minX: 3940, maxX: 4090, speed: 1.8,
       tier: 'pursuer', weapon: 'chainsaw' },
-    { x: 4360, y: GROUND_Y - 22, w: 22, minX: 4300, maxX: 4460, speed: 1.7,
+    { x: 4240, y: GROUND_Y - 22, w: 22, minX: 4230, maxX: 4340, speed: 1.7,
       tier: 'aggressor', shoots: true },
     { x: 4650, y: GROUND_Y - 22, w: 22, minX: 4600, maxX: 4730, speed: 1.7, canHop: true },
     { x: 4880, y: GROUND_Y - 22, w: 22, minX: 4820, maxX: 4990, speed: 1.8,
@@ -153,9 +155,9 @@ export default {
     // --- arena 4 ---
     { x: 5700, y: GROUND_Y - 22, w: 22, minX: 5650, maxX: 5800, speed: 1.8,
       tier: 'pursuer', weapon: 'chainsaw' },
-    { x: 5980, y: GROUND_Y - 22, w: 22, minX: 5920, maxX: 6080, speed: 1.7,
+    { x: 5840, y: GROUND_Y - 22, w: 22, minX: 5830, maxX: 5940, speed: 1.7,
       tier: 'aggressor', shoots: true },
-    { x: 6150, y: GROUND_Y - 22, w: 22, minX: 6090, maxX: 6220, speed: 1.7, canHop: true },
+    { x: 6250, y: GROUND_Y - 22, w: 22, minX: 6240, maxX: 6350, speed: 1.7, canHop: true },
 
     // --- The General ---
     // Bigger than the Foreman and faster than anything else in the game.

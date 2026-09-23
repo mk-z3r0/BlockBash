@@ -129,11 +129,13 @@ export default {
     { x: 220,  y: GROUND_Y - 22, w: 22, minX: 170,  maxX: 290,  speed: 1.7 },
     { x: 620,  y: 260,           w: 20, minX: 570,  maxX: 660,  speed: 1.3 },
     { x: 870,  y: GROUND_Y - 22, w: 22, minX: 820,  maxX: 900,  speed: 1.6, canHop: true },
-    { x: 1330, y: GROUND_Y - 22, w: 22, minX: 1200, maxX: 1450, speed: 1.6,
+    // Short span on purpose: an aggressor reaches 330px, and anything
+    // wider put the checkpoint at 1770 inside it.
+    { x: 1360, y: GROUND_Y - 22, w: 22, minX: 1350, maxX: 1400, speed: 1.6,
       tier: 'aggressor', shoots: true },
     { x: 1700, y: GROUND_Y - 22, w: 22, minX: 1650, maxX: 1730, speed: 1.7,
       tier: 'pursuer', weapon: 'pickaxe' },
-    { x: 2100, y: GROUND_Y - 26, w: 26, minX: 2040, maxX: 2260, speed: 0.85,
+    { x: 2160, y: GROUND_Y - 26, w: 26, minX: 2150, maxX: 2270, speed: 0.85,
       kind: 'octagon', restoreHits: 2 },
     { x: 2560, y: GROUND_Y - 22, w: 22, minX: 2480, maxX: 2620, speed: 1.6, canHop: true },
     { x: 2950, y: GROUND_Y - 22, w: 22, minX: 2900, maxX: 3020, speed: 1.6,

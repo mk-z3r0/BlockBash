@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#000;">
+<canvas id="game" width="800" height="450"></canvas><pre id="out">running…</pre>
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true, narrative: { seenCutscenes: {}, npcStage: 0, flags: {} } })); window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERROR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  // Nothing walks through a wall.
+  //
+  // Enemies had no terrain collision at all until 2026-09-22 — patrol and
+  // chase only ever clamped to the minX/maxX leash — so a sphere whose span
+  // crossed a pillar, a cover block or a terrace wall walked straight
+  // through it, and one whose span crossed a spike bed strolled over the
+  // spikes. Reported from play.
+  //
+  // The static half of this is in level-data-probe (nothing SPAWNS inside
+  // something solid). This is the moving half: run every level for a while,
+  // with the player dragged up and down it so the chase logic actually
+  // fires, and check nothing has ended up inside anything.
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update, switchTo } from '../src/scenes/sceneManager.js';
+  import { getLevel, isBlocked } from '../src/levels/levelLoader.js';
+  import { levels } from '../src/levels/registry.js';
+
+  const out = [];
+  let fails = 0;
+
+  setTimeout(() => {
+   try {
+    for (let i = 0; i < levels.length; i++) {
+      state.currentLevelIndex = i;
+      switchTo('playing', { retry: true });
+      const lv = getLevel();
+      lv.cutscenes.length = 0;
+      state.lives = 999;
+      player.invincible = 999999;
+
+      const worst = new Map();
+      const FRAMES = 900;
+      for (let f = 0; f < FRAMES; f++) {
+        // Sweep the player across the level so every enemy gets a turn at
+        // chasing — a patrolling sphere and a charging one take different
+        // code paths to the same wall.
+        player.x = 60 + (lv.worldEdgeX - 200) * (f / FRAMES);
+        player.y = lv.groundY - player.height - 1;
+        update();
+
+        for (const e of state.enemies) {
+          if (!e.alive || e.restored) continue;
+          const box = { x: e.x, y: e.y, width: e.w, height: e.w };
+          if (isBlocked(box, { hazards: !e.boss })) {
+            const key = `${e.boss ? 'boss' : e.kind || 'sphere'}@${Math.round(e.baseX)}`;
+            if (!worst.has(key)) worst.set(key, Math.round(e.x));
+          }
+        }
+      }
+
+      if (worst.size) {
+        fails += worst.size;
+        for (const [who, where] of worst) {
+          out.push(`  FAIL level ${i + 1}: ${who} ended up inside terrain at x${where}`);
+        }
+      } else {
+        out.push(`  ok   level ${i + 1}: ${state.enemies.length} enemies, ${FRAMES} frames, nothing clipped`);
+      }
+    }
+
+    out.push(fails ? `*** ${fails} FAILURE(S)` : 'PASS nothing walks through a wall or a spike bed');
+   } catch (err) {
+    out.push('*** THREW: ' + (err && err.stack ? err.stack.split('\n').slice(0, 3).join(' | ') : err));
+   }
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 250);
+</script></body></html>

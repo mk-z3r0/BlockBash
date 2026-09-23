@@ -8,6 +8,7 @@ import { startAttack, tickWeapon, spawnSphereShot, boxOf } from '../weapons/comb
 import { initBoss, updateBossBehaviour, onBossDefeated } from './bosses.js';
 import { addShake, addHitStop } from '../engine/impact.js';
 import { addPopup } from '../ui/popups.js';
+import { isBlocked } from '../levels/levelLoader.js';
 import { state } from '../state.js';
 
 // --- enemy tiers (GAME_DESIGN's "Enemies evolve across levels") ---------
@@ -109,11 +110,40 @@ export function spawnEnemies(spawns) {
   return built;
 }
 
+// Walls and spike beds turn an enemy around, the same as the ends of its
+// leash. Checked BEFORE the move rather than after, so it never steps into
+// something solid and then gets pushed back out.
+//
+// Spheres don't die to spikes — the design decision is that their own side
+// put them there — but walking through a bed looked exactly like a bug, and
+// turning around at one is both what it should look like and what something
+// that placed them would do.
+function wouldHit(enemy, x) {
+  // Tested at the enemy's GROUNDED height, not wherever it currently is.
+  //
+  // A hopping sphere is briefly above the thing in its way, so testing its
+  // live y let it sail over a spike bed mid-hop and land in the middle of
+  // it — stuck, standing in spikes, which is precisely the look the whole
+  // change was meant to remove. Caught by the collision probe on level 4,
+  // the first level where anything hops.
+  //
+  // The effect is that a wall stops an enemy whether or not it happens to
+  // be airborne, which is also the more predictable behaviour to author
+  // levels against.
+  const y = enemy.baseY == null ? enemy.y : enemy.baseY;
+  return isBlocked(
+    { x, y, width: enemy.w, height: enemy.w },
+    { hazards: !enemy.boss }
+  );
+}
+
 function patrol(enemy) {
-  enemy.x += enemy.speed;
-  if (enemy.x < enemy.minX || enemy.x + enemy.w > enemy.maxX) {
+  const next = enemy.x + enemy.speed;
+  if (next < enemy.minX || next + enemy.w > enemy.maxX || wouldHit(enemy, next)) {
     enemy.speed *= -1;
     enemy.x = Math.max(enemy.minX, Math.min(enemy.x, enemy.maxX - enemy.w));
+  } else {
+    enemy.x = next;
   }
   enemy.facing = enemy.speed >= 0 ? 1 : -1;
 }
@@ -137,7 +167,11 @@ function chase(enemy, player, speed) {
   const dx = (player.x + player.width / 2) - (enemy.x + enemy.w / 2);
   const dir = Math.sign(dx) || 1;
   enemy.facing = dir;
-  enemy.x = Math.max(enemy.minX, Math.min(enemy.x + dir * speed, enemy.maxX - enemy.w));
+  const next = Math.max(enemy.minX, Math.min(enemy.x + dir * speed, enemy.maxX - enemy.w));
+  // A chase stops at a wall rather than walking through it. The enemy keeps
+  // facing the player and keeps swinging — it just can't get there, which is
+  // what cover is for.
+  if (!wouldHit(enemy, next)) enemy.x = next;
 }
 
 // Boss movement/attack timing for level 1's Foreman is driven by its
@@ -179,7 +213,8 @@ export function updateEnemies(player, cutsceneActive) {
 
     // Knockback decays wherever it came from, before anything else moves.
     if (enemy.knockback) {
-      enemy.x = Math.max(enemy.minX - 20, Math.min(enemy.x + enemy.knockback, enemy.maxX + 20 - enemy.w));
+      const shoved = Math.max(enemy.minX - 20, Math.min(enemy.x + enemy.knockback, enemy.maxX + 20 - enemy.w));
+      if (!wouldHit(enemy, shoved)) enemy.x = shoved;
       enemy.knockback *= 0.78;
       if (Math.abs(enemy.knockback) < 0.3) enemy.knockback = 0;
     }

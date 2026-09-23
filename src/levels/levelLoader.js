@@ -1,3 +1,4 @@
+import { isColliding } from '../engine/physics.js';
 // Turns level data into live runtime objects. Everything mutable is cloned
 // on load, so replaying a level starts from a clean slate instead of
 // inheriting whatever the last attempt left behind.
@@ -135,6 +136,34 @@ export function getLevel() {
 // This is exactly how level 2's arrival scene ended up with Quarrick standing
 // 120px inside the rim: it placed him at groundY while the player was on a
 // terrace far above it.
+// Would a body of this size, at this position, be inside something solid?
+//
+// Enemies had no terrain collision at all — `patrol` and `chase` only ever
+// clamped to the minX/maxX leash — so a sphere whose span crossed a pillar,
+// a cover block or a terrace wall walked straight through it, and one whose
+// span crossed a spike bed strolled over the spikes.
+//
+// Note what does NOT count: the floor an enemy is standing on. isColliding
+// uses strict inequalities, so a body whose bottom edge is exactly the
+// platform's top edge doesn't overlap it. That's what lets this be a single
+// flat test instead of needing to know which surface is underfoot.
+//
+// `hazards: false` for anything that should ignore spikes. Bosses do — the
+// Excavator is busy taking the floor apart and shouldn't be fenced in by
+// its own side's furniture.
+export function isBlocked(box, { hazards = true, level = current } = {}) {
+  if (!level) return false;
+  for (const p of level.platforms) {
+    if (p.width <= 1) continue;
+    if (isColliding(box, p)) return true;
+  }
+  if (!hazards) return false;
+  for (const h of level.hazards) {
+    if (isColliding(box, h.hitbox)) return true;
+  }
+  return false;
+}
+
 export function surfaceYAt(x, level = current) {
   if (!level) return 0;
   const seg = level.platforms.find(p => p.ground && x >= p.x && x <= p.x + p.width);

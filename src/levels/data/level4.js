@@ -113,17 +113,19 @@ export default {
     // ...and the first that hops. Nothing has left the ground under its own
     // power before now.
     { x: 1960, y: SHELF - 22,    w: 22, minX: 1935, maxX: 2140, speed: 1.6, canHop: true },
-    { x: 2250, y: SHELF - 26,    w: 26, minX: 2180, maxX: 2420, speed: 0.8,
+    { x: 2290, y: SHELF - 26,    w: 26, minX: 2280, maxX: 2400, speed: 0.8,
       kind: 'octagon', restoreHits: 2 },
     { x: 3050, y: SHELF - 22,    w: 22, minX: 3000, maxX: 3140, speed: 1.5,
       tier: 'aggressor', shoots: true },
     { x: 3250, y: SHELF - 22,    w: 22, minX: 3150, maxX: 3370, speed: 1.6, canHop: true },
     { x: 3700, y: SHELF - 22,    w: 22, minX: 3620, maxX: 3880, speed: 1.6,
       tier: 'aggressor', shoots: true },
-    { x: 4200, y: GROUND_Y - 22, w: 22, minX: 4000, maxX: 4280, speed: 1.7,
+    { x: 4360, y: GROUND_Y - 22, w: 22, minX: 4350, maxX: 4470, speed: 1.7,
       tier: 'pursuer', weapon: 'pickaxe' },
-    { x: 4750, y: GROUND_Y - 22, w: 22, minX: 4700, maxX: 4830, speed: 1.6, canHop: true },
-    { x: 5450, y: GROUND_Y - 26, w: 26, minX: 5380, maxX: 5570, speed: 0.8,
+    { x: 4910, y: GROUND_Y - 22, w: 22, minX: 4900, maxX: 5020, speed: 1.6, canHop: true },
+    // Past the bed at 5600, not before it: placing it left of here put
+    // the checkpoint at 5290 inside a corrupted square's 200px reach.
+    { x: 5700, y: GROUND_Y - 26, w: 26, minX: 5690, maxX: 5810, speed: 0.8,
       kind: 'octagon', restoreHits: 2 },
     { x: 5900, y: GROUND_Y - 22, w: 22, minX: 5750, maxX: 5950, speed: 1.6,
       tier: 'aggressor', shoots: true },

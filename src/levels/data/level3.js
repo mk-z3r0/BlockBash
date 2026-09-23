@@ -134,7 +134,8 @@ export default {
     { x: 660,  y: 180,           w: 20, minX: 620,  maxX: 730,  speed: 1.2 },
     { x: 1000, y: GROUND_Y - 22, w: 22, minX: 975,  maxX: 1055, speed: 1.6 },
     { x: 1400, y: 150,           w: 20, minX: 1360, maxX: 1460, speed: 1.2 },
-    { x: 1800, y: GROUND_Y - 22, w: 22, minX: 1760, maxX: 1870, speed: 1.8,
+    // Was at 1800, inside the pillar at 1780-1840.
+    { x: 2240, y: GROUND_Y - 22, w: 22, minX: 2230, maxX: 2350, speed: 1.8,
       tier: 'pursuer', weapon: 'pickaxe' },
     { x: 2100, y: 190,           w: 20, minX: 2060, maxX: 2170, speed: 1.2 },
     // The first corrupted square in the game, on the open ground before the

@@ -106,7 +106,9 @@ export default {
     { x: 2300, y: GROUND_Y - 22, w: 22, minX: 2060, maxX: 2600, speed: 1.5,
       tier: 'pursuer', weapon: 'pickaxe' },
     { x: 2460, y: 240,           w: 20, minX: 2420, maxX: 2520, speed: 1.2 },
-    { x: 3250, y: GROUND_Y - 22, w: 22, minX: 3180, maxX: 3480, speed: 1.6 },
+    // Was at 3250, standing in the middle of the long spike bed. Enemies
+    // collide with terrain now, so it would have been stuck there forever.
+    { x: 2940, y: GROUND_Y - 22, w: 22, minX: 2900, maxX: 3040, speed: 1.6 },
     { x: 3940, y: 210,           w: 20, minX: 3900, maxX: 4000, speed: 1.2 },
     { x: 4600, y: GROUND_Y - 22, w: 22, minX: 4520, maxX: 4840, speed: 1.6,
       tier: 'pursuer', weapon: 'pickaxe' },
