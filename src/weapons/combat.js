@@ -108,6 +108,15 @@ function swingReach(owner, weapon) {
   return weapon.reach * (0.55 + 0.45 * out);
 }
 
+// Shared with the stomp test in entities/enemy.js, and deliberately the
+// same shape: "was above it when the frame started, and is falling".
+function comingDownOn(who, target) {
+  if (who.velocityY <= 0) return false;
+  const b = boxOf(target);
+  const prev = who.prevBottom == null ? who.y + who.height : who.prevBottom;
+  return prev <= b.y + b.height * 0.35;
+}
+
 function meleeHitbox(owner, weapon, reach) {
   const b = boxOf(owner);
   const dir = owner.facing >= 0 ? 1 : -1;
@@ -138,6 +147,19 @@ function applyMeleeHits(owner, weapon) {
 
   if (owner.hitThisSwing && owner.hitThisSwing.has(player)) return;
   if (!isColliding(hitbox, boxOf(player))) return;
+  // A stomp beats a swing.
+  //
+  // An armed sphere's hitbox is its own full height, so a player dropping
+  // onto one is inside the swing for the frame before the stomp resolves —
+  // and the swing runs first, because tickWeapon comes before the contact
+  // test in entities/enemy.js. The result is that the enemies carrying a
+  // pickaxe or a chainsaw are the ones you cannot bounce on, which is
+  // precisely backwards: they are the ones you most want to deal with from
+  // above. Reported from play.
+  //
+  // This does not make the player invulnerable mid-air — they have to be
+  // descending, and to have been above the thing when the frame started.
+  if (comingDownOn(player, owner)) return;
   if (owner.hitThisSwing) owner.hitThisSwing.add(player);
   hitThePlayer();
 }

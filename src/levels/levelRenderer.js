@@ -64,6 +64,16 @@ const CARVE_CHAMFER = 5;  // how much of each bottom corner is gone
 
 function isOverSpikes(p, hazards) {
   if (p.ground) return false;
+  // Measured where the platform WAS AUTHORED, not where it currently is.
+  //
+  // Reported from play: "there are some that move side to side toggle
+  // between damaged and undamaged." A slider's live x crosses in and out of
+  // the span of whatever is underneath it, so the test below flipped as it
+  // travelled and the carving appeared and vanished with it. Damage is a
+  // fact about a slab, not about where the slab happens to be this frame —
+  // the same reasoning the bite pattern is already keyed off `baseX` for.
+  const px = p.baseX == null ? p.x : p.baseX;
+  const py = p.baseY == null ? p.y : p.baseY;
   // `chewed: true` in level data forces the damage on regardless of what's
   // underneath. That's how GAME_DESIGN's visual-degradation arc is authored
   // — minor chips early, whole sections sanded smooth by the middle levels,
@@ -72,8 +82,8 @@ function isOverSpikes(p, hazards) {
   if (p.chewed) return true;
   return hazards.some(h =>
     h.type === 'spikes' &&
-    h.y > p.y + p.height &&                      // genuinely below the slab
-    h.x < p.x + p.width && h.x + h.width > p.x   // and overlapping it
+    h.y > py + p.height &&                       // genuinely below the slab
+    h.x < px + p.width && h.x + h.width > px     // and overlapping it
   );
 }
 

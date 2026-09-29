@@ -9,7 +9,7 @@
 // Which means the ending scene does NOT get a victory. It gets a planet
 // that stops being wrong.
 
-import { createQuarrick } from '../../entities/npc.js';
+import { createQuarrick, clearSpotNear } from '../../entities/npc.js';
 import { surfaceYAt } from '../../levels/levelLoader.js';
 import { playRestore, playWin } from '../../audio/sfx.js';
 import { say } from '../say.js';
@@ -31,7 +31,7 @@ export const l7Arrival = {
       name: 'quarrick',
       frames: 40,
       enter(c) {
-        const at = c.player.x + 150;
+        const at = clearSpotNear(c.player.x + 150);
         c.state.rescueNPC = createQuarrick(at, surfaceYAt(at),
           { facing: -1, damage: c.level.quarrickDamage || 1 });
       }
@@ -102,7 +102,7 @@ export const l7Ending = {
       name: 'quarrick-returns',
       frames: 44,
       enter(c) {
-        const back = c.player.x - 150;
+        const back = clearSpotNear(c.player.x - 150);
         c.state.rescueNPC = createQuarrick(back, surfaceYAt(back), { facing: 1, damage: 1 });
         playWin();
       }

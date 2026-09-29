@@ -26,7 +26,16 @@ export function checkCheckpoints() {
   for (const checkpoint of getLevel().checkpoints) {
     if (!checkpoint.activated && isColliding(player, checkpoint)) {
       checkpoint.activated = true;
-      setRespawnPoint(checkpoint.x, checkpoint.y - 20);
+      // At the flag's foot, not 90px above it.
+      //
+      // The old value put the player 20px above the TOP of a 70px flag and
+      // let them fall the rest, which made a respawn a short drop through
+      // whatever happened to be in the column: a ledge with an enemy on it,
+      // or — once platforms came down into jumping range — the underside of
+      // a platform, which is where level 2's checkpoint at 5130 started
+      // killing people. A checkpoint should put you back on your feet where
+      // the flag is. The 6px is just enough to land rather than to fall.
+      setRespawnPoint(checkpoint.x, checkpoint.y + checkpoint.height - player.height - 6);
       showToast('CHECKPOINT REACHED', 90);
       playCheckpoint();
     }

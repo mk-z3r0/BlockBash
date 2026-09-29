@@ -99,6 +99,32 @@ export function updateCornerQuarrick(npc, worldEdgeX, groundY, stopAlong, speed)
   return false;
 }
 
+// Somewhere near `x` with nothing standing in it.
+//
+// Reported from play: "beginning of the level cutscenes with Quarrick have
+// enemies in him." Every scene that places him does it at a fixed offset
+// from the player — `player.x + 170` and friends — which is a spot chosen
+// by where the player happened to stop, not by what is already there. On a
+// busy face that lands him inside a patrolling sphere, and two characters
+// occupying the same 44px is the kind of thing a seven-year-old notices
+// before anything either of them says.
+//
+// Searches outward from the asked-for spot in 24px steps and takes the
+// first clear one, so he still appears roughly where the scene wanted him.
+// Returns the original x if nothing within `range` is clear — a scene that
+// reads slightly wrong beats a scene that doesn't happen.
+export function clearSpotNear(x, width = 44, range = 260) {
+  const free = at => !state.enemies.some(e =>
+    e.alive && !e.restored &&
+    at < e.x + e.w + 10 && at + width > e.x - 10);
+  if (free(x)) return x;
+  for (let d = 24; d <= range; d += 24) {
+    if (free(x + d)) return x + d;
+    if (free(x - d)) return x - d;
+  }
+  return x;
+}
+
 // Quarrick standing somewhere and talking, which is most of his
 // appearances from level 2 on. `damage` is how many corners the spheres
 // have taken off him (0-4) — GAME_DESIGN's deterioration beat is explicitly

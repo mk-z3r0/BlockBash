@@ -26,7 +26,7 @@
 // it for anyone who has watched it already, and the skip still runs
 // onComplete, so they still end up holding it.
 
-import { createQuarrick } from '../../entities/npc.js';
+import { createQuarrick, clearSpotNear } from '../../entities/npc.js';
 import { surfaceYAt } from '../../levels/levelLoader.js';
 import { spawnExplosion } from '../../entities/particles.js';
 import { playWeaponPickup, playHit, playRumble } from '../../audio/sfx.js';
@@ -60,7 +60,7 @@ export const l3Handoff = {
       name: 'stagger-in',
       frames: 60,
       enter(c) {
-        c.data.quarrickX = c.player.x + 150;
+        c.data.quarrickX = clearSpotNear(c.player.x + 150);
         c.state.rescueNPC = createQuarrick(c.data.quarrickX, surfaceYAt(c.data.quarrickX), {
           facing: -1,
           // Worse than the player has ever seen him. The number is the

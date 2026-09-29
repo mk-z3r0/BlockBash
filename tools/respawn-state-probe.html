@@ -21,13 +21,14 @@
   import { player } from '../src/entities/player.js';
   import { state } from '../src/state.js';
   import { update, switchTo } from '../src/scenes/sceneManager.js';
-  import { getLevel } from '../src/levels/levelLoader.js';
+  import { getLevel, hasFooting, isBlocked } from '../src/levels/levelLoader.js';
   import { levels } from '../src/levels/registry.js';
 
   const out = [];
   let fails = 0;
   const check = (ok, label) => { if (!ok) fails++; out.push(`  ${ok ? 'ok  ' : 'FAIL'} ${label}`); };
   const tick = n => { for (let i = 0; i < n; i++) update(); };
+  const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
 
   // Fall out of the world. A pit fall is the one death check that isn't
   // gated on invincibility, so it works regardless of what else is set.
@@ -120,6 +121,59 @@
         if (state.lives < lives0) { bad++; out.push(`  FAIL level ${i + 1}: checkpoint at ${cp.x} kills a player who stands still`); fails++; }
       }
       if (!bad) out.push(`  ok   level ${i + 1}: all ${cps.length} checkpoints survivable`);
+    }
+
+    // --- ...and somewhere you can get OUT of ---
+    //
+    // Reported from play: "there is one that if you get it you're trapped
+    // and can't make the jump out." Survivable and escapable are different
+    // properties, and standing still tests only the first: a flag at the
+    // bottom of a pocket with walls taller than a jump is a perfectly safe
+    // place to spend the rest of your life.
+    out.push('== and you can get out of all of them ==');
+    for (let i = 0; i < levels.length; i++) {
+      startLevel(i);
+      const lv = getLevel();
+      for (const cp of lv.checkpoints || []) {
+        player.x = cp.x;
+        player.y = cp.y + cp.height - player.height - 6;
+        player.velocityX = 0; player.velocityY = 0;
+        player.invincible = 999999;   // this is about geometry, not combat
+        state.enemies.forEach(e => { e.alive = false; });
+        const from = player.x;
+        let furthest = from;
+        key('keydown', 'ArrowRight');
+        key('keydown', 'Shift');
+        let held = 0;
+        for (let f = 0; f < 2400; f++) {
+          // Jump when there's a reason to, not every time it lands.
+          //
+          // The first version hopped continuously, which never builds run
+          // speed — and then reported the flag before level 3's run-only
+          // 160px gap as a pocket, because a bot that cannot run cannot
+          // cross a gap that requires running. The bot has to be able to do
+          // the things the level asks for, or it is measuring itself.
+          const ahead = player.x + player.width + 30;
+          const foot = player.y + player.height;
+          const needJump =
+            !hasFooting(ahead, foot) ||
+            isBlocked({ x: player.x + 14, y: player.y, width: player.width, height: player.height },
+                      { hazards: true });
+          if (player.isOnGround && held <= 0 && needJump) { key('keydown', ' '); held = 22; }
+          if (held > 0 && --held === 0) key('keyup', ' ');
+          update();
+          furthest = Math.max(furthest, player.x);
+          if (furthest - from > 400) break;
+        }
+        key('keyup', ' '); key('keyup', 'ArrowRight'); key('keyup', 'Shift');
+        const got = Math.round(furthest - from);
+        if (got < 400) {
+          fails++;
+          out.push(`  FAIL level ${i + 1}: checkpoint at ${cp.x} only lets you travel ${got}px — it's a pocket`);
+        } else {
+          out.push(`  ok   level ${i + 1}: checkpoint at ${cp.x} leads somewhere`);
+        }
+      }
     }
 
     out.push(fails ? `*** ${fails} FAILURE(S)` : 'PASS a death costs a life and nothing else');

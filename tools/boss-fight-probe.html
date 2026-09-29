@@ -190,6 +190,25 @@
       }
       check(sawClosed && sawOpen, `it closes and opens across its cycle (closed ${sawClosed}, open ${sawOpen})`);
       check(maxY - minY > 100, `the platforms really travel (${Math.round(maxY - minY)}px)`);
+
+      // How LONG is the window, and how long is the platform down where it
+      // can be boarded? Reported from play as "doesn't allow enough time to
+      // get to him" — both numbers were near zero, because the lift was a
+      // plain cosine and a cosine does not stop at either end.
+      {
+        const mv = lv.platforms.find(p => p.mover);
+        let open = 0, longestOpen = 0, low = 0, longestLow = 0;
+        const bottom = mv.baseY == null ? mv.y : mv.baseY;
+        for (let f = 0; f < 800; f++) {
+          update();
+          if (!boss.invulnerable) { open++; longestOpen = Math.max(longestOpen, open); } else open = 0;
+          if (mv.y > bottom - 6) { low++; longestLow = Math.max(longestLow, low); } else low = 0;
+        }
+        // A second of each. Enough to step on, and enough to cross and
+        // land a couple of hits after crossing.
+        check(longestOpen >= 60, `the window stays open for ${longestOpen} frames at a stretch`);
+        check(longestLow >= 40, `and the platform waits ${longestLow} frames at the bottom to be boarded`);
+      }
       // Its arms are the tell for the window: up while it's holding the
       // room, dropped the moment it opens. If those two ever stop being the
       // same event the boss stops being readable.

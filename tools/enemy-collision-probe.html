@@ -19,7 +19,7 @@
   import { player } from '../src/entities/player.js';
   import { state } from '../src/state.js';
   import { update, switchTo } from '../src/scenes/sceneManager.js';
-  import { getLevel, isBlocked } from '../src/levels/levelLoader.js';
+  import { getLevel, isBlocked, hasFooting } from '../src/levels/levelLoader.js';
   import { levels } from '../src/levels/registry.js';
 
   const out = [];
@@ -36,6 +36,7 @@
       player.invincible = 999999;
 
       const worst = new Map();
+      const floating = new Map();
       const FRAMES = 900;
       for (let f = 0; f < FRAMES; f++) {
         // Sweep the player across the level so every enemy gets a turn at
@@ -61,16 +62,32 @@
             const key = `${e.boss ? 'boss' : e.kind || 'sphere'}@${Math.round(e.baseX)}`;
             if (!worst.has(key)) worst.set(key, Math.round(e.x));
           }
+          // ...and nothing walks out over a pit. Reported from play on
+          // level 4 — "a lot of enemies are walking over gaps" — and
+          // invisible to the check above, which only ever asked whether
+          // something was IN the way, never whether anything was underneath.
+          // Things that never walk are exempt. The core hangs in the middle
+          // of a hollow planet on purpose; asking it to stand on something
+          // is asking the wrong question.
+          const foot = grounded.y + e.w;
+          if (e.speed !== 0 &&
+              (!hasFooting(grounded.x, foot) || !hasFooting(grounded.x + e.w, foot))) {
+            const key = `${e.boss ? 'boss' : e.kind || 'sphere'}@${Math.round(e.baseX)}`;
+            if (!floating.has(key)) floating.set(key, Math.round(e.x));
+          }
         }
       }
 
-      if (worst.size) {
-        fails += worst.size;
+      if (worst.size || floating.size) {
+        fails += worst.size + floating.size;
         for (const [who, where] of worst) {
           out.push(`  FAIL level ${i + 1}: ${who} ended up inside terrain at x${where}`);
         }
+        for (const [who, where] of floating) {
+          out.push(`  FAIL level ${i + 1}: ${who} walked out over a pit at x${where}`);
+        }
       } else {
-        out.push(`  ok   level ${i + 1}: ${state.enemies.length} enemies, ${FRAMES} frames, nothing clipped`);
+        out.push(`  ok   level ${i + 1}: ${state.enemies.length} enemies, ${FRAMES} frames, nothing clipped or hanging in the air`);
       }
     }
 

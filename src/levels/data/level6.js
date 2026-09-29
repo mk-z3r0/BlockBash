@@ -47,7 +47,7 @@ export default {
   platforms: [
     // --- arena 1: learn the room. Cover, and one high perch. ---
     cover(380, 120, 44),
-    { x: 700, y: 270, width: 110, height: 18, chewed: true },
+    { x: 700, y: 314, width: 110, height: 18, chewed: true },
     cover(1020, 110, 66),
     cover(1400, 120, 44),
 
@@ -55,14 +55,14 @@ export default {
     cover(2050, 110, 66),
     { x: 2300, y: 250, width: 120, height: 18, chewed: true },
     cover(2700, 120, 44),
-    { x: 3000, y: 280, width: 110, height: 18, chewed: true },
+    { x: 3000, y: 314, width: 110, height: 18, chewed: true },
     cover(3280, 110, 66),
 
     // --- arena 3: the widest, the emptiest, the worst to be caught in ---
     cover(3820, 120, 44),
-    { x: 4150, y: 260, width: 110, height: 18, chewed: true },
+    { x: 4150, y: 314, width: 110, height: 18, chewed: true },
     cover(4500, 110, 66),
-    { x: 4800, y: 240, width: 110, height: 18, chewed: true },
+    { x: 4800, y: 270, width: 110, height: 18, chewed: true },
     // 4950, not 5050: at 5050 this block spanned 5050-5170 and the spike
     // bed at 5100-5155 sat INSIDE it, so there was nothing to jump and
     // nowhere to jump from. The audit reported the bed as having no
@@ -71,7 +71,7 @@ export default {
 
     // --- arena 4: the run-in, then the General's ground ---
     cover(5520, 110, 66),
-    { x: 5800, y: 270, width: 110, height: 18, chewed: true },
+    { x: 5800, y: 314, width: 110, height: 18, chewed: true },
     cover(6100, 120, 44)
     // 6300 onward is bare. The General needs room to charge and the player
     // needs to see it coming — nothing to hide behind is the point of it.
@@ -94,8 +94,8 @@ export default {
 
   ammo: [
     { x: 2350, y: 230, amount: 4 },
-    { x: 4190, y: 240, amount: 5 },
-    { x: 5840, y: 250, amount: 5 }
+    { x: 4190, y: 294, amount: 5 },
+    { x: 5840, y: 294, amount: 5 }
   ],
 
   // The choice. Sitting on the shelf in arena 2, impossible to miss and
@@ -121,7 +121,7 @@ export default {
     { x: 300,  y: GROUND_Y - 22, w: 22, minX: 200,  maxX: 360,  speed: 1.8,
       tier: 'pursuer', weapon: 'chainsaw' },
     { x: 620,  y: GROUND_Y - 22, w: 22, minX: 560,  maxX: 690,  speed: 1.7, bounce: true },
-    { x: 750,  y: 250,           w: 20, minX: 700,  maxX: 790,  speed: 1.3 },
+    { x: 750,  y: 294,           w: 20, minX: 700,  maxX: 790,  speed: 1.3 },
     { x: 1150, y: GROUND_Y - 22, w: 22, minX: 1140, maxX: 1300, speed: 1.6,
       tier: 'aggressor', shoots: true },
     // Between the cover at 1130 and the cover at 1400 — the only clear
@@ -170,7 +170,7 @@ export default {
 
   coins: [
     [420, 352], [465, 352],
-    [740, 256], [785, 256],
+    [740, 300], [785, 300],
     [1055, 330],
     [1250, 396], [1310, 396],
     [1440, 352],
@@ -178,17 +178,17 @@ export default {
     [2085, 330],
     [2340, 236], [2385, 236],
     [2740, 352],
-    [3040, 266],
+    [3040, 300],
     [3315, 330],
     [3560, 396],
     [3860, 352],
-    [4190, 246], [4235, 246],
+    [4190, 300], [4235, 300],
     [4535, 330],
-    [4840, 226], [4885, 226],
+    [4840, 256], [4885, 256],
     [4990, 352],
     [5280, 396],
     [5555, 330],
-    [5840, 256], [5885, 256],
+    [5840, 300], [5885, 300],
     [6140, 352],
     [6350, 396], [6410, 396], [6470, 396]
   ],

@@ -8,7 +8,7 @@ import { startAttack, tickWeapon, spawnSphereShot, boxOf } from '../weapons/comb
 import { initBoss, updateBossBehaviour, onBossDefeated } from './bosses.js';
 import { addShake, addHitStop } from '../engine/impact.js';
 import { addPopup } from '../ui/popups.js';
-import { isBlocked } from '../levels/levelLoader.js';
+import { isBlocked, hasFooting, surfaceYAt, solidTopAt, floorUnder } from '../levels/levelLoader.js';
 import { state } from '../state.js';
 
 // --- enemy tiers (GAME_DESIGN's "Enemies evolve across levels") ---------
@@ -122,6 +122,12 @@ export function spawnEnemies(spawns) {
     // only place the original numbers still exist once play has started.
     baseHp: e.hp == null ? 1 : e.hp,
     baseRestoreHits: e.restoreHits == null ? 2 : e.restoreHits,
+    // Captured for the same reason: patrol flips the sign of `speed` as it
+    // walks, so by the time a fight restarts the authored number is gone.
+    // It matters that this records a ZERO honestly — the Terraformer and the
+    // Core are both authored at speed 0, and the restart used to hand them
+    // 0.96 because `Math.abs(0) || 0.96` is 0.96.
+    baseSpeed: e.speed == null ? 1 : e.speed,
     cornersLost: 4,
     restoreFlash: 0,
     restored: false,
@@ -154,10 +160,34 @@ function wouldHit(enemy, x) {
   // be airborne, which is also the more predictable behaviour to author
   // levels against.
   const y = enemy.baseY == null ? enemy.y : enemy.baseY;
-  return isBlocked(
-    { x, y, width: enemy.w, height: enemy.w },
-    { hazards: !enemy.boss }
-  );
+  if (isBlocked({ x, y, width: enemy.w, height: enemy.w }, { hazards: !enemy.boss })) return true;
+
+  // Quarrick is something to walk around, not through.
+  //
+  // Scenes place him in a spot that's clear at the moment they place it
+  // (clearSpotNear in entities/npc.js), which is the right thing to do and
+  // is not enough on its own: a sphere patrolling nearby simply walks into
+  // him over the next couple of seconds, and level 2's opening had one
+  // standing inside him by the time he finished his first line.
+  const npc = state.rescueNPC;
+  if (npc && isColliding({ x, y, width: enemy.w, height: enemy.w },
+                         { x: npc.x, y: npc.y, width: npc.width, height: npc.height })) {
+    return true;
+  }
+
+  // ...and a LEDGE stops it too, the same as a wall.
+  //
+  // Reported from play on level 4: "a lot of enemies are walking over gaps."
+  // Nothing in this file had ever asked whether there was a floor — only
+  // whether something was in the way — so a sphere whose patrol span ran
+  // past the end of its shelf simply carried on over the pit, and the
+  // shelf levels are full of spans that do.
+  //
+  // Tested at the LEADING edge rather than the whole box: an enemy should
+  // be able to walk right up to a ledge and turn on it, not stop a body
+  // width short and look like it's afraid of the view.
+  const lead = enemy.speed >= 0 ? x + enemy.w : x;
+  return !hasFooting(lead, y + enemy.w);
 }
 
 function patrol(enemy) {
@@ -197,6 +227,171 @@ function chase(enemy, player, speed) {
   if (!wouldHit(enemy, next)) enemy.x = next;
 }
 
+// --- a square that has just been put back, leaving ------------------
+//
+// It used to walk in a dead straight line at a fixed height, which was fine
+// in the one place the behaviour was written for — a restored square on
+// open flat ground — and wrong everywhere else. Reported from play: "the
+// octagons when turned back to square stay on the same level, they should
+// follow the ground even if it means they add a jump."
+//
+// So it follows the floor, and where the floor stops it jumps. The jump is
+// sized to clear the widest gap in the game (160px) from a standing start
+// at the lip: 5.2px a frame across, launched at -9.5 against the usual 0.5
+// gravity, which is 38 frames of air and about 198px of travel. That is
+// deliberately generous — this is a character leaving under its own power
+// after the player has spent triangles saving it, and it must never be
+// possible to watch it walk into a pit.
+const FLEE_WALK = 3.1;
+const FLEE_AIR = 5.2;
+const FLEE_JUMP = -9.5;
+// The biggest leap it will attempt. -14 against 0.5 gravity is a 196px
+// rise, which clears everything in the game except level 3's tallest
+// columns — and those it walks round instead.
+const FLEE_JUMP_MAX = -14;
+
+function runAway(enemy, player) {
+  if (!enemy.fleeDir) enemy.fleeDir = enemy.x < player.x ? -1 : 1;
+  enemy.facing = enemy.fleeDir;
+  const wasX = enemy.x, wasY = enemy.y;
+
+  // --- vertical first, so the horizontal test below runs against the
+  // height it will actually be at this frame ---
+  if (enemy.fleeVY != null) {
+    const wasFoot = enemy.y + enemy.w;
+    enemy.fleeVY += 0.5;
+    enemy.y += enemy.fleeVY;
+    if (enemy.fleeVY > 0) {
+      const floor = floorUnder(enemy.x + enemy.w / 2, wasFoot);
+      if (floor != null && enemy.y + enemy.w >= floor) {
+        enemy.y = floor - enemy.w;
+        enemy.baseY = enemy.y;
+        enemy.fleeVY = null;
+      }
+    }
+    if (enemy.y > surfaceYAt(enemy.x) + 220) { enemy.alive = false; return; }
+  }
+
+  // --- horizontal, and never INTO anything ---
+  //
+  // The step used to be taken unconditionally at the top of this function
+  // and the decision to jump made afterwards, which meant the first frame of
+  // every obstacle was spent a step inside it. Nine of the game's corrupted
+  // squares ended their rescue vibrating inside a cover block.
+  const step = enemy.fleeVY != null ? FLEE_AIR : FLEE_WALK;
+  const nextX = enemy.x + enemy.fleeDir * step;
+  const blocked = isBlocked(
+    { x: nextX, y: enemy.y, width: enemy.w, height: enemy.w }, { hazards: false });
+  if (!blocked) enemy.x = nextX;
+
+  if (enemy.fleeVY != null) { settle(enemy, wasX, wasY); return; }   // still in the air
+
+  const lead = enemy.fleeDir > 0 ? enemy.x + enemy.w : enemy.x;
+  const foot = enemy.y + enemy.w;
+
+  if (blocked) {
+    // Jump it if it can be jumped, go the other way if it can't.
+    const top = solidTopAt(lead + enemy.fleeDir * 3, foot);
+    // v = sqrt(2*g*h), with headroom so it lands ON the thing rather than
+    // clipping its lip.
+    const needed = top == null ? 0 : -Math.sqrt(2 * 0.5 * (foot - top + 16));
+    if (needed && needed >= FLEE_JUMP_MAX) {
+      enemy.fleeVY = Math.min(needed, FLEE_JUMP);
+    } else if (!enemy.fleeTurned) {
+      enemy.fleeTurned = true;
+      enemy.fleeDir *= -1;
+    } else {
+      // Walled in both ways. It's free, the player has moved on, and it
+      // doesn't need to be watched pacing.
+      enemy.alive = false;
+    }
+    settle(enemy, wasX, wasY);
+    return;
+  }
+
+  if (!hasFooting(lead, foot)) {
+    enemy.fleeVY = FLEE_JUMP;
+    settle(enemy, wasX, wasY);
+    return;
+  }
+
+  // Walk whatever it is standing on — which is not the same thing as the
+  // ground. `surfaceYAt` knows about ground segments only, so using it here
+  // snapped a square standing on top of a cover block straight down through
+  // the block it was on.
+  const under = floorUnder(enemy.x + enemy.w / 2, foot - 1);
+  if (under == null || under - foot > 14) {
+    // Nothing under it, or a real step down. Fall rather than teleport: a
+    // 40px terrace snapped in one frame reads as a glitch, and it's the
+    // same drop the player takes at the same place.
+    enemy.fleeVY = 0;
+  } else {
+    enemy.y = under - enemy.w;
+    enemy.baseY = enemy.y;
+  }
+  settle(enemy, wasX, wasY);
+}
+
+// The backstop, and the only thing here that is actually guaranteed.
+//
+// Everything above is a decision — jump this, turn at that — and decisions
+// about an arc that is also being moved horizontally through a world full
+// of columns have edge cases. This is the invariant instead: at the end of
+// a frame a freed square is never standing inside anything. If the move put
+// it somewhere solid, the move didn't happen, and it goes the other way.
+//
+// Worth stating plainly because the first three attempts at this were all
+// attempts to reason the edge cases away, and all three left squares
+// vibrating inside cover blocks.
+function settle(enemy, wasX, wasY) {
+  const solid = () => isBlocked(
+    { x: enemy.x, y: enemy.y, width: enemy.w, height: enemy.w }, { hazards: false });
+  if (!solid()) return;
+
+  // Undo the sideways move first and see if that was enough. It usually is,
+  // and it matters that this is tried alone: undoing the VERTICAL move as
+  // well would drop a mid-air square back to where it was a frame ago and
+  // call it landed, which left one hanging 47px above the floor with its
+  // legs down.
+  enemy.x = wasX;
+  if (solid()) {
+    // The VERTICAL move was the problem — it rose into something's
+    // underside. Put it back and let it fall from there. Zero, not null:
+    // null means "grounded", and marking a square grounded in mid-air left
+    // one standing on nothing 47px up with its legs down.
+    enemy.y = wasY;
+    if (enemy.fleeVY != null) enemy.fleeVY = 0;
+  }
+  if (enemy.fleeTurned) { enemy.alive = false; return; }
+  enemy.fleeTurned = true;
+  enemy.fleeDir *= -1;
+}
+
+// Is the player coming down ON this enemy, as opposed to walking into it?
+//
+// Reported from play: "the hit boxes with the pickaxe and chainsaw enemies
+// is a bit rough still, hard to bounce on them." Two separate reasons, and
+// this fixes the first.
+//
+// The old test was a DEPTH threshold — the player's feet had to be within
+// 0.6 of the enemy's height of its top on the first frame they overlapped.
+// That is 13px on a 22px sphere, and a player falling at terminal speed
+// covers more than that in a single frame, so arriving fast could skip the
+// window entirely and read as walking into it face first. It got worse the
+// harder you committed to the jump, which is exactly backwards.
+//
+// Falling and coming from above is the whole of it. `prevBottom` is where
+// the player's feet were before this frame's move (entities/player.js), so
+// "was above the top of it, is now inside it" is a fact rather than an
+// estimate, and it cannot be outrun.
+function descendingOnto(player, enemy) {
+  if (player.velocityY <= 0) return false;
+  const prev = player.prevBottom == null ? player.y + player.height : player.prevBottom;
+  // A little slack on the lip, so clipping the very top corner still counts
+  // as a stomp rather than as a hit.
+  return prev <= enemy.y + enemy.w * 0.35;
+}
+
 // Boss movement/attack timing for level 1's Foreman is driven by its
 // cutscene, not by the AI here — see the `enemy.boss` branch, which just
 // backs off while a cutscene is in control. Later bosses declare a tier
@@ -224,8 +419,7 @@ export function updateEnemies(player, cutsceneActive) {
       // The core doesn't flee. It's the planet: it stays exactly where it
       // has always been, square again, while the ending plays over it.
       if (enemy.kind === 'core') continue;
-      if (!enemy.fleeDir) enemy.fleeDir = enemy.x < player.x ? -1 : 1;
-      enemy.x += enemy.fleeDir * 3.1;
+      runAway(enemy, player);
       // Counted down rather than compared against the world's width: it
       // only has to outlast the time it takes to leave the screen, and a
       // freed square shouldn't linger in the enemy list for the rest of
@@ -335,7 +529,7 @@ export function updateEnemies(player, cutsceneActive) {
         // Touching one hurts, and the only answer is the Cornerstone.
         if (player.invincible <= 0) state.playerTouchedHazard = true;
       } else {
-        const fromAbove = player.velocityY > 0 && (player.y + player.height) - enemy.y < enemy.w * 0.6;
+        const fromAbove = descendingOnto(player, enemy);
         if (fromAbove && !enemy.stompProof) {
           enemy.hp -= 1;
           player.velocityY = P.STOMP_BOUNCE;

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#000;">
+<canvas id="game" width="800" height="450"></canvas><pre id="out">running…</pre>
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true, narrative: { seenCutscenes: {}, npcStage: 0, flags: {} } })); window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERROR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  // Can you land on it?
+  //
+  // Reported from play: "the hit boxes with the pickaxe and chainsaw
+  // enemies is a bit rough still, hard to bounce on them." Stomping is the
+  // one answer the game teaches in level 1 and never takes away, so an
+  // enemy that is unreliable to land on is an enemy the player has no
+  // answer to — and it was the ARMED ones, which are the ones you most want
+  // to deal with from above.
+  //
+  // Two causes, both measured here. The stomp test used to be a depth
+  // threshold the player could fall straight past in a single frame, so
+  // committing harder to the jump made it LESS likely to work. And an armed
+  // sphere's swing hitbox is its own full height, resolved before the
+  // contact test, so it hit first.
+  //
+  // So: drop on every kind of enemy in the game, from a range of heights,
+  // and count.
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update, switchTo } from '../src/scenes/sceneManager.js';
+  import { getLevel, surfaceYAt } from '../src/levels/levelLoader.js';
+  import { startAttack } from '../src/weapons/combat.js';
+
+  const out = [];
+  let fails = 0;
+  const check = (ok, label) => { if (!ok) fails++; out.push(`  ${ok ? 'ok  ' : 'FAIL'} ${label}`); };
+
+  // Drop the player onto an enemy from `height` px up, and say what
+  // happened. `swinging` makes the enemy attack on the way down, which is
+  // the case that was broken.
+  function dropOn(enemy, height, swinging) {
+    enemy.alive = true;
+    enemy.hp = enemy.baseHp;
+    enemy.x = enemy.baseX;
+    enemy.y = enemy.baseY;
+    // Pinned in place. A chasing enemy slides sideways under a falling
+    // player, and then the test's own "hold the player over it" line shoves
+    // them into its FLANK — which correctly costs a life and says nothing
+    // about whether landing on its head works. Aim is a different question
+    // and not this one.
+    enemy.speed = 0;
+    const target = enemy.x + enemy.w / 2;
+    player.x = target - player.width / 2;
+    player.y = enemy.y - player.height - height;
+    player.velocityX = 0;
+    player.velocityY = 0;
+    player.invincible = 0;
+    player.isOnGround = false;
+    player.prevBottom = player.y + player.height;
+    const lives0 = state.lives;
+    // Shooting is out of scope here and it is not a bug: a sphere that
+    // fires at a player falling towards it from 200px up is playing the
+    // game correctly, and being hit by the pellet says nothing about
+    // whether the landing would have worked.
+    if (enemy.shoots) enemy.shotTimer = 99999;
+    state.projectiles.length = 0;
+    if (swinging && enemy.weapon) { enemy.weaponCooldown = 0; startAttack(enemy); }
+    for (let f = 0; f < 60; f++) {
+      // Hold it over the enemy: this is a test of the hit resolution, not
+      // of aim. Enemies patrol, so track it.
+      player.x = enemy.x + enemy.w / 2 - player.width / 2;
+      update();
+      if (state.lives < lives0) return 'HIT';
+      if (!enemy.alive || enemy.hp < enemy.baseHp) return 'stomped';
+    }
+    return 'nothing';
+  }
+
+  setTimeout(() => {
+    // Level 7 carries one of everything that can be stomped — both
+    // pursuer weapons, shooters and bouncers — because the last face is an
+    // exam and has every rung of the ladder on it.
+    state.currentLevelIndex = 6;
+    switchTo('playing', { retry: true });
+    const lv = getLevel();
+    lv.cutscenes.length = 0;
+    state.lives = 999;
+    // Clear the air above every enemy. This is a test of what happens when
+    // the player and a sphere touch; a ledge in the drop column means the
+    // player lands on the ledge and the test measures the ceiling instead.
+    // The enemies are pinned, so removing what some of them are standing on
+    // costs nothing.
+    lv.platforms = lv.platforms.filter(p => p.ground);
+
+    const HEIGHTS = [10, 30, 60, 100, 150, 220];
+    const kinds = [
+      ['a chainsaw pursuer', e => e.weapon === 'chainsaw'],
+      ['a pickaxe pursuer', e => e.weapon === 'pickaxe'],
+      ['a shooter', e => e.shoots],
+      ['a bouncer', e => e.bounce]
+    ];
+
+    for (const [name, pick] of kinds) {
+      const enemy = state.enemies.find(e => pick(e) && !e.boss);
+      if (!enemy) { out.push(`  --   no ${name} on this face`); continue; }
+      for (const swinging of [false, true]) {
+        if (swinging && !enemy.weapon) continue;
+        const results = HEIGHTS.map(h => dropOn(enemy, h, swinging));
+        const good = results.filter(r => r === 'stomped').length;
+        const hurt = results.filter(r => r === 'HIT').length;
+        check(good === HEIGHTS.length,
+          `${name}${swinging ? ' mid-swing' : ''}: stomped from ${good}/${HEIGHTS.length} heights` +
+          (hurt ? ` — ${hurt} hurt the player instead (${results.join(', ')})` : ''));
+      }
+    }
+
+    // ...and the thing that must NOT change: walking into one still hurts.
+    out.push('== and walking into one still hurts ==');
+    {
+      const enemy = state.enemies.find(e => e.weapon === 'chainsaw' && !e.boss);
+      enemy.alive = true;
+      enemy.hp = enemy.baseHp;
+      player.x = enemy.x - player.width - 2;
+      player.y = enemy.y;
+      player.velocityY = 0;
+      player.velocityX = 2;
+      player.invincible = 0;
+      player.prevBottom = player.y + player.height;
+      const lives0 = state.lives;
+      let hurt = false;
+      for (let f = 0; f < 40 && !hurt; f++) {
+        player.x = enemy.x - player.width + 4;
+        player.y = enemy.y;
+        player.velocityY = 0;
+        player.prevBottom = player.y + player.height;
+        update();
+        if (state.lives < lives0) hurt = true;
+      }
+      check(hurt, 'walking into a chainsaw sphere at its own height still costs a life');
+    }
+
+    out.push(fails ? `*** ${fails} FAILURE(S)` : 'PASS anything that can be stomped can be stomped from any height');
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 250);
+</script></body></html>

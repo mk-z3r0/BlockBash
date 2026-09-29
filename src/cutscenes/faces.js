@@ -25,7 +25,7 @@
 // what these are for. He stops being able to get there first on the fourth
 // face. He starts again on the sixth, and it costs him something to say so.
 
-import { createQuarrick } from '../entities/npc.js';
+import { createQuarrick, clearSpotNear } from '../entities/npc.js';
 import { surfaceYAt } from '../levels/levelLoader.js';
 import { say } from './say.js';
 
@@ -36,7 +36,7 @@ function meetQuarrick(frames = 46) {
     name: 'meet',
     frames,
     enter(c) {
-      const at = c.player.x + 170;
+      const at = clearSpotNear(c.player.x + 170);
       c.state.rescueNPC = createQuarrick(at, surfaceYAt(at),
         { facing: -1, damage: c.level.quarrickDamage || 0 });
     }
@@ -89,7 +89,7 @@ export const l4Glimpse = {
         // off the edge of the screen before the player has finished
         // shouting. At +430 and 2.6px a frame he was visible for about
         // seven frames of a ninety-frame beat.
-        const at = c.player.x + 360;
+        const at = clearSpotNear(c.player.x + 360);
         c.state.rescueNPC = createQuarrick(at, surfaceYAt(at), { facing: 1, damage: 4 });
       }
     },

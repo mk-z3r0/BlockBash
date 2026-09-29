@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#000;">
+<canvas id="game" width="800" height="450"></canvas><pre id="out">running…</pre>
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true, narrative: { seenCutscenes: {}, npcStage: 0, flags: {} } })); window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERROR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  // A square the player just paid triangles to save has to leave in one
+  // piece.
+  //
+  // It used to walk in a dead straight line at whatever height it was
+  // restored at — fine on the flat ground the behaviour was written for,
+  // and visibly wrong everywhere else: it strolled through terraces and out
+  // over pits at a constant y. Reported from play.
+  //
+  // Every restorable thing in the game is restored here, from where the
+  // level actually puts it, and then watched until it leaves. Two things
+  // have to hold the whole way: its feet are on something, and it never
+  // ends up inside terrain.
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update, switchTo } from '../src/scenes/sceneManager.js';
+  import { getLevel, isBlocked, hasFooting, surfaceYAt, floorUnder } from '../src/levels/levelLoader.js';
+  import { levels } from '../src/levels/registry.js';
+  import { restoreTarget } from '../src/weapons/combat.js';
+
+  const out = [];
+  let fails = 0;
+  const check = (ok, label) => { if (!ok) fails++; out.push(`  ${ok ? 'ok  ' : 'FAIL'} ${label}`); };
+
+  setTimeout(() => {
+    for (let i = 0; i < levels.length; i++) {
+      state.currentLevelIndex = i;
+      switchTo('playing', { retry: true });
+      const lv = getLevel();
+      lv.cutscenes.length = 0;
+      state.lives = 999;
+      player.invincible = 999999;
+
+      // The core stays put by design — it's the planet.
+      const targets = state.enemies.filter(e => e.kind === 'octagon' && e.alive);
+      if (!targets.length) { out.push(`  --   level ${i + 1}: nothing to restore`); continue; }
+
+      // Restore them all at once and stand well clear, so the only thing
+      // deciding where they go is the terrain.
+      player.x = 40;
+      player.y = lv.groundY - player.height;
+      const watched = targets.map(e => ({ e, from: Math.round(e.x), worstFloat: 0, sunk: false }));
+      targets.forEach(e => { while (e.restoreHits > 0) restoreTarget(e); });
+
+      for (let f = 0; f < 320; f++) {
+        update();
+        for (const w of watched) {
+          const e = w.e;
+          if (!e.alive) continue;
+          if (isBlocked({ x: e.x, y: e.y, width: e.w, height: e.w }, { hazards: false }) && !w.sunk) {
+            w.sunk = `f${f} at x${Math.round(e.x)} y${Math.round(e.y)} vy=${e.fleeVY == null ? 'grounded' : e.fleeVY.toFixed(1)} dir=${e.fleeDir}`;
+          }
+          // On a grounded frame, its feet have to be ON something.
+          //
+          // Measured against `floorUnder` — the real surface below it,
+          // blocks and platforms included — not against the ground segment.
+          // The first version used the ground line and reported a square
+          // standing on top of a 110px column as "111px off the floor",
+          // which is the behaviour working.
+          if (e.fleeVY != null) continue;                    // mid-jump: fine
+          const foot = e.y + e.w;
+          const under = floorUnder(e.x + e.w / 2, foot - 1);
+          if (under == null) { w.worstFloat = Math.max(w.worstFloat, 999); continue; }
+          const off = Math.abs(foot - under);
+          if (off > w.worstFloat) { w.worstFloat = off; w.where = `f${f} x${Math.round(e.x)} foot${Math.round(foot)} under${Math.round(under)} dir${e.fleeDir}`; }
+        }
+      }
+
+      for (const w of watched) {
+        check(!w.sunk, `level ${i + 1}: the square from ${w.from} never ends up inside terrain${w.sunk ? ' — ' + w.sunk : ''}`);
+        // Grounded frames must be actually grounded. 2px of slack for the
+        // frame it lands on.
+        check(w.worstFloat <= 2,
+          `level ${i + 1}: and its feet are on something whenever it isn't jumping (worst ${Math.round(w.worstFloat)}px off${w.where ? ' — ' + w.where : ''})`);
+      }
+    }
+
+    out.push(fails ? `*** ${fails} FAILURE(S)` : 'PASS a restored square walks the ground it is on and jumps what it has to');
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 250);
+</script></body></html>

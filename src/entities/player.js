@@ -25,6 +25,7 @@ export const player = {
   hasWeapon: false,
   hitThisSwing: null,   // targets already struck by the current swing
   weaponTimer: 0,
+  prevBottom: 0,
   weaponCooldown: 0,
   bazookaCooldown: 0, // unused while the bazooka is parked — see weapons/bazooka.js
   coyoteTimer: 0,
@@ -139,6 +140,13 @@ export function resetPlayer() {
 // scenes/playingScene.js.
 export function updatePlayer(inputLocked) {
   const level = getLevel();
+  // Where the feet were before anything moved this frame.
+  //
+  // Read by the stomp test in entities/enemy.js. "Was above it, is now
+  // inside it" is the only version of that test that survives a player
+  // falling fast enough to cross the whole enemy in one frame — see the
+  // note on descendingOnto() for the depth-threshold version it replaced.
+  player.prevBottom = player.y + player.height;
   // Frozen right after a respawn: ignores left/right (but not jump) so a
   // disoriented player can't immediately walk into an enemy or off a ledge
   // into a pit — see the P.RESPAWN_FREEZE_FRAMES note in physics.js for why

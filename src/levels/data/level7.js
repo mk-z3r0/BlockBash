@@ -50,26 +50,26 @@ export default {
   platforms: [
     // the walk in — barely square, and nothing to climb back to
     { x: 260,  y: 170, width: 110, height: 18, chewed: true },
-    { x: 620,  y: 130, width: 110, height: 18, chewed: true },
+    { x: 620,  y: 154, width: 110, height: 18, chewed: true },
     { x: 900,  y: 180, width: 100, height: 18, chewed: true },
     { x: 1250, y: 220, width: 100, height: 18, chewed: true },
-    { x: 1700, y: 180, width: 110, height: 18, chewed: true },
+    { x: 1700, y: 204, width: 110, height: 18, chewed: true },
     { x: 2020, y: 230, width: 100, height: 18, chewed: true },
     { x: 2410, y: 270, width: 100, height: 18, chewed: true },
-    { x: 2850, y: 230, width: 110, height: 18, chewed: true },
+    { x: 2850, y: 254, width: 110, height: 18, chewed: true },
     { x: 3180, y: 280, width: 100, height: 18, chewed: true },
     { x: 3560, y: 300, width: 100, height: 18, chewed: true },
-    { x: 3980, y: 250, width: 110, height: 18, chewed: true },
-    { x: 4340, y: 300, width: 100, height: 18, chewed: true },
+    { x: 3980, y: 314, width: 110, height: 18, chewed: true },
+    { x: 4340, y: 314, width: 100, height: 18, chewed: true },
 
     // --- the cavity ---
     // Three tiers each side of the core. The low pair cannot reach it.
-    { x: 5000, y: 300, width: 130, height: 18 },
-    { x: 5320, y: 230, width: 110, height: 18 },
-    { x: 5600, y: 170, width: 110, height: 18 },
-    { x: 6580, y: 170, width: 110, height: 18 },
+    { x: 5000, y: 314, width: 130, height: 18 },
+    { x: 5260, y: 230, width: 110, height: 18 },
+    { x: 5500, y: 170, width: 110, height: 18 },
+    { x: 6620, y: 170, width: 110, height: 18 },
     { x: 6860, y: 230, width: 110, height: 18 },
-    { x: 7080, y: 300, width: 130, height: 18 }
+    { x: 7080, y: 314, width: 130, height: 18 }
   ],
 
   hazards: [
@@ -86,11 +86,11 @@ export default {
 
   ammo: [
     { x: 1300, y: 200,  amount: 4 },
-    { x: 2900, y: 210,  amount: 4 },
-    { x: 4030, y: 230,  amount: 5 },
+    { x: 2900, y: 234,  amount: 4 },
+    { x: 4030, y: 294,  amount: 5 },
     // in the cavity, on the two low tiers that can't hit the core
-    { x: 5060, y: 280,  amount: 5 },
-    { x: 7140, y: 280,  amount: 5 }
+    { x: 5060, y: 294,  amount: 5 },
+    { x: 7140, y: 294,  amount: 5 }
   ],
 
   cutscenes: [
@@ -193,29 +193,29 @@ export default {
 
   coins: [
     [300, 156], [345, 156],
-    [660, 116], [705, 116],
+    [660, 140], [705, 140],
     [940, 166],
     [1060, 236],
     [1285, 206], [1325, 206],
-    [1740, 166],
+    [1740, 190],
     [2060, 216],
     [2160, 286],
     [2450, 256], [2490, 256],
-    [2890, 216],
+    [2890, 240],
     [3220, 266],
     [3350, 336],
     [3600, 286], [3640, 286],
-    [4020, 236],
-    [4380, 286],
+    [4020, 300],
+    [4380, 300],
     [4700, 396],
-    [5050, 286],
-    [5370, 216], [5415, 216],
-    [5650, 156],
+    [5050, 300],
+    [5310, 216], [5355, 216],
+    [5550, 156],
     [5850, 396], [5910, 396],
     [6300, 396], [6360, 396],
-    [6630, 156],
+    [6670, 156],
     [6910, 216], [6955, 216],
-    [7130, 286]
+    [7130, 300]
   ],
 
   // One per stretch, each just inside the start of it — see the authoring

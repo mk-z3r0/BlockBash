@@ -54,6 +54,22 @@
           if (x > p.x - CLEAR && x < p.x + p.width + CLEAR) return false;
         }
         for (const h of hazards) if (x > h.x - 35 && x < h.x + h.width + 35) return false;
+        // Nothing overhead in the column the player drops through. A
+        // respawn arrives ~90px above the flag and falls; a platform in
+        // that space means arriving inside it. Level 2's flag at 5130 hit
+        // exactly this the moment the platform above it came down into
+        // jumping range.
+        // The player's box at the instant they respawn. They now appear at
+        // the foot of the flag rather than 90px above it, so this is a
+        // player-sized box on the floor — but the check stays, because
+        // "nothing is inside you when you come back" is the invariant, not
+        // the particular offset that happens to be in collisions.js.
+        const spawnBottom = seg.y - 6, spawnTop = spawnBottom - 22;
+        for (const p of blocks) {
+          if (p.y + p.height >= seg.y - 2) continue;       // on the floor: handled above
+          if (p.y > spawnBottom || p.y + p.height < spawnTop) continue;
+          if (x > p.x - 24 && x < p.x + p.width + 24) return false;
+        }
         for (const e of foes) {
           // Beside the flag and in the column the player FALLS through.
           //
@@ -70,9 +86,8 @@
           // ledge it drops past. Found by standing still there
           // (tools/respawn-state-probe.html), not by this file, which is
           // why this file now knows about it.
-          const fallTop = seg.y - 90;
-          const inFall = e.y < seg.y && e.y + e.w > fallTop;
-          if (inFall && x > e.minX - 60 && x < e.maxX + 60) return false;
+          const inSpawn = e.y < seg.y && e.y + e.w > seg.y - 34;
+          if (inSpawn && x > e.minX - 60 && x < e.maxX + 60) return false;
           // Only things that can actually GET to the flag. An enemy patrols
           // in x, but it also has to be at roughly the checkpoint's height
           // to be a threat to it — entities/enemy.js won't chase across a

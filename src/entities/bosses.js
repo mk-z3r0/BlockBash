@@ -210,23 +210,56 @@ function updateCrew(boss, player) {
 // It sits still and pumps. The arena's platforms are driven from here (see
 // `movers` in the level data), and the boss is only reachable at the top of
 // the cycle, when the platforms it raised put the player level with it.
-const TERRAFORMER_CYCLE = 300;
+// The room breathes, and it HOLDS at each end of the breath.
+//
+// It used to be a plain cosine, which meant the top of the lift — the only
+// moment the raised platforms reach the boss's ledge, and so the only
+// moment the fight exists — was a single instant the arena passed through.
+// Reported from play: "the level 5 boss doesn't allow enough time to get to
+// him." Quite right: the window was real but it was a point, not a door.
+//
+// A cosine also spends almost no time at the BOTTOM, which is the other
+// half of the same problem — the player has to get onto a platform before
+// they can ride it anywhere, and the platform was only down there for a
+// blink.
+//
+// So the curve is four parts. Held low long enough to step on, up, held
+// high long enough to cross and land a couple of hits, and down. Same shape
+// the fight always had; it just stops and waits at both ends now.
+const TERRAFORMER_CYCLE = 360;
+const T_HOLD_LOW = 0.18;   // parked at the bottom: ~65 frames to board
+const T_RISE = 0.26;       // ~94 frames going up
+const T_HOLD_HIGH = 0.30;  // ~108 frames level with the ledge, and open
+// the rest is the way back down
+
+function breath(t) {
+  if (t < T_HOLD_LOW) return 0;
+  if (t < T_HOLD_LOW + T_RISE) {
+    const d = (t - T_HOLD_LOW) / T_RISE;
+    return (1 - Math.cos(d * Math.PI)) / 2;
+  }
+  if (t < T_HOLD_LOW + T_RISE + T_HOLD_HIGH) return 1;
+  const d = (t - T_HOLD_LOW - T_RISE - T_HOLD_HIGH) / (1 - T_HOLD_LOW - T_RISE - T_HOLD_HIGH);
+  return (1 + Math.cos(d * Math.PI)) / 2;
+}
 
 function updateTerraformer(boss) {
   const level = getLevel();
   boss.cycle = (boss.cycle + 1) % TERRAFORMER_CYCLE;
   const t = boss.cycle / TERRAFORMER_CYCLE;
-  // one smooth breath in and out, so the room's rhythm is readable
-  const lift = (1 - Math.cos(t * Math.PI * 2)) / 2;
+  const lift = breath(t);
 
   for (const p of level.platforms) {
     if (!p.mover) continue;
     p.y = p.baseY - p.mover * lift;
   }
 
-  // Open only at the top of the breath, which is also the only moment the
-  // raised platforms reach it.
-  boss.invulnerable = lift < 0.72;
+  // Open across the whole hold at the top, plus the last of the climb and
+  // the first of the drop — so it is already open as the player steps off
+  // the platform, rather than the instant they arrive being the instant it
+  // shuts. That is about 140 frames of the 360, against the old ~100 that
+  // were spread either side of a moment nobody could stand still in.
+  boss.invulnerable = lift < 0.9;
 
   // It has no weapon and it never swings at anyone, which left it standing
   // through its entire fight with one arm held out in the game's default

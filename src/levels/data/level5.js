@@ -62,33 +62,33 @@ export default {
     // it — every one a lift hovering where the player has to jump from.
 
     // --- seg 1: one lift, alone, with coins stacked up it. The teach. ---
-    lift(180, 300, 100, 110, 240),
-    { x: 660, y: 270, width: 100, height: 18 },
+    lift(180, 314, 100, 124, 240),
+    { x: 660, y: 314, width: 100, height: 18 },
 
     // --- seg 2: two lifts out of step with each other ---
-    lift(1030, 300, 90, 120, 260, 0),
-    slider(1450, 250, 100, 110, 300, 0.5),
+    lift(1030, 314, 90, 134, 260, 0),
+    slider(1450, 314, 100, 110, 300, 0.5),
 
     // --- seg 3: sliders start carrying you sideways ---
-    slider(1800, 280, 100, 90, 290, 0.2),
-    lift(2300, 300, 90, 130, 220, 0.25),
+    slider(1800, 314, 100, 90, 290, 0.2),
+    lift(2300, 314, 90, 144, 220, 0.25),
 
     // --- seg 4 ---
-    slider(2700, 270, 100, 100, 340, 0.5),
-    lift(3200, 290, 90, 140, 250, 0.75),
+    slider(2700, 314, 100, 100, 340, 0.5),
+    lift(3200, 314, 90, 164, 250, 0.75),
 
     // --- seg 5: the raised stretch ---
-    lift(3600, 250, 90, 120, 230, 0.15),
-    slider(4050, 230, 100, 90, 280, 0.6),
+    lift(3600, 274, 90, 144, 230, 0.15),
+    slider(4050, 274, 100, 90, 280, 0.6),
 
     // --- seg 6 ---
-    lift(4400, 300, 90, 130, 260, 0.4),
-    slider(4850, 260, 100, 100, 310, 0.3),
+    lift(4400, 314, 90, 144, 260, 0.4),
+    slider(4850, 314, 100, 100, 310, 0.3),
 
     // --- seg 7: the long run in ---
-    lift(5300, 300, 90, 130, 250, 0.1),
-    slider(5750, 260, 100, 90, 290, 0.65),
-    lift(6120, 300, 90, 120, 240, 0.45),
+    lift(5300, 314, 90, 144, 250, 0.1),
+    slider(5750, 314, 100, 90, 290, 0.65),
+    lift(6120, 314, 90, 134, 240, 0.45),
 
     // --- the Terraformer's arena ---
     // `mover` (not `move`) is the boss-driven lift: these are raised by its
@@ -146,23 +146,23 @@ export default {
 
   enemies: [
     { x: 220,  y: GROUND_Y - 22, w: 22, minX: 170,  maxX: 290,  speed: 1.7 },
-    { x: 620,  y: 260,           w: 20, minX: 570,  maxX: 660,  speed: 1.3 },
-    { x: 870,  y: GROUND_Y - 22, w: 22, minX: 820,  maxX: 900,  speed: 1.6, bounce: true },
+    { x: 690,  y: 294,           w: 20, minX: 665,  maxX: 755,  speed: 1.3 },
+    { x: 850,  y: GROUND_Y - 22, w: 22, minX: 820,  maxX: 878,  speed: 1.6, bounce: true },
     // Short span on purpose: an aggressor reaches 330px, and anything
     // wider put the checkpoint at 1770 inside it.
     { x: 1360, y: GROUND_Y - 22, w: 22, minX: 1350, maxX: 1400, speed: 1.6,
       tier: 'aggressor', shoots: true },
-    { x: 1700, y: GROUND_Y - 22, w: 22, minX: 1650, maxX: 1730, speed: 1.7,
+    { x: 2380, y: GROUND_Y - 22, w: 22, minX: 2320, maxX: 2460, speed: 1.7,
       tier: 'pursuer', weapon: 'pickaxe' },
     { x: 2160, y: GROUND_Y - 26, w: 26, minX: 2150, maxX: 2270, speed: 0.85,
       kind: 'octagon', restoreHits: 2 },
-    { x: 2560, y: GROUND_Y - 22, w: 22, minX: 2480, maxX: 2620, speed: 1.6, bounce: true },
+    { x: 2760, y: GROUND_Y - 22, w: 22, minX: 2700, maxX: 2860, speed: 1.6, bounce: true },
     { x: 2950, y: GROUND_Y - 22, w: 22, minX: 2900, maxX: 3020, speed: 1.6,
       tier: 'aggressor', shoots: true },
-    { x: 3400, y: GROUND_Y - 22, w: 22, minX: 3350, maxX: 3440, speed: 1.7,
+    { x: 3390, y: GROUND_Y - 22, w: 22, minX: 3340, maxX: 3420, speed: 1.7,
       tier: 'pursuer', weapon: 'pickaxe' },
     { x: 3850, y: 370 - 22,      w: 22, minX: 3790, maxX: 3900, speed: 1.6, bounce: true },
-    { x: 4250, y: 370 - 22,      w: 22, minX: 4150, maxX: 4320, speed: 1.6,
+    { x: 4180, y: 370 - 22,      w: 22, minX: 4100, maxX: 4240, speed: 1.6,
       tier: 'aggressor', shoots: true },
     // --- Quarrick ---
     // An ordinary corrupted square in the level data, flagged `quarrick`,
@@ -177,9 +177,9 @@ export default {
     // who has been spending freely arrives unable to afford him.
     { x: 4460, y: GROUND_Y - 44, w: 44, minX: 4400, maxX: 4620, speed: 0.55,
       kind: 'octagon', quarrick: true, restoreHits: 4 },
-    { x: 5150, y: GROUND_Y - 22, w: 22, minX: 5080, maxX: 5190, speed: 1.7,
+    { x: 4880, y: GROUND_Y - 22, w: 22, minX: 4820, maxX: 4980, speed: 1.7,
       tier: 'pursuer', weapon: 'pickaxe' },
-    { x: 5700, y: GROUND_Y - 22, w: 22, minX: 5600, maxX: 5800, speed: 1.6,
+    { x: 5740, y: GROUND_Y - 22, w: 22, minX: 5680, maxX: 5820, speed: 1.6,
       tier: 'aggressor', shoots: true },
     { x: 6250, y: GROUND_Y - 26, w: 26, minX: 6180, maxX: 6320, speed: 0.85,
       kind: 'octagon', restoreHits: 2 },
@@ -193,27 +193,27 @@ export default {
   ],
 
   coins: [
-    [225, 286], [225, 230], [225, 190],
-    [700, 256], [745, 256],
+    [225, 300], [225, 230], [225, 190],
+    [700, 300], [745, 300],
     [860, 396],
-    [1075, 286], [1075, 220],
-    [1495, 236],
+    [1075, 300], [1075, 220],
+    [1495, 300],
     [1650, 396],
-    [1845, 266],
-    [2345, 286], [2345, 220],
+    [1845, 300],
+    [2345, 300], [2345, 220],
     [2470, 396],
-    [2745, 256],
-    [3245, 276], [3245, 210],
+    [2745, 300],
+    [3245, 300], [3245, 210],
     [3420, 396],
-    [3645, 236], [3645, 180],
-    [4095, 216],
+    [3645, 260], [3645, 180],
+    [4095, 260],
     [4200, 356],
-    [4445, 286], [4445, 220],
-    [4895, 246],
+    [4445, 300], [4445, 220],
+    [4895, 300],
     [5020, 396],
-    [5345, 286], [5345, 220],
-    [5795, 246],
-    [6165, 286], [6165, 230],
+    [5345, 300], [5345, 220],
+    [5795, 300],
+    [6165, 300], [6165, 230],
     [6350, 396], [6410, 396],
     [6520, 316], [6760, 316]
   ],

@@ -80,33 +80,33 @@ export default {
     // Two per stretch from here on. The 176 is the tallest thing in the
     // level's first half and it is deliberately the SECOND column, so the
     // player arrives at it having already made the shorter version.
-    pillar(1020, 110, { chewed: true }),
-    pillar(1270, 176),
+    pillar(1020, 76, { chewed: true }),
+    pillar(1270, 156),
     { x: 1400, y: 200, width: 100, height: 18, chewed: true },
 
-    pillar(1760, 132, { chewed: true }),
+    pillar(1760, 76, { chewed: true }),
     pillar(2010, 66),
-    { x: 2230, y: 230, width: 110, height: 18 },
+    { x: 2230, y: 248, width: 110, height: 18 },
 
     // --- approaching the clearing: the stacks thin out and get shorter ---
-    pillar(2530, 88),
+    pillar(2530, 76),
     pillar(2800, 44, { chewed: true }),
     // 2884-3700 is the clearing. Nothing in it. Nothing over it.
 
     // --- after the handoff, the columns come back taller ---
-    pillar(3930, 110, { chewed: true }),
-    pillar(4180, 176, { chewed: true }),
+    pillar(3930, 76, { chewed: true }),
+    pillar(4180, 156, { chewed: true }),
     { x: 4400, y: 200, width: 110, height: 18 },
 
-    pillar(4730, 132, { chewed: true }),
-    pillar(4980, 110),
+    pillar(4730, 76, { chewed: true }),
+    pillar(4980, 96),
     { x: 5120, y: 220, width: 110, height: 18, chewed: true },
 
     // --- the run in to the Sculptor: three columns, descending ---
-    pillar(5550, 154, { chewed: true }),
-    pillar(5800, 110, { chewed: true }),
+    pillar(5550, 76, { chewed: true }),
+    pillar(5800, 96, { chewed: true }),
     pillar(6100, 88, { chewed: true }),
-    { x: 6420, y: 250, width: 110, height: 18 }
+    { x: 6420, y: 314, width: 110, height: 18 }
     // 6600 onward is the Sculptor's ground, left open.
   ],
 
@@ -133,7 +133,7 @@ export default {
   ammo: [
     { x: 3820, y: GROUND_Y - 34, amount: 4 },
     { x: 5160, y: 186,           amount: 4 },
-    { x: 6470, y: 216,           amount: 5 }
+    { x: 6470, y: 280,           amount: 5 }
   ],
 
   cutscenes: [
@@ -177,7 +177,7 @@ export default {
     { x: 5150, y: 200,           w: 20, minX: 5120, maxX: 5230, speed: 1.3 },
     { x: 5740, y: GROUND_Y - 26, w: 26, minX: 5710, maxX: 5795, speed: 0.8,
       kind: 'octagon', restoreHits: 2 },
-    { x: 6450, y: 230,           w: 20, minX: 6420, maxX: 6530, speed: 1.3 },
+    { x: 6450, y: 294,           w: 20, minX: 6420, maxX: 6530, speed: 1.3 },
     // Kept back from the last checkpoint at 6340 — an octagon shambles after
     // you from 200px away, so anything closer is a respawn into contact.
     { x: 6010, y: GROUND_Y - 26, w: 26, minX: 5990, maxX: 6090, speed: 0.8,
@@ -195,51 +195,51 @@ export default {
     [740, 186], [780, 186],
     [820, 396],
     // first columns
-    [1050, 286],
+    [1050, 320],
     [1200, 396], [1240, 396],
-    [1300, 220],
+    [1300, 240],
     [1430, 186], [1470, 186],
     [1550, 396],
     // second stretch
-    [1790, 264],
+    [1790, 320],
     [1940, 396], [1980, 396],
     [2040, 330],
-    [2260, 216], [2300, 216],
+    [2260, 234], [2300, 234],
     // in to the clearing
-    [2560, 308],
+    [2560, 320],
     [2830, 352],
     [2980, 396],
     [3200, 396], [3300, 396], [3400, 396],
     // after the handoff
-    [3960, 286],
+    [3960, 320],
     [4120, 396], [4160, 396],
-    [4210, 220],
+    [4210, 240],
     [4430, 186], [4470, 186],
-    [4760, 264],
+    [4760, 320],
     [4920, 396], [4960, 396],
-    [5010, 286],
+    [5010, 300],
     [5150, 206], [5190, 206],
     // the run in
-    [5580, 242],
+    [5580, 320],
     [5760, 396],
-    [5830, 286],
+    [5830, 300],
     [6000, 396], [6040, 396],
     [6130, 308],
-    [6450, 236], [6490, 236],
+    [6450, 300], [6490, 300],
     [6620, 396], [6680, 396]
   ],
 
   checkpoints: [
     // On the flat between the two columns of each stretch, never against a
     // wall and never inside a patrol.
-    { x: 1550, y: GROUND_Y - 70, width: 8, height: 70 },
+    { x: 1450, y: GROUND_Y - 70, width: 8, height: 70 },
     // In the clearing, past the handoff. `lacksWeapon` on the scene is what
     // stops it re-running for someone who already has the Cornerstone, so
     // the checkpoint no longer has to sit in front of the trigger to
     // protect it — and the clearing is the only flat, empty, enemy-free
     // ground in the level, which is exactly what a checkpoint wants.
     { x: 3250, y: GROUND_Y - 70, width: 8, height: 70 },
-    { x: 4920, y: GROUND_Y - 70, width: 8, height: 70 },
+    { x: 5150, y: GROUND_Y - 70, width: 8, height: 70 },
     // Before the Sculptor, outside the 200px an octagon will shamble after
     // you from — respawning next to the boss you just failed is the
     // cheapest death in the game.

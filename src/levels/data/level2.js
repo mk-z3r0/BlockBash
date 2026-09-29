@@ -46,14 +46,14 @@ export default {
     { x: 200,  y: 210, width: 120, height: 18 },
     { x: 470,  y: 170, width: 110, height: 18 },
     { x: 810,  y: 250, width: 100, height: 18 },
-    { x: 1140, y: 200, width: 100, height: 18, chewed: true },
+    { x: 1140, y: 234, width: 100, height: 18, chewed: true },
     { x: 1410, y: 290, width: 100, height: 18 },
-    { x: 1760, y: 230, width: 100, height: 18, chewed: true },
+    { x: 1760, y: 274, width: 100, height: 18, chewed: true },
     { x: 2080, y: 320, width: 110, height: 18 },
-    { x: 2420, y: 260, width: 100, height: 18, chewed: true },
+    { x: 2420, y: 314, width: 100, height: 18, chewed: true },
     // a lift down into the deepest part of the cut — optional, and the coins
     // on it are the reason to bother
-    { x: 2900, y: 250, width: 90,  height: 18, move: { y: 90, period: 260 } },
+    { x: 2900, y: 314, width: 90,  height: 18, move: { y: 90, period: 260 } },
     // Two stepping stones over the long bed, not one. Level 1 established
     // the shape and it's the only arrangement where a wide hazard stays
     // fair: one platform in the middle means two long committed jumps with
@@ -61,13 +61,13 @@ export default {
     { x: 3100, y: 340, width: 100, height: 18 },
     { x: 3250, y: 340, width: 100, height: 18 },
     { x: 3575, y: 280, width: 90,  height: 18 },
-    { x: 3900, y: 230, width: 100, height: 18, chewed: true },
+    { x: 3900, y: 274, width: 100, height: 18, chewed: true },
     { x: 4285, y: 310, width: 100, height: 18 },
-    { x: 4640, y: 250, width: 100, height: 18, chewed: true },
-    { x: 5080, y: 300, width: 110, height: 18 },
-    { x: 5450, y: 250, width: 100, height: 18 },
-    { x: 5900, y: 300, width: 100, height: 18, chewed: true },
-    { x: 6300, y: 260, width: 110, height: 18 },
+    { x: 4640, y: 314, width: 100, height: 18, chewed: true },
+    { x: 5080, y: 314, width: 110, height: 18 },
+    { x: 5450, y: 314, width: 100, height: 18 },
+    { x: 5900, y: 314, width: 100, height: 18, chewed: true },
+    { x: 6300, y: 314, width: 110, height: 18 },
     // The one thing here that has to be climbed rather than jumped over —
     // three tiles of solid block in the run-up to the arena, the same idea
     // as level 1's tall wall and the level's last obstacle before the fight.
@@ -105,17 +105,17 @@ export default {
     // carrying a tool — on the open quarry floor with room to back away.
     { x: 2300, y: GROUND_Y - 22, w: 22, minX: 2060, maxX: 2600, speed: 1.5,
       tier: 'pursuer', weapon: 'pickaxe' },
-    { x: 2460, y: 240,           w: 20, minX: 2420, maxX: 2520, speed: 1.2 },
+    { x: 2460, y: 294,           w: 20, minX: 2420, maxX: 2520, speed: 1.2 },
     // Was at 3250, standing in the middle of the long spike bed. Enemies
     // collide with terrain now, so it would have been stuck there forever.
     { x: 2940, y: GROUND_Y - 22, w: 22, minX: 2900, maxX: 3040, speed: 1.6 },
-    { x: 3940, y: 210,           w: 20, minX: 3900, maxX: 4000, speed: 1.2 },
+    { x: 3940, y: 254,           w: 20, minX: 3900, maxX: 4000, speed: 1.2 },
     { x: 4600, y: GROUND_Y - 22, w: 22, minX: 4520, maxX: 4840, speed: 1.6,
       tier: 'pursuer', weapon: 'pickaxe' },
-    { x: 5120, y: 280,           w: 20, minX: 5080, maxX: 5190, speed: 1.2 },
+    { x: 5120, y: 294,           w: 20, minX: 5080, maxX: 5190, speed: 1.2 },
     { x: 5750, y: GROUND_Y - 22, w: 22, minX: 5700, maxX: 5880, speed: 1.5,
       tier: 'pursuer', weapon: 'pickaxe' },
-    { x: 6340, y: 240,           w: 20, minX: 6300, maxX: 6410, speed: 1.3 },
+    { x: 6340, y: 294,           w: 20, minX: 6300, maxX: 6410, speed: 1.3 },
 
     // --- The Excavator ---
     { x: 6980, y: GROUND_Y - 33, w: 33, minX: 6740, maxX: 7130, speed: 1.5,
@@ -130,35 +130,38 @@ export default {
     [510, 156], [555, 156],
     [640, RIM - 14],
     [845, 236], [890, 236],
-    [1180, 186],
+    [1180, 220],
     [1310, 330 - 14],
     [1445, 276], [1490, 276],
-    [1800, 216],
+    [1800, 260],
     [1900, 370 - 14],
     [2120, 306], [2165, 306],
-    [2460, 246],
+    [2460, 300],
     [2560, 396],
     // the reward for riding the lift down over the long bed
-    [2930, 236], [2930, 300], [2930, 350],
+    [2930, 300], [2930, 300], [2930, 350],
     [3140, 326], [3290, 326],
     [3400, 396],
     [3610, 266], [3650, 266],
-    [3940, 216],
+    [3940, 260],
     [4100, 356],
     [4320, 296], [4365, 296],
-    [4680, 236],
+    [4680, 300],
     [4800, 396],
-    [5120, 286],
-    [5490, 236],
-    [5940, 286], [5985, 286],
-    [6340, 246],
+    [5120, 300],
+    [5490, 300],
+    [5940, 300], [5985, 300],
+    [6340, 300],
     [6683, 330],
     [6800, 396], [6860, 396]
   ],
 
   checkpoints: [
-    { x: 1490, y: GROUND_Y - 70, width: 8, height: 70 },   // the quarry floor
+    // y off the TERRACE it stands on, not the level's base line. This one
+    // moved sideways onto a shelf at 370 and kept a y measured from 410, so
+    // 40px of the flag was buried and only the top 30 showed.
+    { x: 1490, y: 370 - 70,      width: 8, height: 70 },   // second terrace down
     { x: 3650, y: 370 - 70,      width: 8, height: 70 },   // the climb
-    { x: 5130, y: GROUND_Y - 70, width: 8, height: 70 }
+    { x: 5400, y: GROUND_Y - 70, width: 8, height: 70 }
   ]
 };

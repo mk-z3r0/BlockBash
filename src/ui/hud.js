@@ -136,7 +136,13 @@ function drawBossBar() {
     ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
     ctx.fillStyle = restoring ? '#d7faff' : '#ffd9a0';
     ctx.font = 'bold 9px Trebuchet MS, Arial, sans-serif';
-    ctx.fillText(restoring ? 'PUT IT BACK' : 'OPEN — HIT IT', VIEW_WIDTH / 2, y + h + 11);
+    // The count, for the restoration bar only. It fills rather than empties
+    // — noticed from play and liked — and saying how many faces are back
+    // turns that from a thing the player works out into a thing the game
+    // is telling them.
+    ctx.fillText(
+      restoring ? `PUT IT BACK — ${total - left}/${total}` : 'OPEN — HIT IT',
+      VIEW_WIDTH / 2, y + h + 11);
   }
   ctx.restore();
 }

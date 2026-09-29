@@ -92,11 +92,11 @@ export default {
     { x: 650,  y: 300, width: 120, height: 18 },
     { x: 900,  y: 230, width: 100, height: 18 },
     { x: 1150, y: 320, width: 100, height: 18 },
-    { x: 1620, y: 280, width: 140, height: 18 },
-    { x: 1750, y: 200, width: 100, height: 18 },
+    { x: 1620, y: 314, width: 140, height: 18 },
+    { x: 1750, y: 218, width: 100, height: 18 },
     { x: 2040, y: 300, width: 190, height: 18 },
     { x: 2350, y: 260, width: 130, height: 18 },
-    { x: 2600, y: 200, width: 100, height: 18 },
+    { x: 2600, y: 204, width: 100, height: 18 },
     { x: 2850, y: 300, width: 120, height: 18 },
 
     // Staircase (2026-09-20) — four solid blocks flush with the ground,
@@ -114,8 +114,8 @@ export default {
     { x: 3164, y: 322, width: 58, height: 88 },
 
     // --- second half ---
-    { x: 3700, y: 300, width: 110, height: 18 },  // coin perch, before the first spikes
-    { x: 4500, y: 290, width: 110, height: 18 },  // coin perch
+    { x: 3700, y: 314, width: 110, height: 18 },  // coin perch, before the first spikes
+    { x: 4500, y: 314, width: 110, height: 18 },  // coin perch
     { x: 4960, y: 340, width: 100, height: 18 },  // stepping stones over the long bed
     { x: 5120, y: 340, width: 100, height: 18 },
     { x: 6100, y: 300, width: 120, height: 18 },
@@ -221,10 +221,10 @@ export default {
     [680, 286], [730, 286],       // platform at x650-770,  y300
     [920, 216],                   // platform at x900-1000, y230
     [1170, 306], [1220, 306],     // platform at x1150-1250, y320
-    [1770, 186],                  // platform at x1750-1850, y200
+    [1770, 204],                  // platform at x1750-1850, y200
     [2075, 286], [2125, 286],     // platform at x2040-2230, y300
     [2370, 246],                  // platform at x2350-2480, y260
-    [2620, 186],                  // platform at x2600-2700, y200
+    [2620, 190],                  // platform at x2600-2700, y200
     [2870, 286], [2920, 286],     // platform at x2850-2970, y300
     // one per staircase tread (2026-09-20) — same 14px-above-the-surface
     // offset, so each is collected just by walking up, never an extra hop
@@ -269,8 +269,8 @@ export default {
     [4372, 310], [4422, 299], [4472, 310],
     [5710, 340], [5745, 340], [5865, 340], [5995, 340],
     // second half — platform tier: same 14px-above-surface offset
-    [3740, 286], [3780, 286],     // "coin perch" platform at x3700-3810, y300
-    [4540, 276], [4580, 276],     // "coin perch" platform at x4500-4610, y290
+    [3740, 300], [3780, 300],     // "coin perch" platform at x3700-3810, y300
+    [4540, 300], [4580, 300],     // "coin perch" platform at x4500-4610, y290
     [5010, 326],                  // stepping stone at x4960-5060, y340
     [5170, 326],                  // stepping stone at x5120-5220, y340
     [6140, 286], [6180, 286],     // platform at x6100-6220, y300
@@ -281,7 +281,7 @@ export default {
   ],
 
   checkpoints: [
-    { x: 1250, y: GROUND_Y - 70, width: 8, height: 70 },
+    { x: 1070, y: GROUND_Y - 70, width: 8, height: 70 },
     { x: 3820, y: GROUND_Y - 70, width: 8, height: 70 },  // start of the spike half
     { x: 5300, y: GROUND_Y - 70, width: 8, height: 70 }   // after the long spike bed
   ],

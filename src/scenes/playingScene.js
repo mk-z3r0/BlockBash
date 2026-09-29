@@ -127,7 +127,12 @@ function resetBossAndCutscene() {
     boss.x = boss.baseX;
     boss.y = boss.baseY;
     boss.hopVY = 0;
-    boss.speed = Math.abs(boss.speed) || 0.96;
+    // Its authored speed, sign discarded — not `Math.abs(speed) || 0.96`,
+    // which quietly gave the two bosses that are supposed to stand still
+    // (the Terraformer, the Core) a walking speed, because zero is falsy.
+    // Neither of them calls the movement helpers so nothing moved, but it
+    // is the kind of wrong that the next thing to read `speed` inherits.
+    boss.speed = boss.baseSpeed == null ? 0.96 : Math.abs(boss.baseSpeed);
     boss.mining = false;
     // A fight restarts from the top, which means the numbers as well as the
     // position. Without this a boss killed just before the player died came

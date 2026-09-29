@@ -62,7 +62,7 @@ export default {
     shelfCover(2760, 110, 66),
     // a slider carrying coins back and forth across the open middle — the
     // one place on the shelf with nothing to hide behind
-    { x: 3050, y: 250, width: 90, height: 18, move: { x: 170, period: 290 } },
+    { x: 3050, y: 274, width: 90, height: 18, move: { x: 170, period: 290 } },
     shelfCover(3380, 120, 44),
     { x: 3600, y: 230, width: 100, height: 18, chewed: true },
 
@@ -171,7 +171,7 @@ export default {
     [2360, 226],
     [2500, SHELF - 14],
     [2800, 290],
-    [3050, 236], [3095, 236],
+    [3050, 260], [3095, 260],
     [3420, 312],
     [3640, 216], [3685, 216],
     [3860, SHELF - 14],

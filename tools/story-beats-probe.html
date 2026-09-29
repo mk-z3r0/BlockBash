@@ -355,6 +355,30 @@
       }
     }
 
+    // --- nobody is standing inside anybody ---
+    //
+    // Reported from play: "beginning of the level cutscenes with Quarrick
+    // have enemies in him." Every scene places him at a fixed offset from
+    // the player, which is a spot chosen by where the player stopped rather
+    // than by what is already standing there.
+    out.push('== characters have room to stand ==');
+    for (let i = 0; i < levels.length; i++) {
+      resetNarrative();
+      state.currentLevelIndex = i;
+      switchTo('playing', { retry: true });
+      state.lives = 999;
+      player.invincible = 999999;
+      tick(90);
+      const npc = state.rescueNPC;
+      if (!npc) { out.push(`  ok   level ${i + 1}: no one placed at the start`); continue; }
+      const inside = state.enemies.filter(e => e.alive && !e.restored &&
+        npc.x < e.x + e.w && npc.x + npc.width > e.x &&
+        npc.y < e.y + e.w && npc.y + npc.height > e.y);
+      check(inside.length === 0,
+        `level ${i + 1}: nothing is standing inside Quarrick at x${Math.round(npc.x)}` +
+        (inside.length ? ` — ${inside.map(e => Math.round(e.x)).join(', ')}` : ''));
+    }
+
     out.push(fails ? `*** ${fails} FAILURE(S)` : 'PASS the story beats hold together');
     out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
     document.getElementById('out').textContent = out.join('\n');

@@ -487,6 +487,79 @@
     });
     if (!badCheckpoint) out.push('  no checkpoint is inside an enemy\'s reach');
 
+    // ---- can the player get on it at all? ----
+    //
+    // Reported from play: "many of the platforms moving up and down are
+    // unreachable." They were, and so were a lot of the static ones, and
+    // nothing here could see it because this probe had only ever asked
+    // about gaps and spike beds — the things that kill you — never about
+    // the things you are supposed to be able to stand on.
+    //
+    // The number that matters had also been wrong in the docs for a long
+    // time. The level design rules said the jump "rises ~225px"; measured
+    // in clear air (it matters that it's clear air — the first attempt at
+    // this measured a head bonk) the player's FEET rise 97px from a stand,
+    // 107 at walk and 117 at a full run. A platform whose top is 160px
+    // above the floor is not a hard jump, it is not a jump.
+    const RISE_RUN = 117;
+    const RISE_WALK = 107;
+    // Horizontal reach, from the same measurements the rest of this file
+    // uses. Generous on purpose: this is a "could anyone ever" test, and
+    // the jump tests above are what judge anything marginal.
+    const CARRY = P.runMax > 0 ? 168 : 168;
+
+    out.push('== REACH ==');
+    {
+      // Every surface that can be stood on, with the height it offers. A
+      // mover is taken at its LOWEST point, which is where it's boarded.
+      // A platform is BOARDED at its lowest point and DELIVERS you to its
+      // highest. For a static one those are the same; for anything that
+      // travels they are not, and treating a lift as if it stayed at the
+      // bottom concludes that an arena reached by riding one is unreachable.
+      // `move` is the clock-driven kind, `mover` the boss-driven kind — both
+      // rise from their authored y.
+      const travelOf = p => (p.move && p.move.y) || p.mover || 0;
+      const surfaces = [
+        ...ground.map(g => ({ x: g.x, x2: g.x + g.width, y: g.y, top: g.y, what: 'the floor' })),
+        ...floating.map(p => {
+          const bx = p.baseX == null ? p.x : p.baseX;
+          const by = p.baseY == null ? p.y : p.baseY;
+          const travel = travelOf(p);
+          return { x: bx, x2: bx + p.width, y: by, top: by - travel,
+                   what: `the platform at ${bx}`, mover: travel > 0 };
+        })
+      ];
+      const reached = new Set(ground.map(g => g.x));
+      // Repeated passes, because standing on one platform can put another
+      // in range — which is how most of level 5's high route is meant to
+      // work.
+      for (let pass = 0; pass < 6; pass++) {
+        for (const s of surfaces) {
+          if (reached.has(s.x)) continue;
+          const from = surfaces.find(o => {
+            if (!reached.has(o.x)) return false;
+            if (o === s) return false;
+            const rise = o.top - s.y;                     // how far up, from its highest
+            if (rise > RISE_RUN) return false;
+            // Horizontally in range: overlapping, or within a jump's carry.
+            const gap = s.x > o.x2 ? s.x - o.x2 : (o.x > s.x2 ? o.x - s.x2 : 0);
+            return gap <= CARRY;
+          });
+          if (from) reached.add(s.x);
+        }
+      }
+      const orphans = surfaces.filter(s => !reached.has(s.x));
+      if (!orphans.length) {
+        out.push(`  every one of the ${surfaces.length - ground.length} platforms can be got onto`);
+      } else {
+        orphans.forEach(o => {
+          const floor = groundYAt(o.x + 4);
+          fail(`${o.what} (top y${o.y}${o.mover ? ', at its lowest' : ''}) is ${Math.round(floor - o.y)}px above the floor` +
+               ` and nothing in range reaches it — the jump gains ${RISE_RUN}px at a full run`);
+        });
+      }
+    }
+
     // ---- fairness ----
     // Separate from the clearable/not-clearable gate above and reported
     // separately, because they are different failures with different fixes:

@@ -67,10 +67,20 @@
       const spawnOk = ground.some(p => lv.playerSpawn.x >= p.x && lv.playerSpawn.x <= p.x + p.width);
       if (!spawnOk) fail(`${tag}: player spawns at x${lv.playerSpawn.x} with no ground under them`);
 
-      // --- checkpoints over solid ground ---
+      // --- checkpoints over solid ground, AND standing on it ---
       (lv.checkpoints || []).forEach(c => {
-        if (!ground.some(p => c.x >= p.x && c.x <= p.x + p.width)) {
-          fail(`${tag}: checkpoint at ${c.x} has no ground under it`);
+        const seg = ground.find(p => c.x >= p.x && c.x <= p.x + p.width);
+        if (!seg) { fail(`${tag}: checkpoint at ${c.x} has no ground under it`); return; }
+        // The flag's base has to be the surface. Ground is terraced, so a
+        // checkpoint that moves sideways onto a shelf and keeps a y measured
+        // from the level's base line ends up buried in it — reported from
+        // play as "a checkpoint flag that starts below ground level", and
+        // it was one this probe had already passed because there was
+        // technically ground under it.
+        const base = c.y + c.height;
+        if (base !== seg.y) {
+          fail(`${tag}: checkpoint at ${c.x} has its base at y${base} on ground at y${seg.y}` +
+               ` — ${base > seg.y ? 'buried' : 'floating'} by ${Math.abs(base - seg.y)}px`);
         }
       });
 

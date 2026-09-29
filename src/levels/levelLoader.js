@@ -169,3 +169,59 @@ export function surfaceYAt(x, level = current) {
   const seg = level.platforms.find(p => p.ground && x >= p.x && x <= p.x + p.width);
   return seg ? seg.y : level.groundY;
 }
+
+// The top of the tallest solid thing at `x` that stands above `footY`.
+//
+// Null when nothing is in the way. Used by anything that has to decide
+// whether to jump an obstacle or go round it — `isBlocked` answers "is
+// something there", which is enough to stop, and not enough to climb.
+export function solidTopAt(x, footY, level = current) {
+  if (!level) return null;
+  let top = null;
+  for (const p of level.platforms) {
+    if (p.width <= 1) continue;
+    if (x < p.x || x > p.x + p.width) continue;
+    if (p.y >= footY - 2) continue;                 // at or below the feet
+    if (p.y + p.height < footY - 2) continue;       // overhead, not underfoot
+    if (top == null || p.y < top) top = p.y;
+  }
+  return top;
+}
+
+// The surface something falling at `x` would land on, given where its feet
+// are now. Unlike `surfaceYAt` this knows about blocks and floating
+// platforms, and unlike it, it returns null over a genuine pit rather than
+// the level's base line.
+export function floorUnder(x, footY, level = current) {
+  if (!level) return null;
+  let best = null;
+  for (const p of level.platforms) {
+    if (p.width <= 1) continue;
+    if (x < p.x || x > p.x + p.width) continue;
+    if (p.y < footY - 2) continue;                  // above the feet: not a landing
+    if (best == null || p.y < best) best = p.y;
+  }
+  return best;
+}
+
+// Is there anything to stand on at this x, at roughly this height?
+//
+// `surfaceYAt` answers "how high is the floor here" and falls back to the
+// level's base line when there ISN'T one, which is the right answer for
+// placing a character and the wrong one for walking: over a pit it reports
+// a floor that isn't there. Nothing had ever asked the other question, and
+// the result was spheres strolling out over gaps — reported from level 4,
+// where the shelf has three of them.
+//
+// `y` is the walker's foot line. A ledge is anything more than `drop` px
+// below it, which is what lets an enemy step DOWN a terrace (level 2 is
+// built out of them) without treating every step as a cliff.
+export function hasFooting(x, y, drop = 26, level = current) {
+  if (!level) return true;
+  for (const p of level.platforms) {
+    if (p.width <= 1) continue;
+    if (x < p.x || x > p.x + p.width) continue;
+    if (p.y >= y - 2 && p.y <= y + drop) return true;
+  }
+  return false;
+}

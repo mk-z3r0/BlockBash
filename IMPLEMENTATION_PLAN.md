@@ -626,6 +626,8 @@ What's in it, and what each thing is actually for:
 | `full-playthrough-probe` | One run, cleared save to win screen, every story scene asserted |
 | `level-editor-probe` | That the editor edits: a drag moves the right object by the right amount, resize handles keep the opposite edge fixed, undo/redo counts match the gesture, and its change list round-trips |
 | `level-data-probe` | The boring stuff, read straight off level data: weapons and cutscene ids that exist, a level that can end, spawns and checkpoints over ground, hazards that don't run off a ledge. Found three of level 6's checkpoints floating in its pits |
+| `restored-exit-probe` | That a square the player just paid triangles to save leaves in one piece — walks the ground it's on, jumps what it has to, never ends up inside a wall |
+| `stomp-probe` | That anything stompable can be stomped, from any height, including mid-swing. The armed enemies were the ones you couldn't land on, which is precisely backwards |
 | `respawn-state-probe` | What survives a death — and standing at all 24 checkpoints in the game for two seconds without touching the controls. The empirical partner to `checkpoint-siting-probe`'s static rule, and it has caught things the rule couldn't |
 | the older probes | Physics, coins, saves, cutscene contract — unchanged, and all still green |
 
@@ -709,15 +711,31 @@ reports how many jump timings actually clear each obstacle. Headless Chromium
 barely fires `requestAnimationFrame`, so ticking `update()` by hand is the only
 way to simulate more than a frame or two.
 
-- **Jump arc:** rises ~225px, ~73 frames airborne regardless of speed —
-  original was ~144px/~47 frames, cut twice now (2026-09-19 twice: 20% off
-  speed+gravity together each time, most recently after playtesting with an
-  actual kid — see physics.js's note above GRAVITY_UP for why that pairing
-  cancels out and leaves horizontal carry unchanged). Horizontal carry
-  depends on which speed cap is active — walk ~93.5px, run ~168px (same
-  physics, just a lower speed cap; see physics.js) — and has stayed exactly
-  there through both cuts. Any gap/hazard analysis needs both numbers now,
-  not one.
+- **Jump arc: the feet rise 97px from a stand, 107 at walk, 117 at a run,
+  and 120 is the tallest ledge the player can actually land on.** Horizontal
+  carry is walk ~93.5px, run ~168px. Any gap/hazard analysis needs both
+  numbers.
+
+  > **This line said "rises ~225px" for a long time and it was wrong** —
+  > measured 2026-09-29, in clear air, which matters: the first attempt
+  > measured a head bonk off a platform the test happened to be standing
+  > under and reported 50px. The 225 is from before the SMB3 physics
+  > rewrite, which made the jump speed-tiered (`jumpTable` in physics.js:
+  > four tiers from -4.81 standing to -5.5 at P-speed) and much shorter,
+  > and nobody re-measured.
+  >
+  > Seven levels were authored against 225, so **35 platforms across all
+  > seven were out of reach** — including in level 1, which is finished and
+  > playtested, where coins sat on three of them. Reported from play as
+  > "many of the platforms moving up and down are unreachable." They were;
+  > so were a lot of the static ones. Every one has been brought into reach
+  > (lifts by extending their travel DOWN, keeping the top where it was),
+  > and `level-audit-probe`'s REACH section is now a gate so it cannot
+  > happen again.
+  >
+  > The lesson is not about the number. It is that a physics rewrite
+  > invalidated a figure that the level design rules stated as fact, and
+  > for several weeks every level was authored against it.
 - **A fixed-pixel autoplay lookahead doesn't scale with a speed change on its
   own, and needs re-sweeping every time.** Each of the two speed cuts so far
   broke the autoplay at the 2150 gap with the previous lookahead value still
