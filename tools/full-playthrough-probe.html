@@ -133,8 +133,16 @@
       `played all ${levels.length} levels in order (visited ${visited.map(i => i + 1).join(' -> ')})`);
     // The story spine, asserted rather than assumed. A run that reaches the
     // win screen without these has skipped the game.
-    const spine = ['l2-arrival', 'l3-handoff', 'l3-restored', 'l4-arrival',
-                   'l5-arrival', 'l6-arrival', 'descent', 'l7-arrival', 'l7-ending'];
+    // Quarrick's arc is the spine, and it now runs across four levels
+    // rather than resolving inside level 3: taken on the third face,
+    // glimpsed on the fourth, found and put back on the fifth, waiting at
+    // the corner on the sixth. Each of those is a scene that can silently
+    // stop firing, and the absence would read as "he just isn't in the
+    // game any more" rather than as a bug.
+    const spine = ['l2-arrival', 'l3-handoff',
+                   'l4-arrival', 'l4-glimpse',
+                   'l5-arrival', 'l5-found', 'l5-restored',
+                   'l6-arrival', 'descent', 'l7-arrival', 'l7-ending'];
     const missing = spine.filter(id => !allScenes.includes(id));
     check(missing.length === 0, `every story scene played (${missing.length ? 'missing: ' + missing.join(', ') : 'all ' + spine.length})`);
     check(state.gameState === 'win', `the run ends in a win (gameState: ${state.gameState})`);

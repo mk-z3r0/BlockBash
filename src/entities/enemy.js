@@ -39,6 +39,25 @@ const SHOT_COOLDOWN = 110;
 // Corrupted squares shamble. They are not hunting you, they're just drawn
 // toward you, and the speed says so.
 const OCTAGON_SPEED = 0.75;
+// --- bouncers -----------------------------------------------------------
+//
+// GAME_DESIGN's "enemies evolve across levels" asks for the ladder to keep
+// climbing after the ranged tier, and this is the rung: a sphere that never
+// stops bouncing. Straight out of the red Koopa the request named — the
+// difficulty isn't that it hurts more, it's that the ONE answer the player
+// has relied on since level 1 (jump on it) now has a rhythm to it, and
+// mistiming a stomp against something rising to meet you is a hit.
+//
+// Deliberately NOT random. A fixed period is a pattern, and a pattern is
+// something a ten-year-old learns in two screens and then feels clever
+// about; a random one is just a tax. `canHop` — the occasional surprise
+// hop introduced a level earlier — stays what it was, and the two read as
+// the same idea getting serious, which is the point of a ladder.
+const BOUNCE_VY = -6.4;
+// A beat on the floor between bounces, so there is a moment to land the
+// stomp in. Without it the window is a single frame and the tier stops
+// being fair.
+const BOUNCE_REST = 14;
 // How close the player has to be before a fightable boss starts fighting.
 // Comfortably more than a screen, so it's already going by the time it comes
 // into view and never visibly "switches on".
@@ -77,6 +96,10 @@ export function spawnEnemies(spawns) {
     baseX: e.x,
     hopVY: 0,
     hopTimer: spread(e.x, 90, 150),   // ticks down to the next surprise hop
+    // Bouncers start out of step with each other, from their own position
+    // like every other timer in this file, so a row of them reads as a row
+    // of individuals rather than as one animation played three times.
+    bounceTimer: spread(e.x, 1, BOUNCE_REST),
     shout: 0,
     awake: false,     // boss only: has the pickaxe come out yet
     swingPhase: 0,    // boss only: drives the threatening pickaxe swing
@@ -269,11 +292,19 @@ export function updateEnemies(player, cutsceneActive) {
     // backed out of range — committed, like the player's own.
     if (enemy.weapon) tickWeapon(enemy);
 
+    // --- bouncers: never still, on a fixed beat ---
+    if (!enemy.boss && enemy.bounce && enemy.hopVY === 0 && enemy.y === enemy.baseY) {
+      if (--enemy.bounceTimer <= 0) {
+        enemy.hopVY = BOUNCE_VY;
+        enemy.bounceTimer = BOUNCE_REST;
+      }
+    }
+
     // --- surprise! every so often a sphere randomly hops instead of just
     // rolling — parked behind `canHop` (2026-09-19): enemies shouldn't
     // jump yet, that's saved for a later level. Off by default; a level's
     // enemy spawn data opts in with `canHop: true` per enemy. ---
-    if (!enemy.boss && enemy.canHop && enemy.hopVY === 0 && enemy.y === enemy.baseY) {
+    if (!enemy.boss && enemy.canHop && !enemy.bounce && enemy.hopVY === 0 && enemy.y === enemy.baseY) {
       enemy.hopTimer--;
       if (enemy.hopTimer <= 0) {
         enemy.hopVY = -7.5;
@@ -446,15 +477,35 @@ export function drawEnemies(frameCount, cutsceneDone) {
     const cx = enemy.x + enemy.w / 2;
     const cy = enemy.y + enemy.w / 2;
     const squashed = !enemy.alive;
-    const scaleY = squashed ? Math.max(0.1, enemy.squish / 14) * 0.4 : 1;
     const isHopping = enemy.hopVY !== 0 || enemy.y !== enemy.baseY;
+    // Squash and stretch, but only on the tier that bounces. It's the
+    // cheapest way to say "this one is springy" and it doubles as the
+    // timing cue: flattest on the floor is the frame a stomp lands, longest
+    // at speed is the frame it doesn't.
+    let spring = 1;
+    if (enemy.bounce && !squashed) {
+      spring = isHopping
+        ? 1 + Math.min(0.16, Math.abs(enemy.hopVY) * 0.026)
+        : 0.84;
+    }
+    const scaleY = squashed ? Math.max(0.1, enemy.squish / 14) * 0.4 : spring;
+    const scaleX = squashed ? 1 : 2 - spring;
     const legLength = 8;
     const groundY = enemy.w / 2;          // bottom of the hitbox — the actual ground line
     const hipY = groundY - legLength;     // bottom of the body, where the legs attach
 
     ctx.save();
-    ctx.translate(cx, cy);
-    ctx.scale(1, scaleY);
+    // Scaled about the feet, not the middle, or a squashing enemy sinks
+    // into the floor and a stretching one lifts off it.
+    ctx.translate(cx, cy + (enemy.w / 2) * (1 - scaleY));
+    ctx.scale(scaleX, scaleY);
+    // Hauling backwards on something that won't come out. The only place in
+    // the game a sphere's BODY tilts — which is the point: the Excavator's
+    // open window has to be readable from across the arena, and a two-second
+    // window that looks like the phase before it may as well not exist.
+    if (enemy.strain) {
+      ctx.rotate(-(enemy.facing >= 0 ? 1 : -1) * (0.17 + Math.sin(enemy.swingPhase * 0.25) * 0.04));
+    }
 
     // stick legs, reaching exactly to the ground line — tucked up mid-hop
     // The core has no legs. It has never walked anywhere; it's the thing
@@ -526,6 +577,13 @@ export function drawEnemies(frameCount, cutsceneDone) {
     if (enemy.hitFlash > 0) {
       grad.addColorStop(0, '#ffffff');
       grad.addColorStop(1, '#ff8fb5');
+    } else if (enemy.bounce) {
+      // Hotter and more violet than a plain sphere, and unlike the shooter's
+      // orange it's a COLD shift, so the two new tiers can't be confused at
+      // a glance. The player has to be able to tell "this one bounces" from
+      // "this one shoots" before either does it.
+      grad.addColorStop(0, '#ffc2f4');
+      grad.addColorStop(1, '#7b2a86');
     } else if (enemy.shoots) {
       // hotter and more orange than a plain sphere, at every moment
       grad.addColorStop(0, '#ffe9a8');
@@ -577,13 +635,46 @@ export function drawEnemies(frameCount, cutsceneDone) {
         ctx.restore();
       } else if (carried) {
         const facing = enemy.facing >= 0 ? 1 : -1;
-        const progress = enemy.weaponTimer > 0 ? 1 - enemy.weaponTimer / carried.duration : 0;
+        // Mid-swing, the swing decides the pose. Otherwise a boss's phase
+        // machine does, through `posePhase` (entities/bosses.js) — the same
+        // 0..1 point in the same animation, held rather than played. An
+        // ordinary sphere sets neither and rests at 0, which is where it
+        // always was.
+        const progress = enemy.weaponTimer > 0
+          ? 1 - enemy.weaponTimer / carried.duration
+          : (enemy.posePhase || 0);
         const fist = carried.fistAt(r, r, facing, progress);
         const hand = drawMuscleArm(0, -r * 0.1, fist.x, fist.y);
         carried.drawHeld(hand, facing, progress);
       } else if (tool) {
         const facing = enemy.facing >= 0 ? 1 : -1;
-        if (enemy.mining && tool.bracedMining) {
+        if (enemy.strain && tool.bracedMining) {
+          // The drill BOUND in the floor, and the Excavator hauling on it.
+          // This is the two-second window the whole level 2 fight happens
+          // in, and before this it looked identical to the phase before it:
+          // same rig, same pose, nothing to say "now".
+          //
+          // So it leans away from the work instead of into it — arm
+          // stretched out and down, body pulled back — and the bit judders
+          // rather than turning. A player who has seen it once knows the
+          // difference from across the arena.
+          const haul = Math.sin(enemy.swingPhase * 0.25);
+          const judder = Math.sin(enemy.swingPhase * 2.9) * 1.8;
+          // Arm at full stretch, down and forward: it is holding on to the
+          // rig, not driving it. The drill phase has the opposite geometry —
+          // arm tucked, body over the work — and the two poses are meant to
+          // be told apart at a glance, not compared.
+          const fist = { x: facing * (r + 20 + haul * 3), y: r * 0.8 + judder * 0.4 };
+          const hand = drawMuscleArm(0, -r * 0.3, fist.x, fist.y);
+          ctx.save();
+          ctx.translate(hand.x + judder * 0.7, hand.y);
+          ctx.scale(facing, 1);
+          // Buried nose-down in the floor ahead, and juddering instead of
+          // turning, because it isn't turning.
+          ctx.rotate(1.5 + haul * 0.05);
+          tool.drawIcon();
+          ctx.restore();
+        } else if (enemy.mining && tool.bracedMining) {
           // A drill is HELD against the work. It doesn't wind up and it
           // doesn't arc — it points down into the floor, leans in, and
           // shakes. Two different machines were sharing one animation
@@ -613,9 +704,60 @@ export function drawEnemies(frameCount, cutsceneDone) {
           tool.drawIcon();
           ctx.restore();
         } else {
-          const fist = tool.fistAt(r, r, facing, 0);
+          const held = enemy.posePhase || 0;
+          const fist = tool.fistAt(r, r, facing, held);
           const hand = drawMuscleArm(0, -r * 0.1, fist.x, fist.y);
-          tool.drawHeld(hand, facing, 0);
+          tool.drawHeld(hand, facing, held);
+        }
+      } else if (enemy.conducting != null && enemy.bossKind === 'terraformer') {
+        // The Terraformer holds nothing, and for its whole fight that read
+        // as "unfinished" rather than as "this one doesn't fight you". It
+        // conducts: both arms up, rising and falling with the same breath
+        // that lifts the platforms, and dropping flat the moment it opens.
+        //
+        // Two arms, which nothing else in the game has. That's deliberate —
+        // it's the one enemy the player never trades blows with, and the
+        // silhouette should say so before the first platform moves.
+        const lift = enemy.conducting;
+        const sway = Math.sin(enemy.swingPhase * 0.05) * 6;
+        // In absolute pixels, and doubled, because drawMuscleArm only
+        // extends HALF way to the target it's given (ARM_LENGTH in
+        // renderer.js). The first version scaled by the sphere's radius and
+        // forgot the halving, which drew two 9px stubs on a 33px body —
+        // they read as ears.
+        //
+        // reachY crosses zero with the breath, so the arms hang at rest and
+        // go overhead at full lift. That's the tell: when the room is open
+        // the boss has visibly stopped holding it up.
+        const reachX = (r + 12 + lift * 7) * 2;
+        const reachY = (15 - lift * 48) * 2;
+        const hands = [-1, 1].map(side =>
+          drawMuscleArm(0, -r * 0.15, side * reachX + sway * side, reachY));
+        // The field it's holding the room up with, centred between the
+        // hands. Swells with the breath, gone entirely when it opens — so
+        // "the room is open" and "it has stopped pushing" are the same
+        // picture, and the player never has to read the health bar to know.
+        if (lift > 0.03) {
+          // Centred between the hands the arms actually reached, not on the
+          // targets they were aiming at.
+          const top = (hands[0].y + hands[1].y) / 2 - 3;
+          const span = Math.abs(hands[1].x - hands[0].x) / 2;
+          const rad = 14 + lift * 34;
+          const ring = ctx.createRadialGradient(0, top, 2, 0, top, rad);
+          ring.addColorStop(0, `rgba(226, 212, 255, ${0.34 + lift * 0.5})`);
+          ring.addColorStop(0.5, `rgba(168, 128, 255, ${0.2 + lift * 0.34})`);
+          ring.addColorStop(1, 'rgba(120, 80, 255, 0)');
+          ctx.fillStyle = ring;
+          ctx.beginPath();
+          ctx.arc(0, top, rad, 0, Math.PI * 2);
+          ctx.fill();
+          // and an arc strung between the hands, so the two arms read as ONE
+          // gesture rather than as a shrug
+          ctx.strokeStyle = `rgba(226, 212, 255, ${0.3 + lift * 0.6})`;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(0, top + span * 0.55, span * 1.25, Math.PI * 1.15, Math.PI * 1.85);
+          ctx.stroke();
         }
       } else {
         const fist = { x: side * (r + 17), y: -r * 0.35 };

@@ -36,7 +36,7 @@ export default {
   // Twelve faces to put back and a room actively trying to stop you. More
   // triangles than any other level carries, and it still isn't generous.
   startsWithAmmo: 14,
-  quarrickDamage: 1,   // restored in level 3: chipped, but square
+  quarrickDamage: 1,   // put back on the fifth face: chipped, but square
 
   // Four ledges down through the crust, then the cavity floor.
   ground: [
@@ -102,26 +102,86 @@ export default {
     // No edge transition. There is nowhere left to go.
   ],
 
+  // The descent is the last thing the game asks before the core, and it is
+  // the one stretch that should have everything in it. It didn't: measured
+  // by tools/enemy-ladder-probe.html the finale was carrying nine advanced
+  // enemies against the sixth face's seventeen, so the level immediately
+  // before the ending was the emptiest since level 3 — the game got easier
+  // exactly where it should have peaked.
+  //
+  // Every rung of the ladder is on this face now: pursuers with both
+  // weapons, shooters, bouncers, corrupted squares. Nothing new is
+  // introduced, which is deliberate — the last level is an exam, not a
+  // lesson.
+  //
+  // AUTHORING RULE, and the thing that took two passes to get right: the
+  // first ~190px of every ground segment is left empty. That is where the
+  // checkpoints go. Filling the level end to end put seventeen enemies in
+  // it and left nowhere at all to respawn — tools/checkpoint-siting-probe
+  // reported two legal spots in seven thousand pixels, and two of the
+  // level's three checkpoints were standing inside a shooter's range.
+  // A segment start is the right home for a flag anyway: you come back to
+  // the beginning of the stretch you died in, not the middle of it.
+  //
+  // The FLOATING platforms are exempt from that rule and carry a lot of the
+  // load here, because an enemy 70px above the floor can't reach it
+  // (AGGRO_HEIGHT in entities/enemy.js) and so doesn't cost a checkpoint
+  // site. On the last face, a ledge you have to land on has something on it
+  // that objects.
   enemies: [
+    // --- the first ledge (no checkpoint: the level starts here) ---
     { x: 340,  y: 250 - 22, w: 22, minX: 280,  maxX: 410,  speed: 1.7,
       tier: 'pursuer', weapon: 'pickaxe' },
+    { x: 560,  y: 250 - 22, w: 22, minX: 500,  maxX: 780,  speed: 1.6, bounce: true },
     { x: 700,  y: 110,      w: 20, minX: 620,  maxX: 730,  speed: 1.3 },
     { x: 980,  y: 250 - 22, w: 22, minX: 900,  maxX: 1080, speed: 1.6,
       tier: 'aggressor', shoots: true },
-    { x: 1600, y: 300 - 22, w: 22, minX: 1520, maxX: 1860, speed: 1.6,
+
+    // --- the second: checkpoint at 1230, so nothing on the floor before 1410
+    { x: 1620, y: 300 - 22, w: 22, minX: 1560, maxX: 1760, speed: 1.7,
+      tier: 'pursuer', weapon: 'chainsaw' },
+    // Was a plain patroller on a ledge.
+    { x: 1760, y: 160,      w: 20, minX: 1700, maxX: 1810, speed: 1.4,
+      tier: 'pursuer', weapon: 'pickaxe' },
+    { x: 2060, y: 208,      w: 22, minX: 2020, maxX: 2120, speed: 1.4,
       tier: 'aggressor', shoots: true },
-    { x: 1760, y: 160,      w: 20, minX: 1700, maxX: 1810, speed: 1.3 },
     { x: 2100, y: 300 - 26, w: 26, minX: 2040, maxX: 2190, speed: 0.85,
       kind: 'octagon', restoreHits: 2 },
-    { x: 2750, y: 350 - 22, w: 22, minX: 2680, maxX: 2830, speed: 1.8,
+
+    // --- the third: checkpoint at 2390 ---
+    // On the ledge at 2850, not the one at 2410. A respawn arrives 90px
+    // above the flag and FALLS, so it passes through the altitude of any
+    // platform beside it on the way down — and the checkpoint at 2390 sits
+    // right next to 2410. tools/respawn-state-probe.html caught it by
+    // standing still there and dying; the siting tool couldn't, because it
+    // was comparing enemy heights against the floor rather than against the
+    // column the player drops through.
+    { x: 2890, y: 210,      w: 20, minX: 2850, maxX: 2960, speed: 1.5, bounce: true },
+    { x: 2700, y: 350 - 22, w: 22, minX: 2680, maxX: 2830, speed: 1.6, bounce: true },
+    { x: 2900, y: 350 - 26, w: 26, minX: 2870, maxX: 2985, speed: 0.85,
+      kind: 'octagon', restoreHits: 2 },
+    { x: 3220, y: 260,      w: 20, minX: 3180, maxX: 3280, speed: 1.4,
       tier: 'pursuer', weapon: 'pickaxe' },
     { x: 3250, y: 350 - 22, w: 22, minX: 3120, maxX: 3380, speed: 1.7,
       tier: 'aggressor', shoots: true },
-    { x: 3900, y: GROUND_Y - 22, w: 22, minX: 3850, maxX: 3960, speed: 1.7, canHop: true },
+
+    // --- the floor of the crust: checkpoint at 3530 ---
+    { x: 3880, y: GROUND_Y - 22, w: 22, minX: 3840, maxX: 4000, speed: 1.7,
+      tier: 'pursuer', weapon: 'chainsaw' },
+    { x: 4100, y: GROUND_Y - 22, w: 22, minX: 4030, maxX: 4170, speed: 1.6, bounce: true },
+    { x: 4380, y: 280,      w: 20, minX: 4340, maxX: 4440, speed: 1.4,
+      tier: 'aggressor', shoots: true },
     { x: 4400, y: GROUND_Y - 26, w: 26, minX: 4340, maxX: 4520, speed: 0.85,
       kind: 'octagon', restoreHits: 2 },
-    { x: 4920, y: GROUND_Y - 22, w: 22, minX: 4870, maxX: 5020, speed: 1.8,
+
+    // --- the mouth of the cavity: checkpoint at 4800 ---
+    // The last two before the core. Past 5400 the arena is the core's, and
+    // nothing else is put in it: its three phases are already attacking the
+    // room the player is standing on.
+    { x: 5050, y: GROUND_Y - 22, w: 22, minX: 4990, maxX: 5140, speed: 1.8,
       tier: 'pursuer', weapon: 'pickaxe' },
+    { x: 5300, y: GROUND_Y - 22, w: 22, minX: 5240, maxX: 5400, speed: 1.6,
+      tier: 'aggressor', shoots: true },
 
     // --- The Core ---
     // Twelve faces, twelve triangles, and no way to hurt it in between. No
@@ -158,10 +218,17 @@ export default {
     [7130, 286]
   ],
 
+  // One per stretch, each just inside the start of it — see the authoring
+  // rule on the enemy list above for why they can only be there.
   checkpoints: [
-    { x: 1210, y: 300 - 70, width: 8, height: 70 },
-    { x: 3510, y: GROUND_Y - 70, width: 8, height: 70 },
+    // Each ledge down is only 50px below the one before it, which is
+    // inside the 70px an enemy will engage across — so the shooters on
+    // the ledge ABOVE reach the first stretch of the one below, and
+    // these sit past that rather than at the very start.
+    { x: 1340, y: 300 - 70, width: 8, height: 70 },
+    { x: 2390, y: 350 - 70, width: 8, height: 70 },
+    { x: 3630, y: GROUND_Y - 70, width: 8, height: 70 },
     // The last checkpoint in the game, right where the cavity opens out.
-    { x: 4790, y: GROUND_Y - 70, width: 8, height: 70 }
+    { x: 4800, y: GROUND_Y - 70, width: 8, height: 70 }
   ]
 };

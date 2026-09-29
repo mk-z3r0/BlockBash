@@ -35,7 +35,7 @@ export default {
 
   startsWith: 'cornerstone',
   startsWithAmmo: 12,
-  quarrickDamage: 1,   // restored in level 3: chipped, but square
+  quarrickDamage: 1,   // put back on the fifth face: chipped, but square
 
   ground: [
     { x: 0,    width: 1800 },   // arena 1
@@ -120,7 +120,7 @@ export default {
     // --- arena 1 ---
     { x: 300,  y: GROUND_Y - 22, w: 22, minX: 200,  maxX: 360,  speed: 1.8,
       tier: 'pursuer', weapon: 'chainsaw' },
-    { x: 620,  y: GROUND_Y - 22, w: 22, minX: 560,  maxX: 690,  speed: 1.7, canHop: true },
+    { x: 620,  y: GROUND_Y - 22, w: 22, minX: 560,  maxX: 690,  speed: 1.7, bounce: true },
     { x: 750,  y: 250,           w: 20, minX: 700,  maxX: 790,  speed: 1.3 },
     { x: 1150, y: GROUND_Y - 22, w: 22, minX: 1000, maxX: 1300, speed: 1.6,
       tier: 'aggressor', shoots: true },
@@ -135,7 +135,7 @@ export default {
     { x: 2650, y: GROUND_Y - 22, w: 22, minX: 2600, maxX: 2780, speed: 1.7,
       tier: 'aggressor', shoots: true },
     { x: 2350, y: 230,           w: 20, minX: 2300, maxX: 2410, speed: 1.4 },
-    { x: 2850, y: GROUND_Y - 22, w: 22, minX: 2790, maxX: 2980, speed: 1.7, canHop: true },
+    { x: 2850, y: GROUND_Y - 22, w: 22, minX: 2830, maxX: 2980, speed: 1.7, bounce: true },
     { x: 3150, y: GROUND_Y - 26, w: 26, minX: 3080, maxX: 3260, speed: 0.85,
       kind: 'octagon', restoreHits: 2 },
 
@@ -144,7 +144,7 @@ export default {
       tier: 'pursuer', weapon: 'chainsaw' },
     { x: 4240, y: GROUND_Y - 22, w: 22, minX: 4230, maxX: 4340, speed: 1.7,
       tier: 'aggressor', shoots: true },
-    { x: 4650, y: GROUND_Y - 22, w: 22, minX: 4600, maxX: 4730, speed: 1.7, canHop: true },
+    { x: 4650, y: GROUND_Y - 22, w: 22, minX: 4620, maxX: 4730, speed: 1.7, bounce: true },
     { x: 4880, y: GROUND_Y - 22, w: 22, minX: 4820, maxX: 4990, speed: 1.8,
       tier: 'pursuer', weapon: 'chainsaw' },
     { x: 5080, y: GROUND_Y - 22, w: 22, minX: 5030, maxX: 5150, speed: 1.7,
@@ -157,14 +157,14 @@ export default {
       tier: 'pursuer', weapon: 'chainsaw' },
     { x: 5840, y: GROUND_Y - 22, w: 22, minX: 5830, maxX: 5940, speed: 1.7,
       tier: 'aggressor', shoots: true },
-    { x: 6250, y: GROUND_Y - 22, w: 22, minX: 6240, maxX: 6350, speed: 1.7, canHop: true },
+    { x: 6250, y: GROUND_Y - 22, w: 22, minX: 6240, maxX: 6350, speed: 1.7, bounce: true },
 
     // --- The General ---
     // Bigger than the Foreman and faster than anything else in the game.
     // Open the whole time, and it tells you before every charge.
     { x: 6850, y: GROUND_Y - 36, w: 36, minX: 6400, maxX: 7220, speed: 1.9,
       boss: true, mode: 'fight', bossKind: 'general', bossName: 'THE GENERAL',
-      tool: 'sledgehammer',
+      weapon: 'sledgehammer',
       hp: 6, stompProof: true, dropsAmmo: 8 }
   ],
 

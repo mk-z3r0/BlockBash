@@ -33,7 +33,10 @@ export default {
 
   startsWith: 'cornerstone',
   startsWithAmmo: 10,
-  quarrickDamage: 1,   // restored in level 3: chipped, but square
+  // He is not on this face as himself. The glimpse scene draws him at 4
+  // corners gone, hardcoded, because that is not a number the level gets a
+  // say in — it's the worst the shape goes.
+  quarrickDamage: 4,
 
   ground: [
     { x: 0,    width: 1200 },
@@ -98,6 +101,9 @@ export default {
 
   cutscenes: [
     { id: 'l4-arrival', when: { levelStart: true }, once: true },
+    // Halfway. Far enough in that the player has stopped expecting him at
+    // the corner and started expecting him nowhere.
+    { id: 'l4-glimpse', when: { reachX: 3400 }, once: true },
     { id: 'edge-transition', when: { nearWorldEdge: 100 } }
   ],
 
@@ -118,7 +124,12 @@ export default {
     { x: 3050, y: SHELF - 22,    w: 22, minX: 3000, maxX: 3140, speed: 1.5,
       tier: 'aggressor', shoots: true },
     { x: 3250, y: SHELF - 22,    w: 22, minX: 3150, maxX: 3370, speed: 1.6, canHop: true },
-    { x: 3700, y: SHELF - 22,    w: 22, minX: 3620, maxX: 3880, speed: 1.6,
+    // Stops 80px short of the end of the shelf. The floor below is only
+    // 40px down — well inside the height an enemy engages across — so a
+    // shooter patrolling to the shelf's edge covers the whole first stretch
+    // of the ground after it, and there was nowhere in that 1100px to put a
+    // checkpoint.
+    { x: 3700, y: SHELF - 22,    w: 22, minX: 3620, maxX: 3800, speed: 1.6,
       tier: 'aggressor', shoots: true },
     { x: 4360, y: GROUND_Y - 22, w: 22, minX: 4350, maxX: 4470, speed: 1.7,
       tier: 'pursuer', weapon: 'pickaxe' },
@@ -139,10 +150,10 @@ export default {
     // back, which is exactly what instinct says to ignore.
     { x: 6800, y: GROUND_Y - 26, w: 26, minX: 6660, maxX: 7200, speed: 1.5,
       boss: true, mode: 'fight', bossKind: 'crew', bossName: 'THE DEMOLITION CREW',
-      crew: 'demo', role: 'bruiser', tool: 'pickaxe', hp: 2, stompProof: true },
+      crew: 'demo', role: 'bruiser', weapon: 'pickaxe', hp: 2, stompProof: true },
     { x: 6950, y: GROUND_Y - 26, w: 26, minX: 6660, maxX: 7200, speed: 1.6,
       boss: true, mode: 'fight', bossKind: 'crew', crew: 'demo', role: 'bruiser',
-      tool: 'pickaxe', hp: 2, stompProof: true },
+      weapon: 'pickaxe', hp: 2, stompProof: true },
     { x: 7120, y: GROUND_Y - 26, w: 26, minX: 6700, maxX: 7250, speed: 1.2,
       boss: true, mode: 'fight', bossKind: 'crew', crew: 'demo', role: 'shooter',
       hp: 2, stompProof: true, dropsAmmo: 6 }
@@ -176,9 +187,16 @@ export default {
     [6620, 396]
   ],
 
+  // Just inside the start of each stretch, and far enough inside that a
+  // respawn isn't standing on the lip of the pit behind it — 15px was, and
+  // tools/checkpoint-siting-probe.html counts that as no landing room.
   checkpoints: [
-    { x: 1285, y: SHELF - 70,    width: 8, height: 70 },
-    { x: 2665, y: SHELF - 70,    width: 8, height: 70 },
+    { x: 1305, y: SHELF - 70,    width: 8, height: 70 },
+    { x: 2685, y: SHELF - 70,    width: 8, height: 70 },
+    // In the one gap this stretch has: past the shelf shooter's range and
+    // before the cover block at 4120. The 2600px between the second
+    // checkpoint and the fourth was the longest unbroken run in the game.
+    { x: 4040, y: GROUND_Y - 70, width: 8, height: 70 },
     { x: 5290, y: GROUND_Y - 70, width: 8, height: 70 }
   ]
 };

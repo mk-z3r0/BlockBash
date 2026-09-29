@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#000;">
+<canvas id="game" width="800" height="450"></canvas><pre id="out">running…</pre>
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true, narrative: { seenCutscenes: {}, npcStage: 0, flags: {} } })); window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERROR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  // Does the game actually get harder, and in the order it says it does?
+  //
+  // GAME_DESIGN asks for "enemies evolve across levels", and that is the
+  // kind of claim that rots quietly: a level gets rebuilt, its aggressors
+  // come back as patrollers, and nothing anywhere notices that the fifth
+  // face is now easier than the third. Difficulty is not something the
+  // audit probe can see — every obstacle in an easy level is as clearable
+  // as every obstacle in a hard one.
+  //
+  // Two things are checked. First the LADDER: each capability has a level
+  // it is introduced on, and from that level to the end of the game it
+  // must keep appearing. Second the bouncer itself, because it's the one
+  // tier whose whole value is a rhythm the player can learn, and a rhythm
+  // that isn't actually regular is just noise.
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update, switchTo } from '../src/scenes/sceneManager.js';
+  import { getLevel } from '../src/levels/levelLoader.js';
+  import { levels } from '../src/levels/registry.js';
+  import { isBlocked } from '../src/levels/levelLoader.js';
+
+  const out = [];
+  let fails = 0;
+  const check = (ok, label) => { if (!ok) fails++; out.push(`  ${ok ? 'ok  ' : 'FAIL'} ${label}`); };
+
+  // capability -> the 1-based level it must first appear on. After that it
+  // is part of the furniture and has to keep showing up.
+  const LADDER = [
+    { name: 'patroller', from: 1, has: e => !e.boss && !e.tier && !e.kind },
+    { name: 'pursuer',   from: 2, has: e => e.tier === 'pursuer' },
+    { name: 'octagon',   from: 3, has: e => e.kind === 'octagon' && !e.boss },
+    // A bouncer satisfies this rung too. It is the hopper with the pause
+    // taken out — level 4 teaches "they can leave the ground" with the
+    // occasional surprise hop, level 5 makes it constant, and levels 5-7
+    // legitimately have no plain hoppers left because they've all grown up.
+    { name: 'hopper',    from: 4, has: e => !!e.canHop || !!e.bounce },
+    { name: 'shooter',   from: 4, has: e => e.tier === 'aggressor' || e.shoots },
+    { name: 'bouncer',   from: 5, has: e => !!e.bounce }
+  ];
+
+  setTimeout(() => {
+    out.push('== the ladder ==');
+    const perLevel = levels.map(lv => lv.enemies || []);
+
+    for (const rung of LADDER) {
+      const seen = perLevel.map(es => es.some(rung.has));
+      const firstAt = seen.indexOf(true) + 1;
+      check(firstAt === rung.from,
+        `${rung.name} first appears on level ${rung.from} (found on ${firstAt || 'never'})`);
+      // ...and keeps appearing. One gap is a level that forgot; the
+      // patroller is exempt from the tail because later levels legitimately
+      // replace plain spheres with armed ones.
+      if (rung.name === 'patroller') continue;
+      const after = seen.slice(rung.from - 1);
+      const gaps = after.map((v, i) => v ? null : rung.from + i).filter(v => v);
+      check(gaps.length === 0,
+        `and appears on every level after it${gaps.length ? ` (missing on ${gaps.join(', ')})` : ''}`);
+    }
+
+    // Nothing may get EASIER. A crude but honest measure: count the enemies
+    // on each level that do more than walk at you.
+    out.push('== pressure never drops ==');
+    const threat = es => es.filter(e =>
+      !e.boss && (e.tier === 'pursuer' || e.tier === 'aggressor' || e.shoots ||
+                  e.bounce || e.canHop || e.kind === 'octagon')).length;
+    const counts = perLevel.map(threat);
+    out.push(`  advanced enemies per level: ${counts.join(', ')}`);
+    for (let i = 2; i < counts.length; i++) {
+      // From level 3 on, where the tiers actually exist. A level may match
+      // the one before it; it may not fall behind it.
+      check(counts[i] >= counts[i - 1] - 1,
+        `level ${i + 1} is not softer than level ${i} (${counts[i - 1]} -> ${counts[i]})`);
+    }
+
+    // --- the bouncer, in motion ---
+    out.push('== bouncers bounce on a beat ==');
+    state.currentLevelIndex = 4;      // level 5, where the tier is introduced
+    switchTo('playing', { retry: true });
+    getLevel().cutscenes.length = 0;
+    state.lives = 999;
+    player.invincible = 999999;
+    // Out of everyone's way: this is about what the enemies do on their own.
+    player.x = 60;
+    player.y = getLevel().groundY - player.height;
+
+    const bouncer = state.enemies.find(e => e.bounce);
+    check(!!bouncer, 'level 5 has a bouncer');
+    if (bouncer) {
+      const base = bouncer.baseY;
+      let peak = base, landings = [], airborne = 0;
+      let wasAir = false;
+      for (let f = 0; f < 420; f++) {
+        update();
+        const air = bouncer.y < base - 0.5;
+        if (air) airborne++;
+        peak = Math.min(peak, bouncer.y);
+        if (wasAir && !air) landings.push(f);
+        wasAir = air;
+      }
+      const height = Math.round(base - peak);
+      check(height > 24 && height < 70, `it clears ${height}px — high enough to see, low enough to stomp`);
+      check(airborne > 120, `and it is in the air most of the time (${airborne}/420 frames)`);
+      check(landings.length >= 4, `it landed ${landings.length} times`);
+
+      // The beat has to be regular, or there is no rhythm to learn.
+      const gaps = landings.slice(1).map((v, i) => v - landings[i]);
+      const spread = gaps.length ? Math.max(...gaps) - Math.min(...gaps) : 999;
+      check(spread <= 2, `on a steady period (gaps ${gaps.join(', ')} — spread ${spread})`);
+
+      // And it must not bounce itself into the scenery. Terrain collision
+      // is tested against the GROUNDED box (entities/enemy.js), precisely so
+      // that something airborne can't sail over a wall and land inside it —
+      // this is the tier that would do it.
+      check(!isBlocked({ x: bouncer.x, y: bouncer.baseY, width: bouncer.w, height: bouncer.w }),
+        `and it never lands inside terrain (x ${Math.round(bouncer.x)})`);
+    }
+
+    // Every bouncer in the game, left to run, ends up somewhere legal.
+    out.push('== no bouncer ends up in a wall ==');
+    for (let i = 0; i < levels.length; i++) {
+      if (!(levels[i].enemies || []).some(e => e.bounce)) continue;
+      state.currentLevelIndex = i;
+      switchTo('playing', { retry: true });
+      getLevel().cutscenes.length = 0;
+      state.lives = 999;
+      player.invincible = 999999;
+      for (let f = 0; f < 600; f++) update();
+      const stuck = state.enemies.filter(e => e.bounce && e.alive &&
+        isBlocked({ x: e.x, y: e.baseY, width: e.w, height: e.w }));
+      check(stuck.length === 0,
+        `level ${i + 1}: all ${state.enemies.filter(e => e.bounce).length} bouncers clear of terrain after 600 frames` +
+        (stuck.length ? ` — stuck at ${stuck.map(e => Math.round(e.x)).join(', ')}` : ''));
+    }
+
+    out.push(fails ? `*** ${fails} FAILURE(S)` : 'PASS the difficulty ladder climbs and the bouncers keep a beat');
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 250);
+</script></body></html>

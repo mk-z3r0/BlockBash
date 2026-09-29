@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#000;">
+<canvas id="game" width="800" height="450"></canvas>
+<pre id="out">running…</pre>
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true, narrative: { seenCutscenes: {}, npcStage: 0, flags: {} } })); window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERROR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  // Where a checkpoint is ALLOWED to be, per level — and whether the ones
+  // in the game are there.
+  //
+  // Both a gate and a tool. It fails on a badly sited flag, and it also
+  // prints where the legal ground IS, because
+  // "checkpoint at 5390 is inside the reach of the aggressor at 5080" leaves
+  // you hunting for somewhere better by hand, across seven levels, with
+  // three different reach numbers to keep straight.
+  //
+  // A site is legal when it has flat ground under it, is not inside a block
+  // or a spike bed, is not within any enemy's reach, and has room on both
+  // sides to land after a respawn. Respawning grants invincibility frames,
+  // which is why the game can ship a couple of near misses — but "near an
+  // enemy" and "inside its reach" are different things, and only one of them
+  // is a cheap death.
+  import { levels } from '../src/levels/registry.js';
+
+  // NOT the enemy's full aggro range. The first version of this used it —
+  // 240 for a pursuer, 340 for an aggressor — and reported that level 6 had
+  // one legal spot in six thousand pixels, which is a rule that has stopped
+  // describing the game.
+  //
+  // A respawn grants 60 invincible frames (physics.js), which is a full
+  // second to see what is coming and move. So being seen is survivable;
+  // what is not is arriving already touching something, or with no time to
+  // react before it reaches you. These are the distances an enemy of each
+  // tier covers in about a second at its chase speed, plus its body.
+  const KEEP_OFF = { passive: 60, pursuer: 150, aggressor: 190, octagon: 120 };
+  const reachOf = s => KEEP_OFF[s.kind === 'octagon' ? 'octagon' : (s.tier || 'passive')] || 60;
+  const CLEAR = 30;            // room either side of the flag to stand up in
+
+  const out = [];
+  let fails = 0;
+  setTimeout(() => {
+    levels.forEach((lv, idx) => {
+      const ground = (lv.ground || []).map(g => ({ x: g.x, width: g.width, y: g.y == null ? lv.groundY : g.y }));
+      const blocks = (lv.platforms || []).filter(p => p.width > 1);
+      const hazards = lv.hazards || [];
+      const foes = (lv.enemies || []).filter(e => !e.boss);
+      const bosses = (lv.enemies || []).filter(e => e.boss);
+
+      const legal = x => {
+        const seg = ground.find(g => x - CLEAR >= g.x && x + CLEAR <= g.x + g.width);
+        if (!seg) return false;
+        for (const p of blocks) {
+          if (p.y + p.height < seg.y - 2) continue;       // floats overhead are fine
+          if (x > p.x - CLEAR && x < p.x + p.width + CLEAR) return false;
+        }
+        for (const h of hazards) if (x > h.x - 35 && x < h.x + h.width + 35) return false;
+        for (const e of foes) {
+          // Beside the flag and in the column the player FALLS through.
+          //
+          // A respawn puts the player about 90px above the floor and drops
+          // them (the flag is 70 tall and setRespawnPoint adds 20), so on
+          // the way down they pass through every altitude between there and
+          // the ground. An enemy on a ledge 230px up is no threat to that —
+          // the height test below is right about it — but one on a ledge
+          // 100px up is directly in the way, and the ONLY thing that
+          // distinguishes the two is whether its body overlaps the fall.
+          //
+          // Level 7's checkpoint at 2390 was exactly this: clean by every
+          // other measure, and fatal, because a bouncer was parked on the
+          // ledge it drops past. Found by standing still there
+          // (tools/respawn-state-probe.html), not by this file, which is
+          // why this file now knows about it.
+          const fallTop = seg.y - 90;
+          const inFall = e.y < seg.y && e.y + e.w > fallTop;
+          if (inFall && x > e.minX - 60 && x < e.maxX + 60) return false;
+          // Only things that can actually GET to the flag. An enemy patrols
+          // in x, but it also has to be at roughly the checkpoint's height
+          // to be a threat to it — entities/enemy.js won't chase across a
+          // 70px height difference, because a sphere on a ledge jittering at
+          // someone two jumps below reads as broken rather than menacing.
+          // Without this, every sphere parked on a floating platform vetoed
+          // the ground underneath it.
+          if (Math.abs((e.y + e.w) - seg.y) > 70) continue;
+          const r = reachOf(e);
+          if (x > e.minX - r && x < e.maxX + r) return false;
+        }
+        // A fightable boss gets most of a screen of clearance: respawning
+        // inside its arena means arriving mid-fight with no run-up. An
+        // octagon boss is not a fight — it's a thing to walk up to and
+        // restore — so it only needs the same room any corrupted square
+        // does, and treating it like the General cost level 3 every legal
+        // site in its last 2000px.
+        for (const b of bosses) {
+          const room = b.kind === 'octagon' ? 220 : 500;
+          if (x > b.minX - room && x < b.maxX + room) return false;
+        }
+        return true;
+      };
+
+      // Collapse the legal xs into bands, so the answer is "anywhere in
+      // here" rather than a list of sample points.
+      const bands = [];
+      for (let x = 0; x < lv.worldWidth; x += 10) {
+        if (!legal(x)) continue;
+        const last = bands[bands.length - 1];
+        if (last && x - last.to <= 10) last.to = x; else bands.push({ from: x, to: x });
+      }
+      const wide = bands.filter(b => b.to - b.from >= 60);
+
+      out.push(`== ${idx}: ${lv.name} ==`);
+      (lv.checkpoints || []).forEach(c => {
+        const ok = legal(c.x);
+        const near = wide
+          .map(b => ({ b, d: c.x < b.from ? b.from - c.x : c.x > b.to ? c.x - b.to : 0 }))
+          .sort((a, z) => a.d - z.d)[0];
+        const mid = near ? Math.round((near.b.from + near.b.to) / 2 / 10) * 10 : null;
+        if (!ok) fails++;
+        out.push(`  ${ok ? 'ok  ' : 'FAIL'} ${c.x}${ok ? '' : '  -> nearest legal band ' + (near ? `${near.b.from}-${near.b.to} (mid ${mid})` : 'NONE')}`);
+      });
+      out.push(`  legal bands: ${wide.map(b => `${b.from}-${b.to}`).join('  ') || 'NONE'}`);
+    });
+    out.push(fails ? `*** ${fails} FAILURE(S)` : 'PASS every checkpoint in the game is somewhere fair to come back to');
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 250);
+</script></body></html>

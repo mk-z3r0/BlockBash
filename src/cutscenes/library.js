@@ -13,16 +13,17 @@
 import { bossShowdown } from './level1/bossShowdown.js';
 import { edgeTransition } from './level1/edgeTransition.js';
 import { l2Arrival } from './level2/arrival.js';
-import { l3Handoff, l3Restored } from './level3/handoff.js';
-import { l4Arrival, l5Arrival, l6Arrival } from './faces.js';
+import { l3Handoff } from './level3/handoff.js';
+import { l4Arrival, l4Glimpse, l5Arrival, l6Arrival } from './faces.js';
+import { l5Found, l5Restored } from './level5/reunion.js';
 import { descent } from './level7/descent.js';
 import { l7Arrival, l7Ending } from './level7/core.js';
 import { sandboxChat } from './sandbox/sandboxChat.js';
 
 const all = [
   bossShowdown, edgeTransition,
-  l2Arrival, l3Handoff, l3Restored,
-  l4Arrival, l5Arrival, l6Arrival,
+  l2Arrival, l3Handoff,
+  l4Arrival, l4Glimpse, l5Arrival, l5Found, l5Restored, l6Arrival,
   descent, l7Arrival, l7Ending,
   sandboxChat
 ];

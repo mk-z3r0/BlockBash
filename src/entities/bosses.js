@@ -20,7 +20,7 @@ import { getLevel, surfaceYAt, isBlocked } from '../levels/levelLoader.js';
 import { carveGap } from '../levels/terrain.js';
 import { spawnWeaponPickup, spawnAmmoPickup } from './weaponPickup.js';
 import { spawnExplosion, spawnDust } from './particles.js';
-import { spawnSphereShot } from '../weapons/combat.js';
+import { spawnSphereShot, startAttack } from '../weapons/combat.js';
 import { playExplosion, playRumble, playSphereShot } from '../audio/sfx.js';
 import { showToast } from '../ui/hud.js';
 
@@ -31,6 +31,37 @@ import { showToast } from '../ui/hud.js';
 function setPhase(boss, phase, frames) {
   boss.phase = phase;
   boss.phaseTimer = frames;
+}
+
+// --- what a boss LOOKS like it's doing ---------------------------------
+//
+// Reported from play, twice: "the boss' weapon isn't visible", and then
+// "the level 2 boss is swinging the drill like a pickaxe". The second one
+// was fixed by giving the drill a braced pose, but the shape of the problem
+// was bigger than one animation — every fightable boss in the game stood
+// holding its kit in a single frozen idle pose for its entire fight, because
+// nothing between the phase machine and the draw carried "and right now it
+// is doing THIS".
+//
+// `posePhase` is that channel, and it deliberately reuses the one the player
+// already has: it's a frozen point in the weapon's own swing animation,
+// 0 (carried) to 1 (followed through), read by entities/enemy.js exactly
+// where it reads the player's live swing progress. So a boss holding its
+// hammer up is the same pose the player sees at 0.25 of their own swing, not
+// a second set of numbers that can drift away from it.
+//
+// A boss that carries a real `weapon` (as opposed to a `tool` it only
+// holds) swings it through weapons/combat.js like anything else, and that
+// overrides the held pose while the swing is live.
+function pose(boss, phase) {
+  boss.posePhase = phase;
+}
+
+// Close enough to swing at. Slightly inside the weapon's reach so the hit
+// connects rather than whiffing at full extension — same reasoning as the
+// ordinary pursuer's SWING_RANGE in entities/enemy.js.
+function withinSwing(boss, player, range = 52) {
+  return Math.abs((player.x + player.width / 2) - (boss.x + boss.w / 2)) < range;
 }
 
 // Bosses move by direct assignment rather than through the patrol helpers,
@@ -67,8 +98,16 @@ function updateExcavator(boss, player) {
 
   if (boss.phase === 'advance') {
     boss.invulnerable = true;
+    boss.mining = false;
+    boss.strain = false;
+    // Rig carried level in front, bit spinning, walking it toward you. The
+    // drill's idle pose already points forward — this is the one phase where
+    // the frozen idle was the RIGHT picture, and the only thing it was
+    // missing was that the machine is running.
+    pose(boss, 0);
     const dir = Math.sign((player.x + player.width / 2) - (boss.x + boss.w / 2)) || 1;
     boss.facing = dir;
+    boss.swingPhase += 4;        // the bit, turning
     stepTo(boss, boss.x + dir * Math.abs(boss.speed));
     if (boss.phaseTimer <= 0) setPhase(boss, 'drill', EXCAVATOR.drill);
     return;
@@ -104,7 +143,17 @@ function updateExcavator(boss, player) {
   boss.invulnerable = false;
   boss.mining = false;
   boss.telegraph = 0;
-  if (boss.phaseTimer <= 0) setPhase(boss, 'advance', EXCAVATOR.advance);
+  // Stuck fast, and it has to LOOK stuck — the window is two seconds long
+  // and a player who can't see it is playing a guessing game. It leans back
+  // on the rig hauling at it, the bit judders instead of turning, and it
+  // throws sparks. See the `strain` branch in entities/enemy.js.
+  boss.strain = true;
+  boss.swingPhase += 1.2;
+  if (boss.phaseTimer % 9 === 0) {
+    spawnDust(boss.x + boss.w / 2 + boss.facing * (boss.w * 0.9), boss.y + boss.w * 0.9,
+      3, { spread: 4, size: 4, life: 14, color: '#ffd27a' });
+  }
+  if (boss.phaseTimer <= 0) { boss.strain = false; setPhase(boss, 'advance', EXCAVATOR.advance); }
 }
 
 // --- level 4: The Demolition Crew --------------------------------------
@@ -133,13 +182,25 @@ function updateCrew(boss, player) {
     stepTo(boss, boss.x + Math.sign(wanted - boss.x) * Math.abs(boss.speed) * 0.7);
     if (--boss.shotTimer <= 0) {
       boss.shotTimer = 95;
+      boss.charge = 0;
       spawnSphereShot(boss);
+    } else {
+      // The same wind-up halo every ordinary shooter in the game uses
+      // (entities/enemy.js draws it off `charge`). The one crew member you
+      // are supposed to work out is the target should be the one telegraphing
+      // hardest — it's the visual that says "this one is doing something
+      // different from the other two", which IS the puzzle.
+      boss.charge = Math.max(0, 1 - boss.shotTimer / 34);
     }
     return;
   }
 
-  // the other two crowd the player
+  // The other two crowd the player, and now they swing at them. They were
+  // carrying a pickaxe as decoration — `tool`, drawn and never used — so two
+  // thirds of this fight was three spheres walking into you.
   stepTo(boss, boss.x + dir * Math.abs(boss.speed) * 1.25);
+  pose(boss, 0);
+  if (withinSwing(boss, player, 46)) startAttack(boss);
 }
 
 // --- level 5: The Terraformer ------------------------------------------
@@ -166,6 +227,23 @@ function updateTerraformer(boss) {
   // Open only at the top of the breath, which is also the only moment the
   // raised platforms reach it.
   boss.invulnerable = lift < 0.72;
+
+  // It has no weapon and it never swings at anyone, which left it standing
+  // through its entire fight with one arm held out in the game's default
+  // empty-handed pose — the same pose a dead-eyed patrolling sphere holds.
+  // The one boss whose whole idea is that it is DOING something to the room
+  // was the one boss that looked like it was doing nothing.
+  //
+  // So it conducts. Both arms up, driven by the same `lift` that drives the
+  // platforms, so the room and the thing moving the room are visibly on one
+  // clock — and they drop when it opens, which is the tell.
+  boss.conducting = !boss.invulnerable ? 0 : lift;
+  boss.swingPhase += 2.4;
+  if (boss.invulnerable && boss.cycle % 6 === 0) {
+    spawnDust(boss.x + boss.w / 2, boss.y - 6 - lift * 26, 1,
+      { spread: 2.4, size: 5, life: 26, color: 'rgba(160, 130, 255, 0.55)' });
+  }
+
   if (!boss.invulnerable && boss.phaseTimer <= 0) {
     boss.phaseTimer = 40;
     showToast('THE ROOM IS OPEN — NOW!', 50);
@@ -184,15 +262,22 @@ function updateGeneral(boss, player) {
 
   if (boss.phase === 'charge') {
     boss.telegraph = 0;
+    // Hammer out ahead of it, at the end of its own arc. It does NOT get a
+    // swing hitbox here: the charge is a body-check, and putting a 58px
+    // hammer box on the front of something moving at 2.6x speed is how a
+    // fair fight stops being one. The pose is what sells it.
+    pose(boss, 0.92);
     stepTo(boss, boss.x + boss.chargeDir * Math.abs(boss.speed) * 2.6);
     if (boss.phaseTimer <= 0) setPhase(boss, 'recover', 55);
     return;
   }
   if (boss.phase === 'recover') {
     // Stopped dead. This is the window, and the only thing the whole fight
-    // is asking the player to read.
+    // is asking the player to read. Hammer down, head on the floor, leaning
+    // on it — the picture of something that has just spent everything.
     boss.telegraph = 0;
     boss.facing = dir;
+    pose(boss, 1);
     if (boss.phaseTimer <= 0) setPhase(boss, 'stalk', 90);
     return;
   }
@@ -200,6 +285,11 @@ function updateGeneral(boss, player) {
   // stalk: pressure, then commit
   boss.facing = dir;
   stepTo(boss, boss.x + dir * Math.abs(boss.speed));
+  // It actually swings it now. The General carried a sledgehammer through
+  // its entire fight as scenery — "pure combat, no gimmick" fought by
+  // walking into people. In close it swings, which is both the threat and
+  // the reason to not simply stand next to it and trade hits.
+  if (withinSwing(boss, player, 54)) startAttack(boss);
   if (--boss.shotTimer <= 0) {
     boss.shotTimer = 150;
     spawnSphereShot(boss);
@@ -209,6 +299,11 @@ function updateGeneral(boss, player) {
   // turning to track them and visibly gathers for the last third of the
   // stalk, which is also the moment to stop being in front of it.
   boss.telegraph = Math.max(0, 1 - boss.phaseTimer / 30);
+  // Hauls the hammer up as it gathers. 0.28 is the top of the backswing in
+  // weapons/sledgehammer.js, so the boss visibly winds up through exactly
+  // the frames the telegraph ring is swelling — one gesture, two channels,
+  // which is what makes it readable at a glance.
+  if (boss.weaponTimer <= 0) pose(boss, boss.telegraph * 0.28);
   if (boss.phaseTimer <= 0) {
     boss.chargeDir = dir;
     setPhase(boss, 'charge', 46);
@@ -301,6 +396,10 @@ export function initBoss(boss) {
   boss.telegraph = 0;
   boss.invulnerable = true;
   boss.defeatHandled = false;
+  boss.posePhase = 0;
+  boss.strain = false;
+  boss.conducting = 0;
+  boss.charge = 0;
 }
 
 export function updateBossBehaviour(boss, player) {

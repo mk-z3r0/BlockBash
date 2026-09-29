@@ -36,8 +36,8 @@ export default {
   playerSpawn: { x: 80, y: 300 },
 
   startsWith: 'cornerstone',
-  startsWithAmmo: 10,
-  quarrickDamage: 1,   // restored in level 3: chipped, but square
+  startsWithAmmo: 12,
+  quarrickDamage: 1,   // only used after the reunion below: chipped, but square
 
   ground: [
     { x: 0,    width: 900 },
@@ -113,22 +113,41 @@ export default {
   ],
 
   ammo: [
-    // All of it on the high route — the lifts are where the rewards live.
+    // Mostly on the high route — the lifts are where the rewards live.
     { x: 1075, y: 240, amount: 4 },
     { x: 3245, y: 220, amount: 4 },
     { x: 4895, y: 200, amount: 4 },
-    { x: 6165, y: 240, amount: 5 }
+    { x: 6165, y: 240, amount: 5 },
+    // Two on the FLOOR, which breaks that rule on purpose. This is the only
+    // level where the Cornerstone is the player's whole arsenal, and it is
+    // now also the level that asks four triangles for Quarrick. A player who
+    // doesn't trust the moving platforms — which the level has spent six
+    // screens teaching them not to — would otherwise arrive at the boss with
+    // what they started with minus a rescue, and the rescue is not something
+    // this game should ever price out of reach.
+    { x: 4330, y: GROUND_Y - 34, amount: 4 },
+    { x: 5260, y: GROUND_Y - 34, amount: 4 }
   ],
 
   cutscenes: [
     { id: 'l5-arrival', when: { levelStart: true }, once: true },
+    // The reunion. Fires as the player lands on the sixth stretch, with him
+    // already on screen — see cutscenes/level5/reunion.js for why the arc
+    // waits this long.
+    //
+    // Neither is `once`. `l5-found` has to be able to run again for a
+    // player who died before reaching him, and `l5-restored` is gated on
+    // the restoration itself having happened, which a death undoes along
+    // with everything else in the level.
+    { id: 'l5-found',    when: { reachX: 4300, quarrickLost: true } },
+    { id: 'l5-restored', when: { quarrickRestored: true } },
     { id: 'edge-transition', when: { nearWorldEdge: 100 } }
   ],
 
   enemies: [
     { x: 220,  y: GROUND_Y - 22, w: 22, minX: 170,  maxX: 290,  speed: 1.7 },
     { x: 620,  y: 260,           w: 20, minX: 570,  maxX: 660,  speed: 1.3 },
-    { x: 870,  y: GROUND_Y - 22, w: 22, minX: 820,  maxX: 900,  speed: 1.6, canHop: true },
+    { x: 870,  y: GROUND_Y - 22, w: 22, minX: 820,  maxX: 900,  speed: 1.6, bounce: true },
     // Short span on purpose: an aggressor reaches 330px, and anything
     // wider put the checkpoint at 1770 inside it.
     { x: 1360, y: GROUND_Y - 22, w: 22, minX: 1350, maxX: 1400, speed: 1.6,
@@ -137,16 +156,27 @@ export default {
       tier: 'pursuer', weapon: 'pickaxe' },
     { x: 2160, y: GROUND_Y - 26, w: 26, minX: 2150, maxX: 2270, speed: 0.85,
       kind: 'octagon', restoreHits: 2 },
-    { x: 2560, y: GROUND_Y - 22, w: 22, minX: 2480, maxX: 2620, speed: 1.6, canHop: true },
+    { x: 2560, y: GROUND_Y - 22, w: 22, minX: 2480, maxX: 2620, speed: 1.6, bounce: true },
     { x: 2950, y: GROUND_Y - 22, w: 22, minX: 2900, maxX: 3020, speed: 1.6,
       tier: 'aggressor', shoots: true },
     { x: 3400, y: GROUND_Y - 22, w: 22, minX: 3350, maxX: 3440, speed: 1.7,
       tier: 'pursuer', weapon: 'pickaxe' },
-    { x: 3850, y: 370 - 22,      w: 22, minX: 3790, maxX: 3900, speed: 1.6, canHop: true },
+    { x: 3850, y: 370 - 22,      w: 22, minX: 3790, maxX: 3900, speed: 1.6, bounce: true },
     { x: 4250, y: 370 - 22,      w: 22, minX: 4150, maxX: 4320, speed: 1.6,
       tier: 'aggressor', shoots: true },
-    { x: 4650, y: GROUND_Y - 26, w: 26, minX: 4590, maxX: 4800, speed: 0.85,
-      kind: 'octagon', restoreHits: 2 },
+    // --- Quarrick ---
+    // An ordinary corrupted square in the level data, flagged `quarrick`,
+    // not something a cutscene spawns. That's the whole design of the beat:
+    // he can be walked past, come back to, and run out of triangles in
+    // front of. 44px wide like every other version of him, so he is
+    // visibly bigger than the field octagons before the player is close
+    // enough to see he's gold.
+    //
+    // Four triangles, not the field's two and not the Sculptor's six. Enough
+    // to be a decision with ten in the magazine; not so many that a player
+    // who has been spending freely arrives unable to afford him.
+    { x: 4460, y: GROUND_Y - 44, w: 44, minX: 4400, maxX: 4620, speed: 0.55,
+      kind: 'octagon', quarrick: true, restoreHits: 4 },
     { x: 5150, y: GROUND_Y - 22, w: 22, minX: 5080, maxX: 5190, speed: 1.7,
       tier: 'pursuer', weapon: 'pickaxe' },
     { x: 5700, y: GROUND_Y - 22, w: 22, minX: 5600, maxX: 5800, speed: 1.6,
@@ -189,8 +219,8 @@ export default {
   ],
 
   checkpoints: [
-    { x: 1770, y: GROUND_Y - 70, width: 8, height: 70 },
-    { x: 3570, y: 370 - 70,      width: 8, height: 70 },
-    { x: 5240, y: GROUND_Y - 70, width: 8, height: 70 }
+    { x: 1960, y: GROUND_Y - 70, width: 8, height: 70 },
+    { x: 3660, y: 370 - 70,      width: 8, height: 70 },
+    { x: 5380, y: GROUND_Y - 70, width: 8, height: 70 }
   ]
 };

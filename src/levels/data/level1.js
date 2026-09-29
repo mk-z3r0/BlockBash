@@ -281,8 +281,8 @@ export default {
   ],
 
   checkpoints: [
-    { x: 1600, y: GROUND_Y - 70, width: 8, height: 70 },
-    { x: 3300, y: GROUND_Y - 70, width: 8, height: 70 },  // start of the spike half
+    { x: 1250, y: GROUND_Y - 70, width: 8, height: 70 },
+    { x: 3820, y: GROUND_Y - 70, width: 8, height: 70 },  // start of the spike half
     { x: 5300, y: GROUND_Y - 70, width: 8, height: 70 }   // after the long spike bed
   ],
 

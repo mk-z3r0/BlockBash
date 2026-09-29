@@ -61,21 +61,29 @@ const WEAPONS = {
     id: 'sledgehammer',
     label: 'SLEDGEHAMMER',
     kind: 'melee',
-    // Half the swing rate of the pickaxe, ~22% more reach, and it shoves.
-    // Slow enough that mistiming it against a pursuing sphere genuinely
-    // costs you, which is the point of a power trade.
-    cooldown: 54,
-    duration: 22,
-    // 56, not 62. Its strike is an overhead smash that finishes BELOW the
+    // Slower than the pickaxe, more reach, double damage, and it shoves.
+    //
+    // Was cooldown 54 — nearly a full second between swings, on top of a
+    // hitbox that stayed shut for the first half of the animation. Against
+    // anything that moves that is not a power trade, it's a weapon you put
+    // down; a player who misses once waits 54 frames to try again while a
+    // pursuer closes. 38 still reads as heavy next to the pickaxe's 30 and
+    // still costs you for a miss, without the wait being the main thing you
+    // feel about the weapon.
+    cooldown: 38,
+    duration: 20,
+    // 58, not 62. Its strike is an overhead smash that finishes BELOW the
     // player's feet, so its reach at torso height — where the hitbox is —
     // is shorter than a level chop's, and 62 left the box noticeably longer
     // than anywhere the head actually goes. Still longer than the pickaxe's
     // 51, which is the weapon's whole selling point.
-    reach: 56,
-    // An overhead smash spends its first HALF going up. This is the weapon
-    // that made the old always-on hitbox obvious, because there was so much
-    // visible wind-up to land a hit during.
-    activeFrom: 0.5,
+    reach: 58,
+    // 0.42 is the frame the head passes vertical on its way down — measured
+    // off the arc in weapons/sledgehammer.js, not guessed. Earlier than
+    // that and the box is open while the hammer is still up behind the
+    // shoulder, which is the complaint that started all of this; later and
+    // the weapon whiffs at anything that is moving.
+    activeFrom: 0.42,
     damage: 2,
     knockback: 11,
     score: 200,

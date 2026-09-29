@@ -4,7 +4,20 @@
 // step 7 calls it "the single most sequenced moment in the game — give
 // weapon, corrupt NPC, force the player to use it on them." The trick is
 // entirely in the order: hand over the tool, then create the one target the
-// player cannot refuse. The tutorial for the mechanic IS the emotional peak.
+// player cannot refuse.
+//
+// REVISED, on the note that the story should be drawn out rather than
+// resolved in one level. It was: he gives you the Cornerstone, corrupts,
+// you put him back, and he walks off — all inside about ninety seconds, on
+// the same screen. Every emotional beat the character had, spent at once,
+// in the middle of level three of seven, after which he is simply fine
+// again and shows up to wave you through the next four faces.
+//
+// Now the scene stops at the corruption. He is taken, and the player
+// carries that for two levels before they find him on the fifth face
+// (cutscenes/level5/reunion.js). The tool still gets handed over here —
+// that part has to happen before the Sculptor at the end of this level —
+// and the thing it's FOR is established here too. It just isn't spent here.
 //
 // Deliberately NOT `once: true`. It replays on a retry, which is the same
 // call level 1's boss showdown makes and for the same reason: the player
@@ -16,7 +29,7 @@
 import { createQuarrick } from '../../entities/npc.js';
 import { surfaceYAt } from '../../levels/levelLoader.js';
 import { spawnExplosion } from '../../entities/particles.js';
-import { playWeaponPickup, playHit } from '../../audio/sfx.js';
+import { playWeaponPickup, playHit, playRumble } from '../../audio/sfx.js';
 import { getWeapon } from '../../weapons/registry.js';
 import { say } from '../say.js';
 import { setNpcStage, setFlag } from '../../narrative.js';
@@ -25,40 +38,16 @@ const CORNERSTONE_AMMO = 10;
 
 // Everything that must be true when this is over, whether it was watched or
 // skipped. Idempotent for the reason the runner's notes give: a skip at the
-// wrong moment must never strand the player without the weapon, or without
-// the thing they have to use it on.
+// wrong moment must never strand the player without the weapon.
 function completeHandoff(c) {
   c.player.weapon = 'cornerstone';
   c.player.hasWeapon = true;
   c.player.ammo = Math.max(c.player.ammo, CORNERSTONE_AMMO);
+  // Stage 3 is "corrupted" in the arc narrative.js documents. He stays
+  // there for two levels now instead of two minutes.
   setNpcStage(3);
   setFlag('cornerstoneGiven');
-
-  // He isn't a character any more, he's an obstacle in the shape of one.
-  if (!c.state.enemies.some(e => e.quarrick)) {
-    const groundY = surfaceYAt(c.data.quarrickX == null ? c.player.x + 150 : c.data.quarrickX);
-    c.state.enemies.push({
-      quarrick: true,
-      kind: 'octagon',
-      x: c.data.quarrickX == null ? c.player.x + 150 : c.data.quarrickX,
-      y: groundY - 44,
-      w: 44,
-      minX: 0, maxX: c.level.worldWidth,
-      speed: 0.6,
-      tier: 'passive',
-      alive: true, squish: 0, hp: 999,
-      baseY: groundY - 44, baseX: 0,
-      hopVY: 0, hopTimer: 9999, shout: 0,
-      awake: false, swingPhase: 0, mining: false,
-      weaponTimer: 0, weaponCooldown: 0, hitThisSwing: null,
-      facing: -1, hitFlash: 0, knockback: 0, thudTimer: 0, shotTimer: 9999,
-      // Three triangles. Enough to feel like an act rather than a click,
-      // few enough that a player who has just been handed ten can afford it
-      // without thinking about the arithmetic.
-      restoreTotal: 3, restoreHits: 3,
-      cornersLost: 4, restoreFlash: 0, restored: false, fleeing: false
-    });
-  }
+  setFlag('quarrickTaken');
   c.state.rescueNPC = null;
 }
 
@@ -110,59 +99,53 @@ export const l3Handoff = {
       frames: 70,
       enter(c) {
         const npc = c.state.rescueNPC;
-        if (npc) spawnExplosion(npc.x + npc.width / 2, npc.y + npc.height / 2, '#f2c14e');
-        playHit();
-        completeHandoff(c);
-      }
-    },
-
-    // Three words, because a seven-year-old has to know what to do and
-    // anything longer would be the game explaining its own best moment.
-    say('narrator', "Put him back.")
-  ]
-};
-
-// What happens once they do.
-export const l3Restored = {
-  id: 'l3-restored',
-
-  onComplete(c) {
-    setFlag('quarrickRestored');
-  },
-
-  beats: [
-    {
-      name: 'reform',
-      frames: 50,
-      enter(c) {
-        const q = c.state.enemies.find(e => e.quarrick);
-        if (q) {
-          q.alive = false;
-          c.spawnExplosion(q.x + q.w / 2, q.y + q.w / 2, '#5ee7ff');
-          // damage 1: chipped, but SQUARE. He says "I'm square. That'll do."
-          // four lines from now and the player has to be able to see that
-          // it's true — this is the payoff of the whole game's central
-          // mechanic and it cannot end with him still the shape of the
-          // thing they just cured. The corners the spheres took are still
-          // visibly gone, which is what the ending calls back to.
-          c.state.rescueNPC = createQuarrick(q.x, surfaceYAt(q.x), { facing: -1, damage: 1 });
+        if (npc) {
+          spawnExplosion(npc.x + npc.width / 2, npc.y + npc.height / 2, '#f2c14e');
+          // Four corners gone: the worst the drawing goes, and the same
+          // silhouette every corrupted square in the game wears. He's still
+          // gold, which is the whole point — the player has to be able to
+          // tell it's him (see drawQuarrickBody in entities/npc.js).
+          npc.damage = 4;
+          npc.facing = 1;
         }
+        playHit();
       }
     },
 
-    say('quarrick', "...Oh."),
-    say('quarrick', "It works, then."),
-    say('player',   "You're all right?"),
-    say('quarrick', "I'm square. That'll do."),
-    say('quarrick', "Go on. There are a lot more of them than there are of me."),
+    say('player', "Quarrick—"),
+
+    // And he goes. Under his own legs, which is worse than being dragged:
+    // there is nothing here for the player to fight or to shoot, and the
+    // weapon they are holding — the one he just made for exactly this — is
+    // not enough yet. That gap is the thing the next two levels are for.
+    {
+      name: 'taken',
+      frames: 110,
+      enter(c) {
+        playRumble();
+      },
+      update(c) {
+        const npc = c.state.rescueNPC;
+        if (!npc) return;
+        npc.state = 'walking';
+        npc.facing = 1;
+        npc.x += 2.2;
+        npc.y = surfaceYAt(npc.x) - npc.height;
+      }
+    },
+
+    say('narrator', "He doesn't look back."),
+    say('player',   "...Where are they taking him?"),
+    say('narrator', "Down. Same as everything else."),
+    // Three words, because a ten-year-old has to know what to do and
+    // anything longer would be the game explaining its own best moment.
+    say('narrator', "Go and get him."),
 
     {
-      name: 'leave',
+      name: 'gone',
       frames: 1,
       enter(c) {
-        if (!c.state.rescueNPC) return;
-        c.state.rescueNPC.state = 'exit';
-        c.state.rescueNPC.velocityX = 3.8;
+        c.state.rescueNPC = null;
       }
     }
   ]

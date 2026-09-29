@@ -193,6 +193,68 @@
       for (const [n, l, h] of TIMINGS) STYLES.push([`${run ? 'run' : 'walk'}/${n}`, l, h, run]);
     }
     const anyOk = results => results.some(r => r.startsWith('ok'));
+
+    // --- how much room for error the obstacle leaves -------------------
+    //
+    // "Is it clearable" and "is it fair" are different questions, and this
+    // gate only ever answered the first. An obstacle with exactly one
+    // working timing IS clearable, and it is also a precision jump that a
+    // ten-year-old will die on twenty times.
+    //
+    // The first attempt at measuring this counted how many of the six
+    // canned timings above cleared each obstacle, and it was worthless:
+    // level 1's beds mostly score 2/6 while clearing by 130px, because
+    // "edge+short" is a hop that clears nothing and "early+long" jumps from
+    // so far back that it lands short. Two crude samples of a wide window
+    // look identical to two lucky hits on a narrow one.
+    //
+    // What actually decides whether a jump is fair is HOW PRECISELY the
+    // button has to be pressed. So sweep the take-off point: jump from
+    // every position in a band before the obstacle and count the ones that
+    // survive. The answer comes back in pixels of run-up — "you can press
+    // jump anywhere in a 60px stretch" — which is both the thing the player
+    // experiences and a number a level author can act on.
+    const SWEEP_LEADS = [0, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80];
+    const SWEEP_STEP = 8;
+    // Calibrated against level 1, which is finished and hand-playtested.
+    // Its narrowest obstacle is the 160px bed at 4320 (see the numbers in
+    // the level design rules); nothing there comes in under 24px of window,
+    // so that is what the rest of the game has to match.
+    const MIN_WINDOW = 24;
+    const tight = [];
+
+    // The widest CONTIGUOUS band of take-off positions that clears it, at
+    // either speed, from any launch point. Contiguous matters: three
+    // scattered leads that work with failures between them is not a window,
+    // it's three coincidences, and a player cannot aim at it.
+    function timingWindow(triggerX, fromX, targetX, froms) {
+      let best = 0, bestLabel = '';
+      for (const from of froms) {
+        for (const run of [true, false]) {
+          let runLen = 0;
+          for (const lead of SWEEP_LEADS) {
+            const ok = jumpTest(triggerX, fromX, targetX, lead, 22, run, from).startsWith('ok');
+            runLen = ok ? runLen + 1 : 0;
+            if (runLen * SWEEP_STEP > best) {
+              best = runLen * SWEEP_STEP;
+              bestLabel = `${run ? 'run' : 'walk'}${from.label === 'ground' ? '' : ' ' + from.label}`;
+            }
+          }
+        }
+      }
+      return { px: best, how: bestLabel };
+    }
+
+    function gradeObstacle(what, results, triggerX, fromX, targetX, froms) {
+      const oks = results.filter(r => r.startsWith('ok'));
+      if (!oks.length) return { ways: 0, of: results.length, window: 0, how: '' };
+      const w = timingWindow(triggerX, fromX, targetX, froms);
+      if (w.px < MIN_WINDOW) {
+        tight.push(`${what} — only a ${w.px}px window to take off in` +
+                   (w.how ? ` (best: ${w.how})` : ''));
+      }
+      return { ways: oks.length, of: results.length, window: w.px, how: w.how };
+    }
     // Only the timings that worked, so a passing line stays readable.
     // Results come back as launch points x timings, flattened. Only the ones
     // that worked are printed, so a passing line stays readable.
@@ -232,7 +294,8 @@
         for (const [, l, h, run] of STYLES) results.push(jumpTest(g.edge, g.from, g.landing, l, h, run, from));
       }
       const climb = g.rise ? `  ${g.rise > 0 ? '+' : ''}${g.rise}px step` : '';
-      out.push(`  ${g.edge}-${g.landing} (${g.size}px)${climb}  ${summarise(results, froms)}`);
+      const d = gradeObstacle(`gap ${g.edge}-${g.landing} (${g.size}px)`, results, g.edge, g.from, g.landing, froms);
+      out.push(`  ${g.edge}-${g.landing} (${g.size}px)${climb}  [window ${d.window}px]  ${summarise(results, froms)}`);
       if (!anyOk(results)) fail(`gap ${g.edge}-${g.landing} (${g.size}px) is not clearable at any tested speed or timing`);
     });
 
@@ -264,7 +327,8 @@
       for (const from of froms) {
         for (const [, l, h, run] of STYLES) results.push(jumpTest(hz.x, seg.x, hz.x + hz.width, l, h, run, from));
       }
-      out.push(`  ${hz.x}-${hz.x + hz.width} (${hz.width}px)  ${summarise(results, froms)}`);
+      const d = gradeObstacle(`spike bed ${hz.x}-${hz.x + hz.width} (${hz.width}px)`, results, hz.x, seg.x, hz.x + hz.width, froms);
+      out.push(`  ${hz.x}-${hz.x + hz.width} (${hz.width}px)  [window ${d.window}px]  ${summarise(results, froms)}`);
       if (!anyOk(results)) fail(`spike bed ${hz.x}-${hz.x + hz.width} (${hz.width}px) is not clearable at any tested speed or timing`);
     });
 
@@ -347,6 +411,54 @@
     });
     if (!bedOffLedge) out.push('  every spike bed has ground to land on after it');
 
+    // ...and the version of that rule for levels built out of standing
+    // blocks rather than pits. A pillar counts as the end of the floor just
+    // as much as a ledge does: clearing a bed into a 60px slot with spikes
+    // behind you and a wall in front is not a landing, it's a trap you have
+    // to jump straight back out of from a standstill.
+    //
+    // This is what level 3 was actually doing wrong. Its take-off windows
+    // measure fine — the obstacle you aim at is reachable — but every one of
+    // them lands you in a gap between a spike bed and the next column, and
+    // the audit had no way to see that because it only ever asked whether
+    // the player got PAST the hazard.
+    const RECOVERY = 70;        // room to stop, turn, and set up the next jump
+    let cramped = 0;
+    lv.hazards.forEach(h => {
+      if (h.width > 200) return;
+      const seg = ground.find(p => h.x >= p.x && h.x <= p.x + p.width);
+      if (!seg) return;
+      const landAt = h.x + h.width;
+      // The nearest thing that stops a player who has just landed: a block
+      // standing on this floor, or the next spike bed.
+      let blocker = seg.x + seg.width, what = `the ledge at ${seg.x + seg.width}`;
+      floating.forEach(p => {
+        const px = p.baseX == null ? p.x : p.baseX;
+        if (p.y + p.height < groundYAt(px) - 2) return;   // not standing on the floor
+        if (px >= landAt && px < blocker) { blocker = px; what = `the column at ${px}`; }
+      });
+      lv.hazards.forEach(o => {
+        if (o === h) return;
+        if (o.x >= landAt && o.x < blocker) { blocker = o.x; what = `the spikes at ${o.x}`; }
+      });
+      const room = blocker - landAt;
+      if (room < RECOVERY) {
+        cramped++;
+        warn(`spike bed ${h.x}-${landAt} lands you in ${room}px of floor before ${what} — under ${RECOVERY}px there is no room to set up the next jump`);
+      }
+    });
+    if (!cramped) out.push(`  every spike bed landing has ${RECOVERY}px+ of floor to recover on`);
+
+    // How wide the tops are that the level expects to be landed on. The
+    // player is 22px; a 54px column leaves 32px of slack, and a chain of
+    // those is a precision platforming level, which this game is not.
+    const MIN_TOP = 70;
+    const narrow = floating
+      .filter(p => p.width < MIN_TOP)
+      .map(p => `${p.baseX == null ? p.x : p.baseX} (${p.width}px wide)`);
+    if (narrow.length) warn(`${narrow.length} landing surface(s) under ${MIN_TOP}px wide: ${narrow.slice(0, 8).join(', ')}${narrow.length > 8 ? ' …' : ''}`);
+    else out.push(`  every landing surface is at least ${MIN_TOP}px wide`);
+
     // A checkpoint inside an enemy's patrol span means respawning into a
     // sphere, which the design rules call a cheap death.
     // Measured against what an enemy can actually REACH, not just where it
@@ -355,20 +467,36 @@
     // patrol is still somewhere you respawn and get shot standing still.
     // The old ±30 only knew about patrol spans and passed five checkpoints
     // that tools/respawn-state-probe.html then proved were fatal.
+    // Octagons are not on the tier ladder — they shamble at anything within
+    // 200px regardless of what `tier` says (entities/enemy.js), so a table
+    // keyed only on tier reported a checkpoint standing inside a corrupted
+    // square's reach as clean.
     const REACH = { passive: 30, pursuer: 240, aggressor: 340 };
+    const reachOf = s => (s.kind === 'octagon' ? 210 : (REACH[s.tier || 'passive'] || 30));
     let badCheckpoint = 0;
     (lv.checkpoints || []).forEach(c => {
       const e = (lv.enemySpawns || []).find(s => {
         if (s.boss) return false;
-        const r = REACH[s.tier || 'passive'] || 30;
+        const r = reachOf(s);
         return c.x > s.minX - r && c.x < s.maxX + r;
       });
       // Advisory: respawning grants P.RESPAWN_INVINCIBLE_FRAMES, which is
       // what lets level 1 ship two of these without it reading as a cheap
       // death. Still worth not doing on purpose.
-      if (e) { badCheckpoint++; warn(`checkpoint at ${c.x} is inside the reach of the ${e.tier || 'passive'} enemy at ${e.x} (${e.minX}-${e.maxX})`); }
+      if (e) { badCheckpoint++; warn(`checkpoint at ${c.x} is inside the reach of the ${e.kind === 'octagon' ? 'octagon' : (e.tier || 'passive')} at ${e.x} (${e.minX}-${e.maxX})`); }
     });
     if (!badCheckpoint) out.push('  no checkpoint is inside an enemy\'s reach');
+
+    // ---- fairness ----
+    // Separate from the clearable/not-clearable gate above and reported
+    // separately, because they are different failures with different fixes:
+    // an unclearable obstacle is broken, a tight one plays badly.
+    out.push('== ROOM FOR ERROR ==');
+    if (!tight.length) {
+      out.push(`  every obstacle leaves at least a ${MIN_WINDOW}px stretch to take off from`);
+    } else {
+      tight.forEach(t => fail(`TIGHT ${t}`));
+    }
 
     out.push(failures
       ? `*** ${failures} FAILURE(S)${warnings ? `, ${warnings} warning(s)` : ''}`

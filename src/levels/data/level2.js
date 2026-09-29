@@ -157,8 +157,8 @@ export default {
   ],
 
   checkpoints: [
-    { x: 2020, y: GROUND_Y - 70, width: 8, height: 70 },   // the quarry floor
-    { x: 3560, y: 370 - 70,      width: 8, height: 70 },   // the climb
-    { x: 5040, y: GROUND_Y - 70, width: 8, height: 70 }
+    { x: 1490, y: GROUND_Y - 70, width: 8, height: 70 },   // the quarry floor
+    { x: 3650, y: 370 - 70,      width: 8, height: 70 },   // the climb
+    { x: 5130, y: GROUND_Y - 70, width: 8, height: 70 }
   ]
 };

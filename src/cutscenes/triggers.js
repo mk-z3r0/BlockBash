@@ -66,6 +66,18 @@ const CONDITIONS = {
     return !!q && q.restored;
   },
 
+  // A corrupted Quarrick is in the level and has not been put back yet.
+  //
+  // Guards the scene that NAMES him on the fifth face. That scene isn't
+  // `once` — a player who died before reaching him has to be able to see it
+  // — so without this it re-fires for anyone who walks back past the
+  // trigger after the reunion, and tells them to put back someone who is
+  // standing there restored.
+  quarrickLost: () => {
+    const q = state.enemies.find(e => e.quarrick && e.alive);
+    return !!q && !q.restored;
+  },
+
   // The player does NOT currently hold this weapon.
   //
   // Exists for level 3's handoff, which is deliberately not `once` — a

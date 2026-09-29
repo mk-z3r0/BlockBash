@@ -150,34 +150,78 @@ export function drawBackground(cameraX, cameraY = 0) {
 // of the handle AT the origin, head extending toward +x/-y, so the two are
 // interchangeable in any hand that holds a weapon.
 //
-// Deliberately blunter and heavier-looking than the pickaxe — a thicker
-// handle and a squared-off steel head instead of a tapered spike. The
-// silhouette has to say "slow but it hurts" before the player has swung it
-// once, because that's exactly how it plays (see weapons/sledgehammer.js).
+// Reported from play: "the sledgehammer sucks and doesn't even look like a
+// sledgehammer." It didn't, and the reason was one transform. The head was
+// a 12x26 block drawn after rotating the canvas by (handle angle + 90°),
+// which put its LONG axis along the handle and its thin axis across — so
+// the 26px dimension stuck out past the end of the shaft like a blade and
+// the whole thing read as a cleaver.
+//
+// A sledgehammer is the other way round. The head is a block lying ACROSS
+// the handle, and the handle ends inside it rather than beside it: it goes
+// through the eye and stops in the middle. Both ends of the head are
+// striking faces. That crossed silhouette is the entire reason the shape is
+// recognisable at 30px, and it's what's drawn here now.
 export function drawSledgehammerIcon() {
+  // Where the head sits, and which way the shaft runs. Everything below is
+  // derived from these two so the head can't drift off the end of the
+  // handle again.
+  const hx = 23, hy = -17;
+  const along = Math.atan2(hy, hx);
+
+  // the shaft, running from the grip at the origin into the head
   ctx.strokeStyle = '#7d5730';
-  ctx.lineWidth = 5;
+  ctx.lineWidth = 4.5;
   ctx.lineCap = 'round';
   ctx.beginPath();
   ctx.moveTo(0, 0);
-  ctx.lineTo(20, -15);
+  ctx.lineTo(hx, hy);
   ctx.stroke();
 
-  // the head: a solid block across the end of the handle
+  // A darker wrap over the bottom third. Without it the shaft is a plain
+  // stick and there's nothing to say which end is held — which matters,
+  // because this weapon is drawn shouldered far more often than swung.
+  ctx.strokeStyle = '#54381d';
+  ctx.lineWidth = 5.5;
+  ctx.beginPath();
+  ctx.moveTo(1, -0.7);
+  ctx.lineTo(8, -5.9);
+  ctx.stroke();
+
   ctx.save();
-  ctx.translate(21, -16);
-  ctx.rotate(Math.atan2(-15, 20) + Math.PI / 2);
+  ctx.translate(hx, hy);
+  ctx.rotate(along);
+  // Local +x now runs ALONG the shaft, away from the grip; local +y runs
+  // across it. So the head is short in x (its thickness) and long in y (its
+  // two faces), centred on the origin — i.e. on the end of the shaft.
+  const HALF_LEN = 15;        // half the face-to-face length
+  const HALF_THICK = 7;       // half the thickness through the eye
+
   ctx.fillStyle = '#8f9ab0';
-  ctx.strokeStyle = '#464e5e';
+  ctx.strokeStyle = '#3f4655';
   ctx.lineWidth = 1.4;
   ctx.beginPath();
-  ctx.rect(-6, -13, 12, 26);
+  ctx.rect(-HALF_THICK, -HALF_LEN, HALF_THICK * 2, HALF_LEN * 2);
   ctx.fill();
   ctx.stroke();
-  // a lighter band down the striking face, so the block reads as metal
-  // rather than as a plain rectangle
-  ctx.fillStyle = 'rgba(232, 238, 248, 0.45)';
-  ctx.fillRect(-6, -13, 3, 26);
+
+  // The two striking faces, a shade brighter and slightly proud of the
+  // body, so the head reads as forged steel with ends rather than as a
+  // rectangle. Drawn at both ends because a sledge is double-faced and the
+  // symmetry is most of what identifies it.
+  ctx.fillStyle = '#c3ccdc';
+  ctx.fillRect(-HALF_THICK, -HALF_LEN, HALF_THICK * 2, 4);
+  ctx.fillRect(-HALF_THICK, HALF_LEN - 4, HALF_THICK * 2, 4);
+  ctx.strokeRect(-HALF_THICK, -HALF_LEN, HALF_THICK * 2, 4);
+  ctx.strokeRect(-HALF_THICK, HALF_LEN - 4, HALF_THICK * 2, 4);
+
+  // the eye: the shaft showing through the middle of the head
+  ctx.fillStyle = '#6b4a27';
+  ctx.fillRect(-HALF_THICK + 1.5, -4.5, HALF_THICK * 2 - 3, 9);
+  // and a highlight down the side facing the light, which is the only thing
+  // stopping the block reading flat
+  ctx.fillStyle = 'rgba(232, 238, 248, 0.32)';
+  ctx.fillRect(-HALF_THICK, -HALF_LEN, 2.5, HALF_LEN * 2);
   ctx.restore();
 }
 

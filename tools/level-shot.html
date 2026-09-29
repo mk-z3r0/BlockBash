@@ -15,6 +15,7 @@
   import { camera } from '../src/engine/camera.js';
   import { update, draw, switchTo } from '../src/scenes/sceneManager.js';
   import { getLevel } from '../src/levels/levelLoader.js';
+  import { getWeapon } from '../src/weapons/registry.js';
 
   const q = new URLSearchParams(location.search);
   const levelIndex = parseInt(q.get('level') || '0', 10);
@@ -45,14 +46,49 @@
       const core = state.enemies.find(e => e.kind === 'core');
       if (core) core.restoreHits = parseInt(q.get('restore'), 10);
     }
+    for (let i = 0; i < frames; i++) update();
+
     // ?phase=name forces the boss into a phase, for shooting a specific
-    // moment of a fight — a telegraph, an open window — instead of ticking
-    // and hoping to catch one.
+    // moment of a fight — a telegraph, an open window, a drill bound in the
+    // floor — instead of ticking and hoping to catch one.
+    //
+    // Applied AFTER the ticks, not before: the phase machine runs every
+    // frame, so a phase set up front is several phases stale by the time
+    // anything is drawn. The few frames after it are what let the phase
+    // populate the visual state it owns (mining, strain, posePhase), which
+    // is the entire thing being photographed.
     if (q.has('phase')) {
       const boss = state.enemies.find(e => e.boss && e.mode === 'fight');
-      if (boss) { boss.phase = q.get('phase'); boss.phaseTimer = parseInt(q.get('phaseTimer') || '10', 10); }
+      if (boss) {
+        boss.phase = q.get('phase');
+        boss.phaseTimer = parseInt(q.get('phaseTimer') || '40', 10);
+        // Park the player right next to it so it faces and reacts to
+        // someone, and so the shot frames the fight rather than empty floor.
+        if (q.has('near')) {
+          player.x = boss.x - parseFloat(q.get('near'));
+          player.y = boss.y + boss.w - player.height;
+          camera.x = Math.max(0, Math.min(boss.x - 800 / 2, getLevel().worldWidth - 800));
+        }
+        for (let i = 0; i < parseInt(q.get('settle') || '3', 10); i++) update();
+        boss.phase = q.get('phase');
+      }
     }
-    for (let i = 0; i < frames; i++) update();
+    // ?weapon=id&swing=T puts a specific weapon in the player's hands and
+    // freezes it T of the way through its swing (0..1). Weapon art is the
+    // one thing with no probe and no way to check by playing — a swing is
+    // 16-30 frames — so this is how "does the hammer look like a hammer at
+    // 22px" gets answered. Set after the ticks so nothing winds it back.
+    if (q.has('weapon')) {
+      player.weapon = q.get('weapon');
+      player.hasWeapon = true;
+      player.ammo = 10;
+      if (q.has('swing')) {
+        const w = getWeapon(q.get('weapon'));
+        const t = parseFloat(q.get('swing'));
+        if (w) player.weaponTimer = Math.max(1, Math.round(w.duration * (1 - t)));
+      }
+      if (q.has('facing')) player.facing = parseInt(q.get('facing'), 10);
+    }
     // Invincibility makes the player BLINK (entities/player.js), so half the
     // frames photograph an empty space where they're standing. Clear it just
     // before drawing — deaths all happen during update, which is over.
