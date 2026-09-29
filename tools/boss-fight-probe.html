@@ -41,6 +41,41 @@
 
   const tick = n => { for (let i = 0; i < n; i++) update(); };
 
+  // --- is it ANIMATED? ---------------------------------------------------
+  //
+  // Reported from play twice — "the boss' weapon isn't visible", then "the
+  // level 2 boss is swinging the drill like a pickaxe" — and both times the
+  // fix was a drawing change that nothing could hold in place afterwards.
+  // Every fightable boss in the game spent its whole fight in one frozen
+  // idle pose, and no probe could tell, because a boss that never moves its
+  // arms fights exactly as well as one that does.
+  //
+  // So: watch the visual state the phase machine owns, and require it to
+  // change. `posePhase` is the held point in the weapon's own swing,
+  // `mining`/`strain`/`conducting` are the per-boss poses, and a live
+  // `weaponTimer` is a real swing in progress. A boss that shows only one
+  // distinct value across four hundred frames of its own fight is standing
+  // still, whatever its hp bar is doing.
+  function poseSamples(boss, frames = 400) {
+    const seen = new Set();
+    for (let f = 0; f < frames; f++) {
+      update();
+      seen.add([
+        Math.round((boss.posePhase || 0) * 20),
+        boss.mining ? 'M' : '', boss.strain ? 'S' : '',
+        boss.conducting == null ? '' : Math.round(boss.conducting * 6),
+        boss.weaponTimer > 0 ? 'W' : ''
+      ].join('/'));
+    }
+    return seen;
+  }
+
+  function checkAnimated(boss, least = 3) {
+    const seen = poseSamples(boss);
+    check(seen.size >= least,
+      `its kit moves through the fight (${seen.size} distinct poses, want ${least}+)`);
+  }
+
   function findBoss() {
     return state.enemies.find(e => e.boss && e.mode === 'fight');
   }
@@ -113,6 +148,17 @@
       const bruiser = crew.find(e => e.role === 'bruiser');
       update();
       check(bruiser.invulnerable === true, 'a bruiser is shielded while the crew is linked');
+      // The bruisers carry a pickaxe. For most of the game's life it was
+      // decoration — `tool`, drawn and never used — so two thirds of this
+      // fight was spheres walking into you.
+      check(!!bruiser.weapon, `a bruiser is actually armed (${bruiser.weapon || 'nothing'})`);
+      {
+        player.x = bruiser.x - 30;
+        player.y = bruiser.y;
+        let swung = false;
+        for (let f = 0; f < 200 && !swung; f++) { update(); if (bruiser.weaponTimer > 0) swung = true; }
+        check(swung, 'and it swings when you are in front of it');
+      }
       check(shooter.invulnerable === false, 'the shooter is the one you can reach');
 
       const noDamage = swingAt(bruiser, 2);
@@ -144,6 +190,19 @@
       }
       check(sawClosed && sawOpen, `it closes and opens across its cycle (closed ${sawClosed}, open ${sawOpen})`);
       check(maxY - minY > 100, `the platforms really travel (${Math.round(maxY - minY)}px)`);
+      // Its arms are the tell for the window: up while it's holding the
+      // room, dropped the moment it opens. If those two ever stop being the
+      // same event the boss stops being readable.
+      {
+        let upWhileClosed = false, downWhenOpen = true;
+        for (let f = 0; f < 400; f++) {
+          update();
+          if (boss.invulnerable && boss.conducting > 0.5) upWhileClosed = true;
+          if (!boss.invulnerable && boss.conducting > 0.05) downWhenOpen = false;
+        }
+        check(upWhileClosed, 'its arms go up while it is holding the room shut');
+        check(downWhenOpen, 'and drop the moment it opens');
+      }
       // The ledge is only reachable from a raised mover — that IS the fight.
       check(minY < lv.platforms.find(p => p.y === 150 || p.baseY === 150).y + 60,
         'the lifted platform rises to near the boss ledge');
@@ -176,12 +235,54 @@
       for (let f = 0; f < 400; f++) { update(); phases.add(boss.phase); }
       check(phases.has('charge') && phases.has('recover'),
         `it charges and then has to recover (saw: ${[...phases].join(', ')})`);
+      check(!!boss.weapon, `it is actually holding the sledgehammer (${boss.weapon || 'nothing'})`);
+      // ...and it swings it. "Pure combat, no gimmick" was being fought by
+      // walking into people.
+      {
+        let swung = false;
+        for (let f = 0; f < 400 && !swung; f++) {
+          player.x = boss.x - 34;
+          player.y = boss.y;
+          update();
+          if (boss.weaponTimer > 0) swung = true;
+        }
+        check(swung, 'and swings it at you in close');
+      }
       const hp0 = boss.hp;
       swingAt(boss, 8);
       check(!boss.alive, `it can be beaten by out-playing it (hp ${hp0} -> ${boss.hp})`);
     });
 
-    out.push(fails ? `*** ${fails} FAILURE(S)` : 'PASS every boss opens, closes and pays out');
+    // --- and every one of them is ANIMATED ---
+    //
+    // Its own pass, deliberately, because the fight tests above pin phases
+    // and timers to reach specific moments — which is exactly the wrong
+    // conditions for asking "does this thing move on its own". Here nothing
+    // is pinned: the boss is left alone with its phase machine for four
+    // hundred frames and the visual state it owns is sampled.
+    out.push('== every boss animates itself ==');
+    for (const [index, name, least] of [[1, 'excavator', 3], [3, 'crew', 2],
+                                        [4, 'terraformer', 4], [5, 'general', 4]]) {
+      state.currentLevelIndex = index;
+      switchTo('playing', { retry: true });
+      getLevel().cutscenes.length = 0;
+      state.lives = 999;
+      player.invincible = 99999;
+      const boss = findBoss();
+      if (!boss) { check(false, `${name}: present`); continue; }
+      // Inside BOSS_ENGAGE_RANGE, and inside the boss's own patrol — a
+      // boss is leashed to minX/maxX like anything else, so standing just
+      // OUTSIDE the arena means it walks to the fence and stops there,
+      // which for the crew meant it never got close enough to swing and
+      // read as "it doesn't animate".
+      player.x = Math.max(boss.minX + 30, boss.x - 240);
+      player.y = boss.y;
+      const seen = poseSamples(boss);
+      check(seen.size >= least,
+        `${name}: its kit moves through the fight (${seen.size} distinct poses, want ${least}+)`);
+    }
+
+    out.push(fails ? `*** ${fails} FAILURE(S)` : 'PASS every boss opens, closes, animates and pays out');
    } catch (err) {
     out.push('*** THREW: ' + (err && err.stack ? err.stack.split('\n').slice(0, 3).join(' | ') : err));
    }

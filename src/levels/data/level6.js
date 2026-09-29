@@ -122,7 +122,7 @@ export default {
       tier: 'pursuer', weapon: 'chainsaw' },
     { x: 620,  y: GROUND_Y - 22, w: 22, minX: 560,  maxX: 690,  speed: 1.7, bounce: true },
     { x: 750,  y: 250,           w: 20, minX: 700,  maxX: 790,  speed: 1.3 },
-    { x: 1150, y: GROUND_Y - 22, w: 22, minX: 1000, maxX: 1300, speed: 1.6,
+    { x: 1150, y: GROUND_Y - 22, w: 22, minX: 1140, maxX: 1300, speed: 1.6,
       tier: 'aggressor', shoots: true },
     // Between the cover at 1130 and the cover at 1400 — the only clear
     // stretch of arena 1 that keeps the checkpoint at 1920 out of reach.
@@ -132,7 +132,7 @@ export default {
     // --- arena 2 ---
     { x: 2250, y: GROUND_Y - 22, w: 22, minX: 2200, maxX: 2350, speed: 1.8,
       tier: 'pursuer', weapon: 'chainsaw' },
-    { x: 2650, y: GROUND_Y - 22, w: 22, minX: 2600, maxX: 2780, speed: 1.7,
+    { x: 2650, y: GROUND_Y - 22, w: 22, minX: 2600, maxX: 2695, speed: 1.7,
       tier: 'aggressor', shoots: true },
     { x: 2350, y: 230,           w: 20, minX: 2300, maxX: 2410, speed: 1.4 },
     { x: 2850, y: GROUND_Y - 22, w: 22, minX: 2830, maxX: 2980, speed: 1.7, bounce: true },
@@ -145,9 +145,9 @@ export default {
     { x: 4240, y: GROUND_Y - 22, w: 22, minX: 4230, maxX: 4340, speed: 1.7,
       tier: 'aggressor', shoots: true },
     { x: 4650, y: GROUND_Y - 22, w: 22, minX: 4620, maxX: 4730, speed: 1.7, bounce: true },
-    { x: 4880, y: GROUND_Y - 22, w: 22, minX: 4820, maxX: 4990, speed: 1.8,
+    { x: 4880, y: GROUND_Y - 22, w: 22, minX: 4820, maxX: 4945, speed: 1.8,
       tier: 'pursuer', weapon: 'chainsaw' },
-    { x: 5080, y: GROUND_Y - 22, w: 22, minX: 5030, maxX: 5150, speed: 1.7,
+    { x: 5090, y: GROUND_Y - 22, w: 22, minX: 5075, maxX: 5200, speed: 1.7,
       tier: 'aggressor', shoots: true },
     { x: 5150, y: GROUND_Y - 26, w: 26, minX: 5090, maxX: 5190, speed: 0.85,
       kind: 'octagon', restoreHits: 2 },

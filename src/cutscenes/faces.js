@@ -81,9 +81,12 @@ export const l4Glimpse = {
       name: 'spot',
       frames: 46,
       enter(c) {
-        // Out at the right edge of the view, walking away. Far enough that
-        // he reads as "over there" rather than "just there".
-        const at = c.player.x + 430;
+        // Over on the far side, walking away. Far enough that he reads as
+        // "over there" rather than "just there" — but not so far that he's
+        // off the edge of the screen before the player has finished
+        // shouting. At +430 and 2.6px a frame he was visible for about
+        // seven frames of a ninety-frame beat.
+        const at = c.player.x + 360;
         c.state.rescueNPC = createQuarrick(at, surfaceYAt(at), { facing: 1, damage: 4 });
       }
     },
@@ -96,7 +99,7 @@ export const l4Glimpse = {
         if (!npc) return;
         npc.state = 'walking';
         npc.facing = 1;
-        npc.x += 2.6;
+        npc.x += 1.9;
         npc.y = surfaceYAt(npc.x) - npc.height;
       }
     },

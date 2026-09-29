@@ -16,6 +16,8 @@
   import { update, draw, switchTo } from '../src/scenes/sceneManager.js';
   import { getLevel } from '../src/levels/levelLoader.js';
   import { getWeapon } from '../src/weapons/registry.js';
+  import { startCutscene, isCutsceneActive, skipCutscene } from '../src/cutscenes/runner.js';
+  import { cutsceneLibrary } from '../src/cutscenes/library.js';
 
   const q = new URLSearchParams(location.search);
   const levelIndex = parseInt(q.get('level') || '0', 10);
@@ -46,6 +48,24 @@
       const core = state.enemies.find(e => e.kind === 'core');
       if (core) core.restoreHits = parseInt(q.get('restore'), 10);
     }
+    // ?scene=id  plays a named cutscene and ticks `frames` into it, with
+    // anything the level would have opened with skipped out of the way
+    // first. Dialogue beats wait for a keypress, so a scene halfway through
+    // a level can't be reached by ticking — the opening would still be
+    // sitting there on its first line.
+    if (q.has('scene')) {
+      for (let i = 0; i < 6 && isCutsceneActive(); i++) { skipCutscene(); update(); }
+      const def = cutsceneLibrary[q.get('scene')];
+      if (def) {
+        startCutscene(def, {
+          player, state, level: lv, data: {},
+          showToast: () => {},
+          spawnExplosion: () => {},
+          finishLevel: () => {}
+        });
+      }
+    }
+
     for (let i = 0; i < frames; i++) update();
 
     // ?phase=name forces the boss into a phase, for shooting a specific

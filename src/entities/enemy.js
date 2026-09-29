@@ -395,8 +395,13 @@ function drawOctagonBody(size, cornersLost, flash, wasQuarrick) {
   // able to tell that the thing shambling at them is him — that's the
   // entire weight of the beat, and a generic corrupted square would throw
   // it away.
-  const sick = wasQuarrick ? '#8a7434' : '#8fa08c';
-  const sicker = wasQuarrick ? '#4a3d1c' : '#4a5a52';
+  // Quarrick's gold, drained but not extinguished. It was #8a7434 over
+  // #4a3d1c, which against this background reads as brown — and "that shape
+  // over there is a person you know" is the entire weight of the beat he
+  // appears in. Drained enough to be visibly wrong, bright enough to be
+  // visibly HIM.
+  const sick = wasQuarrick ? '#c9a54a' : '#8fa08c';
+  const sicker = wasQuarrick ? '#6b5420' : '#4a5a52';
   grad.addColorStop(0, flash > 0 ? '#d8faff' : sick);
   grad.addColorStop(1, flash > 0 ? '#5ee7ff' : sicker);
   ctx.fillStyle = grad;
@@ -406,7 +411,7 @@ function drawOctagonBody(size, cornersLost, flash, wasQuarrick) {
   ctx.stroke();
 
   // dead eyes — the zombie read
-  ctx.fillStyle = '#20282a';
+  ctx.fillStyle = wasQuarrick ? '#3a2c0c' : '#20282a';
   ctx.fillRect(-h * 0.45, -h * 0.25, size * 0.14, size * 0.14);
   ctx.fillRect(h * 0.18, -h * 0.25, size * 0.14, size * 0.14);
 }

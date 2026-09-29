@@ -618,13 +618,15 @@ What's in it, and what each thing is actually for:
 |---|---|
 | `module-load-probe` | Does every module still parse? There is no build step and no node here, so a syntax error otherwise shows up as a blank canvas in whatever runs next. **Run this first after any edit** — it's seconds |
 | `level-audit-probe?level=N` | Is this level *playable*? Every gap and jumpable bed, both speeds, three timings, from a clean runway, plus the structural rules. One per level in the registry, counted off the registry itself |
-| `boss-fight-probe` | Does each boss open, close and pay out? |
-| `story-beats-probe` | Can the player be blocked by a story beat? The handoff, the restoration, the Sculptor, the core |
+| `boss-fight-probe` | Does each boss open, close, **animate** and pay out? The animation half is its own pass: every boss left alone with its phase machine for 400 frames has to take at least three distinct visual poses. A boss that stands still fights exactly as well as one that moves, which is why all seven shipped frozen |
+| `story-beats-probe` | Can the player be blocked by a story beat? The handoff, the reunion on face 5, the Sculptor, the core |
+| `enemy-ladder-probe` | Does the game actually get harder, in the order the design doc says? Each rung has a face it is introduced on and must keep appearing after it, and no level may come in softer than the one before it. Immediately found that level 7 — the finale — was carrying nine advanced enemies against level 6's seventeen |
+| `checkpoint-siting-probe` | Is every flag somewhere fair to come back to? Computes where a checkpoint is *allowed* to be, per level, and fails on the ones that aren't — then prints the legal bands, because "this one is bad" leaves you hunting for a better spot by hand across seven levels |
 | `progression-chain-probe` | Does every level actually lead to the next one? |
 | `full-playthrough-probe` | One run, cleared save to win screen, every story scene asserted |
 | `level-editor-probe` | That the editor edits: a drag moves the right object by the right amount, resize handles keep the opposite edge fixed, undo/redo counts match the gesture, and its change list round-trips |
 | `level-data-probe` | The boring stuff, read straight off level data: weapons and cutscene ids that exist, a level that can end, spawns and checkpoints over ground, hazards that don't run off a ledge. Found three of level 6's checkpoints floating in its pits |
-| `respawn-state-probe` | What survives a death — and standing at all 21 checkpoints in the game for two seconds without touching the controls |
+| `respawn-state-probe` | What survives a death — and standing at all 24 checkpoints in the game for two seconds without touching the controls. The empirical partner to `checkpoint-siting-probe`'s static rule, and it has caught things the rule couldn't |
 | the older probes | Physics, coins, saves, cutscene contract — unchanged, and all still green |
 
 Not a probe, but in the same spirit: **`python3 tools/pressure-profile.py`**
@@ -680,6 +682,23 @@ obstacles was wrong even though each was fine alone:
   so a checkpoint 100px outside a shooter's patrol is still somewhere you
   respawn and get shot standing still. Five checkpoints passed the old rule
   and were fatal.
+- **An obstacle has two ends, and the audit used to only measure one.**
+  Level 3 played meaner than every other level and nothing could say why:
+  its take-off windows measured as wide as level 1's, because the only
+  question being asked was whether the player got PAST the hazard. What
+  they landed in was a 30-60px slot between the spikes they had just
+  cleared and the next column — a correct jump that puts you somewhere you
+  cannot jump again from. The audit now measures **landing room** (95px+ of
+  floor after a bed, before the next wall) and **landing surface width**
+  (70px+, against a 22px player), and level 3 is rebuilt to both.
+- **How precisely does the button have to be pressed?** The audit's
+  fairness number is the widest contiguous band of take-off positions that
+  clears an obstacle, swept in 8px steps. Level 1 — finished, hand-tuned,
+  playtested with an actual kid — never drops below 64px, and that is the
+  bar. A first attempt at this counted how many of six canned timings
+  cleared each obstacle and was worthless: level 1's beds mostly score 2/6
+  while clearing by 130px, because two crude samples of a wide window look
+  identical to two lucky hits on a narrow one.
 
 ---
 
@@ -764,6 +783,18 @@ way to simulate more than a frame or two.
 - **Wider hazards get crossed via platforms,** not jumped.
 - **Keep landing zones clear of the next hazard.** A hard jump carries 162px —
   don't let a full-power leap off a pit land in spikes.
+- **A checkpoint is somewhere you FALL into, not somewhere you appear.** A
+  respawn puts the player ~90px above the flag's base and drops them, so on
+  the way down they pass through every altitude between there and the
+  floor. An enemy on a ledge 230px up is no threat to that; one on a ledge
+  100px up is directly in the way. Level 7's checkpoint at 2390 was clean
+  by every other measure and fatal, because a bouncer was parked on the
+  ledge it drops past.
+- **Leave the first ~190px of each ground segment empty.** That is where
+  checkpoints live, and a level authored end to end has nowhere to put
+  them. Level 7 hit exactly this: seventeen enemies, and two legal flag
+  sites in seven thousand pixels. Floating platforms are exempt, because
+  an enemy 70px above the floor can't reach it and so costs nothing.
 - **Don't start an enemy patrol at a checkpoint.** Respawning into a sphere is a
   cheap death.
 - **Enemies don't jump/hop yet, on purpose (2026-09-19).** The old "surprise

@@ -118,7 +118,7 @@ export default {
     { x: 6340, y: 240,           w: 20, minX: 6300, maxX: 6410, speed: 1.3 },
 
     // --- The Excavator ---
-    { x: 6980, y: GROUND_Y - 33, w: 33, minX: 6200, maxX: 7130, speed: 1.5,
+    { x: 6980, y: GROUND_Y - 33, w: 33, minX: 6740, maxX: 7130, speed: 1.5,
       boss: true, mode: 'fight', bossKind: 'excavator', bossName: 'THE EXCAVATOR',
       // The rig it operates. Drawn, not swung — see `tool` in entities/enemy.js.
       tool: 'drill',

@@ -96,13 +96,29 @@ without becoming a different enemy.
 
 ### Enemies
 
-Enemies evolve across levels:
+Enemies evolve across levels. **Built, and asserted** — `tools/enemy-ladder-probe.html`
+fails if a rung stops appearing or if a level comes in softer than the one
+before it, because "the game gets harder" is exactly the kind of claim that
+rots quietly when a level gets rebuilt:
 
-| Level Range | Enemy Behavior | Weapons They Carry |
+| Face | New rung | What it changes for the player |
 |---|---|---|
-| Early levels | Patrolling, passive | None |
-| Mid levels | Begin pursuing the player | Pick axes, basic tools |
-| Late levels | Aggressive pursuit, coordinated | Chainsaws, lasers, etc. |
+| 1 | **patroller** | walks its span, ignores you. Stomp it. |
+| 2 | **pursuer** | breaks patrol at 230px and swings a pickaxe. Contact is no longer the only threat. |
+| 3 | **octagon** | cannot be beaten at all. The first enemy the stomp and the swing are both wrong answers to. |
+| 4 | **hopper** + **shooter** | things leave the ground, and things reach you from across a screen. |
+| 5 | **bouncer** | never stops. A sphere on a fixed 14-frame beat, rising to meet a stomp — the one answer the player has relied on since face 1 now has a rhythm to it. |
+| 6 | *(no new rung)* | chainsaws instead of pickaxes: same tier, longer active window. The exam starts here. |
+| 7 | *(no new rung)* | all of it at once. The last face is an exam, not a lesson. |
+
+Two rules the ladder is authored to. **A pattern, not a dice roll** — the
+bouncer's period is fixed, because a pattern is something a ten-year-old
+learns in two screens and feels clever about, and a random one is just a
+tax. And **one new idea per face**, introduced alone before it appears in
+company.
+
+Advanced-enemy counts per face, which is the crude number the probe actually
+guards: 0, 3, 6, 12, 13, 17, 17.
 
 Enemies are using their tools to **reshape the world** (carving, sanding, rounding off the block terrain). This is both narrative and a gameplay mechanic — the environment changes as enemies work on it.
 
@@ -174,18 +190,29 @@ The single biggest piece of character writing in the game, and the spine the wea
 
 **3. The handoff — key story beat.** The NPC gives the player the **triangle restoration weapon**. Not as a reward or an upgrade drop: because they are **too damaged to keep fighting**. The mentor passes the torch because they can't carry it any further.
 
-**4. The corruption — immediately after.** Right after the handoff, the NPC **fully corrupts** — into an octagon, or worse. This forces the player's **first use of the restoration weapon to be on the NPC who just handed it to them.** The player restores their mentor. The weapon is proven, the mechanic is taught, and the game's central verb lands with real weight, all in one beat.
+**4. The corruption — immediately after.** Right after the handoff, the NPC **fully corrupts** — into an octagon, or worse.
 
-> The sequencing is the whole trick: give the weapon, then immediately create the one target the player can't refuse. The tutorial for the mechanic *is* the emotional peak.
+**5. He is taken, and the player carries it for two levels.** *(Revised 2026-09-28, from play.)* The original plan was for the corruption and the rescue to be the same beat: corrupt him, and force the player's first use of the restoration weapon to be on the mentor who just handed it over. It was built that way, and the problem with it was pacing, not sequencing — **every beat the character had was spent inside about ninety seconds of level 3**, after which he was fine again and spent the back half of the game waving the player through corners.
+
+So the scene now stops at the corruption. He turns, and he walks away east under his own legs, which is worse than being dragged because there is nothing to fight and the weapon in the player's hands does not help. Then:
+
+| Face | What he is |
+|---|---|
+| 3 | given, corrupted, gone |
+| 4 | **nobody at the corner.** Halfway across, one glimpse of him being walked the other way, unreachable, and he doesn't answer to his name |
+| 5 | **found, as one of them** — a gold octagon in the level's enemy list, four triangles to put back, and affordable but not free |
+| 6 | at the corner for the first time since face 2, because the player put him there. And it's the one face he won't cross |
+
+> The sequencing trick survives intact, just spread out: give the weapon, create the one target the player can't refuse, and then make them carry it. What the player learns the verb on is now an ordinary corrupted square two hundred pixels past the clearing — the tutorial and the emotional peak are separate again, and the peak is two levels later and costs something.
 
 **The ending of the arc — decided 2026-09-21, and built:**
 
 - **He stays restored.** Re-corruption would make the player's one act of rescue provisional, and the whole game is an argument that putting something back is worth doing.
-- **He does not stay whole.** He comes back scarred: the corners the spheres took are still gone, on every appearance after level 3. Restoring someone is not the same as undoing what was done to them, and the game says so out loud exactly once, at the end — *"You're still missing your corners." / "So is everyone worth knowing."*
+- **He does not stay whole.** He comes back scarred: the corners the spheres took are still gone, on every appearance after he is put back on face 5. Restoring someone is not the same as undoing what was done to them, and the game says so out loud exactly once, at the end — *"You're still missing your corners." / "So is everyone worth knowing."*
 - **He is at the core, and he does not fight.** He meets the player in the cavity, gives them the last of his triangles, says the same thing he said in level 3 ("the same as always — put it back"), and withdraws. The final fight is solo.
 - **He does not sacrifice himself.** He is alive at the end and the last line of the game is him suggesting they go up and look at the world together. This is a game built with and for a seven-year-old; the mentor surviving is not a softer ending, it's the one the story earned.
 
-> The beat this arc was really built for is **his absence on level 6**. He meets the player at every new face — four, five — and then on six he simply isn't there, and nothing explains it. Being always already there was the whole of his competence. Taking it away was the last thing the arc needed the player to feel before the descent.
+> The beat this arc was really built for is **his absence at a corner**. Being always already there was the whole of his competence, and taking it away was the thing the arc needed the player to feel. It was on face 6 and unexplained; it's on face 4 now and earned, because the player watched him go. The unexplained version was doing the work of a beat it hadn't paid for — and it left face 6, the hardest fight in the game, with nobody standing at the door. He's there now, and he says he isn't coming.
 
 ---
 
@@ -261,6 +288,37 @@ One boss per level, at the end. **A starting framework in the same spirit as the
 | 7 | **The Core** | The corrupted dodecahedron itself. | Twelve triangles, landed while it takes the room apart. See [the final boss](#the-final-boss). |
 
 Note the intended shape of the progression: it escalates through **mechanic variety** (jam it, restore it, puzzle it, survive it, out-fight it) before the finale, rather than through bigger health bars.
+
+### A boss has to be visibly doing the thing
+
+*(Added 2026-09-28, from play — "the boss' weapon isn't visible", then "the
+level 2 boss is swinging the drill like a pickaxe".)*
+
+All seven bosses worked, mechanically, long before any of them looked like
+it. Each one held a **single frozen idle pose for its entire fight**,
+because nothing carried "and right now it is doing THIS" from the phase
+machine to the drawing — the phases were real, and invisible.
+
+That is not a polish problem. Every fight in the list above is won by
+reading a window, and a window the player cannot see is a guessing game
+with a health bar attached. So:
+
+- **The window and the picture are the same event.** The Excavator hauls
+  *backwards* on a bound rig, body tilted away, bit juddering instead of
+  turning — the opposite geometry from the phase before it. The
+  Terraformer's arms drop the instant it opens. You should never need the
+  health bar to know it's your turn.
+- **The kit is the weapon, not a prop.** A boss holding a tool it never
+  uses is a boss the player learns to ignore. The Crew's bruisers swing the
+  pickaxes they were carrying as decoration; the General swings the
+  sledgehammer it was fighting "pure combat, no gimmick" *without*.
+- **Tools animate like themselves.** A drill is braced and pushed, not
+  chopped. This one is worth writing down because it was got wrong twice.
+
+`tools/boss-fight-probe.html` asserts it: every boss is left alone with its
+own phase machine for four hundred frames, and the visual state it owns has
+to take at least three distinct values. A boss that stands still fights
+exactly as well as one that moves, so nothing else would have noticed.
 
 ### Environmental storytelling — visual degradation
 
