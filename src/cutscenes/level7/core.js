@@ -37,7 +37,14 @@ export const l7Arrival = {
       }
     },
 
-    say('quarrick', "I can't go any closer. It pulls."),
+    // He said, on the sixth face, that it was as far as he went. He is
+    // standing in the middle of the world. Nobody makes anything of it,
+    // which is the point — the game does not need him to explain that he
+    // changed his mind, and the player worked out what the line was worth
+    // the moment they saw him here.
+    say('player',   "You said that was as far as you went."),
+    say('quarrick', "I did say that."),
+    say('quarrick', "I can't go any closer than this, though. It pulls."),
     say('quarrick', "Take the rest of mine."),
     {
       name: 'give-ammo',

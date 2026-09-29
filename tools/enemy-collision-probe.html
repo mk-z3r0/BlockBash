@@ -47,8 +47,17 @@
 
         for (const e of state.enemies) {
           if (!e.alive || e.restored) continue;
-          const box = { x: e.x, y: e.y, width: e.w, height: e.w };
-          if (isBlocked(box, { hazards: !e.boss })) {
+          // Two boxes, and the second one matters more than it looks.
+          //
+          // Where it IS catches the obvious case. Where it will LAND — the
+          // same grounded box entities/enemy.js tests moves against — is
+          // what catches something that has cleared a wall in mid-air and
+          // is about to come down inside it. A bouncer spends most of its
+          // life off the floor, so for that tier the live box is airborne
+          // and innocent for most of the frames it is sampled on.
+          const live = { x: e.x, y: e.y, width: e.w, height: e.w };
+          const grounded = { x: e.x, y: e.baseY == null ? e.y : e.baseY, width: e.w, height: e.w };
+          if (isBlocked(live, { hazards: !e.boss }) || isBlocked(grounded, { hazards: !e.boss })) {
             const key = `${e.boss ? 'boss' : e.kind || 'sphere'}@${Math.round(e.baseX)}`;
             if (!worst.has(key)) worst.set(key, Math.round(e.x));
           }

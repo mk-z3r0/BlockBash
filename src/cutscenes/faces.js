@@ -63,7 +63,10 @@ export const l4Arrival = {
     { name: 'empty', frames: 70 },
     say('narrator', "No one is waiting on this face."),
     say('player',   "He came through here. He has to have."),
-    say('narrator', "They shoot on this one. Did you notice?")
+    // A statement, not a question. It was Quarrick's line — he used to be
+    // standing here to ask it — and a narrator asking the player whether
+    // they noticed something reads as the game talking to itself.
+    say('narrator', "They shoot on this one.")
   ]
 };
 

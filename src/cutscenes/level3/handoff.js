@@ -135,7 +135,10 @@ export const l3Handoff = {
     },
 
     say('narrator', "He doesn't look back."),
-    say('player',   "...Where are they taking him?"),
+    // Not "where are they taking him" — nothing is visibly taking him. He
+    // is walking, on his own legs, and the scene has to ask the question the
+    // picture actually raises.
+    say('player',   "...Where's he going?"),
     say('narrator', "Down. Same as everything else."),
     // Three words, because a ten-year-old has to know what to do and
     // anything longer would be the game explaining its own best moment.
