@@ -449,6 +449,31 @@
     });
     if (!cramped) out.push(`  every spike bed landing has ${RECOVERY}px+ of floor to recover on`);
 
+    // ...and the mirror: a bed just past a column traps anyone on the FLOOR.
+    // The jump tests launch from the column's top and so never saw it; the
+    // sloppy-play bot, which runs along the floor like a kid does, stalled
+    // on level 3's bed 16px past an 88px column on every seed.
+    let hemmed = 0;
+    lv.hazards.forEach(h => {
+      if (h.width > 200) return;
+      const seg = ground.find(p => h.x >= p.x && h.x <= p.x + p.width);
+      if (!seg) return;
+      floating.forEach(p => {
+        const px = p.baseX == null ? p.x : p.baseX;
+        if (p.y + p.height < groundYAt(px) - 2) return;          // floating: not a wall
+        const end = px + p.width;
+        if (end <= h.x && h.x - end < RECOVERY && end > seg.x) {
+          hemmed++;
+          // Advisory. Level 3 is BUILT this way on purpose — the column is
+          // the launch pad and the bed is cleared from its top, which the
+          // jump tests above verify. It's the floor-level route that's
+          // hemmed, and that's a note for the author, not a broken level.
+          warn(`spike bed ${h.x}-${h.x + h.width} starts only ${h.x - end}px past the column at ${px}-${end} — nothing on the floor can set up that jump; it's cleared from the column`);
+        }
+      });
+    });
+    if (!hemmed) out.push(`  every spike bed has ${RECOVERY}px+ of floor before it after a column`);
+
     // How wide the tops are that the level expects to be landed on. The
     // player is 22px; a 54px column leaves 32px of slack, and a chain of
     // those is a precision platforming level, which this game is not.

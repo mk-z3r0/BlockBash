@@ -62,9 +62,9 @@ export default {
     { x: 970,  width: 630 },    // 70
     { x: 1690, width: 710 },    // 90
     { x: 2460, width: 1240 },   // 60 — the long stretch holding the clearing
-    { x: 3850, width: 750 },    // 150 — run only
+    { x: 3795, width: 805 },    // 95
     { x: 4655, width: 645 },    // 55
-    { x: 5460, width: 1840 }    // 160 — run only, then the Sculptor
+    { x: 5395, width: 1905 }    // 95 — then the Sculptor
   ],
 
   platforms: [
@@ -73,7 +73,7 @@ export default {
     // as the exam. Nothing here can kill you until 600.
     pillar(300, 44),
     pillar(410, 88),
-    pillar(520, 132),
+    pillar(520, 100),
     { x: 700, y: 200, width: 110, height: 18 },
 
     // --- the first real columns ---
@@ -81,7 +81,7 @@ export default {
     // level's first half and it is deliberately the SECOND column, so the
     // player arrives at it having already made the shorter version.
     pillar(1020, 76, { chewed: true }),
-    pillar(1270, 156),
+    pillar(1270, 100),
     { x: 1400, y: 200, width: 100, height: 18, chewed: true },
 
     pillar(1760, 76, { chewed: true }),
@@ -95,16 +95,16 @@ export default {
 
     // --- after the handoff, the columns come back taller ---
     pillar(3930, 76, { chewed: true }),
-    pillar(4180, 156, { chewed: true }),
+    pillar(4180, 100, { chewed: true }),
     { x: 4400, y: 200, width: 110, height: 18 },
 
     pillar(4730, 76, { chewed: true }),
-    pillar(4980, 96),
+    pillar(4980, 76),
     { x: 5120, y: 220, width: 110, height: 18, chewed: true },
 
     // --- the run in to the Sculptor: three columns, descending ---
     pillar(5550, 76, { chewed: true }),
-    pillar(5800, 96, { chewed: true }),
+    pillar(5800, 76, { chewed: true }),
     pillar(6100, 88, { chewed: true }),
     { x: 6420, y: 314, width: 110, height: 18 }
     // 6600 onward is the Sculptor's ground, left open.
@@ -127,7 +127,10 @@ export default {
     { type: 'spikes', x: 4830, width: 55 },
     { type: 'spikes', x: 5650, width: 55 },
     { type: 'spikes', x: 5900, width: 55 },
-    { type: 'spikes', x: 6200, width: 55 }
+    // There was a twelfth bed here, 16px past the column at 6100. From the
+    // column top it was fine; from the floor nobody could set it up, and
+    // moved out to where the floor could, the column top couldn't reach
+    // it. The run-in to the Sculptor has two beds, which is plenty.
   ],
 
   ammo: [
@@ -145,7 +148,7 @@ export default {
     // carrying, so the scene that hands over the Cornerstone has no business
     // running for someone who already has one.
     { id: 'l3-handoff',  when: { reachX: 3100, lacksWeapon: 'cornerstone' } },
-    { id: 'edge-transition', when: { nearWorldEdge: 100 } }
+    { id: 'edge-transition', when: { nearWorldEdge: 100, bossDefeated: true } }
   ],
 
   enemies: [
@@ -191,13 +194,13 @@ export default {
 
   coins: [
     // the stair
-    [330, 352], [440, 308], [550, 264],
+    [330, 352], [440, 308], [550, 296],
     [740, 186], [780, 186],
     [820, 396],
     // first columns
     [1050, 320],
     [1200, 396], [1240, 396],
-    [1300, 240],
+    [1300, 296],
     [1430, 186], [1470, 186],
     [1550, 396],
     // second stretch
@@ -213,16 +216,16 @@ export default {
     // after the handoff
     [3960, 320],
     [4120, 396], [4160, 396],
-    [4210, 240],
+    [4210, 296],
     [4430, 186], [4470, 186],
     [4760, 320],
     [4920, 396], [4960, 396],
-    [5010, 300],
+    [5010, 320],
     [5150, 206], [5190, 206],
     // the run in
     [5580, 320],
     [5760, 396],
-    [5830, 300],
+    [5830, 320],
     [6000, 396], [6040, 396],
     [6130, 308],
     [6450, 300], [6490, 300],

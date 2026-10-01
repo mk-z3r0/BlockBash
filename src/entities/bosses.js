@@ -17,7 +17,7 @@
 
 import { state } from '../state.js';
 import { getLevel, surfaceYAt, isBlocked } from '../levels/levelLoader.js';
-import { carveGap } from '../levels/terrain.js';
+import { carveGap, crackFloor, updateCracks } from '../levels/terrain.js';
 import { spawnWeaponPickup, spawnAmmoPickup } from './weaponPickup.js';
 import { spawnExplosion, spawnDust } from './particles.js';
 import { spawnSphereShot, startAttack } from '../weapons/combat.js';
@@ -165,6 +165,20 @@ function updateExcavator(boss, player) {
 // only one that stops to fire and so the only one you can reach, and the
 // other two lose the link and become ordinary. That IS the puzzle: work
 // out that the one hanging back is the one that matters.
+// The crew works in SHIFTS. Reported from play: "the demolition crew isn't
+// really fair, the pursuit is too good, can't find many openings." Two
+// bruisers that never stop closing at 1.25x, plus a shooter, is three
+// problems with no gaps between them. So they press, and then they fall
+// back to regroup — and the regroup is the opening, because the shooter is
+// the one you have to reach and for those frames nothing is in your way.
+//
+// Shared across the crew off one clock (the shooter's shotTimer, which all
+// three can read), so the two bruisers always move together: one pressing
+// while the other backs off would be the same wall from a different side.
+const CREW_PRESS = 110;     // frames closing in
+const CREW_REGROUP = 90;    // frames backing off to flank positions
+const CREW_CYCLE = CREW_PRESS + CREW_REGROUP;
+
 function updateCrew(boss, player) {
   const crew = state.enemies.filter(e => e.alive && e.crew === boss.crew);
   const shooter = crew.find(e => e.role === 'shooter');
@@ -176,12 +190,20 @@ function updateCrew(boss, player) {
   const dir = Math.sign((player.x + player.width / 2) - (boss.x + boss.w / 2)) || 1;
   boss.facing = dir;
 
+  // One clock for the whole crew.
+  const leader = shooter || crew[0];
+  if (leader === boss) boss.crewClock = ((boss.crewClock || 0) + 1) % CREW_CYCLE;
+  const clock = leader.crewClock || 0;
+  const pressing = clock < CREW_PRESS;
+
   if (boss.role === 'shooter') {
     // hangs back and fires — reachable, which is the point
     const wanted = player.x + player.width / 2 - dir * 260;
     stepTo(boss, boss.x + Math.sign(wanted - boss.x) * Math.abs(boss.speed) * 0.7);
     if (--boss.shotTimer <= 0) {
-      boss.shotTimer = 95;
+      // 130, not 95. With the bruisers pressing in waves the shots are the
+      // thing that fills the gaps, and at 95 they filled them completely.
+      boss.shotTimer = 130;
       boss.charge = 0;
       spawnSphereShot(boss);
     } else {
@@ -195,12 +217,21 @@ function updateCrew(boss, player) {
     return;
   }
 
-  // The other two crowd the player, and now they swing at them. They were
-  // carrying a pickaxe as decoration — `tool`, drawn and never used — so two
-  // thirds of this fight was three spheres walking into you.
-  stepTo(boss, boss.x + dir * Math.abs(boss.speed) * 1.25);
+  if (pressing) {
+    // Closing — at the speed they were authored, not a quarter faster. The
+    // 1.25 was the whole of "the pursuit is too good".
+    stepTo(boss, boss.x + dir * Math.abs(boss.speed));
+    pose(boss, 0);
+    if (withinSwing(boss, player, 46)) startAttack(boss);
+    return;
+  }
+  // Regrouping: back off to a flank position either side of the shooter
+  // and hold there. This is the window — the shooter is open for the whole
+  // of it, and for once the two things that hurt you are walking away.
+  const side = boss.flank || (boss.flank = (crew.indexOf(boss) % 2 === 0 ? -1 : 1));
+  const home = (shooter ? shooter.x : boss.baseX) + side * 150;
+  stepTo(boss, boss.x + Math.sign(home - boss.x) * Math.abs(boss.speed) * 0.8);
   pose(boss, 0);
-  if (withinSwing(boss, player, 46)) startAttack(boss);
 }
 
 // --- level 5: The Terraformer ------------------------------------------
@@ -243,15 +274,61 @@ function breath(t) {
   return (1 + Math.cos(d * Math.PI)) / 2;
 }
 
-function updateTerraformer(boss) {
+// How the Terraformer attacks the ROOM rather than the player — the thing
+// the fight was always described as and, until this, mostly wasn't.
+// Reported from play: "the terraformer level where you just get knocked off
+// the platform is not what I was intending, but seeing the spheres move
+// platforms and pits underneath the player."
+//
+//   while the room is LOW and the player is on the floor: it cracks the
+//   floor under them. The crack holds TERRA_WARN frames, then that patch
+//   drops out. Where the crack was — not where the player is by then.
+//   while the room is RISING: the lifts also drift sideways, so the
+//   platform you boarded is not quite where you boarded it.
+//
+// Capped, like the core's collapses: a floor you can saw into islands turns
+// hard into over.
+const TERRA_WARN = 75;              // 1.25s to read it and step off
+const TERRA_PIT = 40;              // a hop, not a jump (walk carry ~93)
+const TERRA_MAX_PITS = 4;
+const TERRA_SWAY = 48;             // px the lifts drift sideways at the top
+
+function updateTerraformer(boss, player) {
   const level = getLevel();
   boss.cycle = (boss.cycle + 1) % TERRAFORMER_CYCLE;
   const t = boss.cycle / TERRAFORMER_CYCLE;
   const lift = breath(t);
+  const low = t < T_HOLD_LOW;
 
   for (const p of level.platforms) {
     if (!p.mover) continue;
     p.y = p.baseY - p.mover * lift;
+    // Sideways drift, strongest at the top. Deterministic from the
+    // platform's own x so the two never move in lockstep.
+    const phase = (p.baseX % 7) / 7 * Math.PI * 2;
+    p.x = p.baseX + Math.sin(boss.cycle * 0.02 + phase) * TERRA_SWAY * lift;
+  }
+
+  // Crack the floor under the player once per low phase, while they are
+  // actually standing on the floor (not on a lift — a crack under a
+  // platform means nothing).
+  if (low && !boss.crackedThisCycle && (boss.pits || 0) < TERRA_MAX_PITS &&
+      player.isOnGround && Math.abs((player.y + player.height) - level.groundY) < 3) {
+    const at = player.x + player.width / 2 - TERRA_PIT / 2;
+    // never right under a lift's footprint, or the lift lands on nothing
+    const underLift = level.platforms.some(p => p.mover && at + TERRA_PIT > p.baseX - 30 && at < p.baseX + p.width + 30);
+    if (!underLift) {
+      crackFloor(level, at, TERRA_PIT, TERRA_WARN, { margin: 36, maxX: level.worldEdgeX - 220 });
+      boss.crackedThisCycle = true;
+      playRumble();
+      showToast('THE FLOOR IS CRACKING', 60);
+    }
+  }
+  if (!low) boss.crackedThisCycle = false;
+  for (const g of updateCracks(level)) {
+    boss.pits = (boss.pits || 0) + 1;
+    spawnDust(g.x + g.width / 2, level.groundY, 14, { spread: 5, size: 8, life: 30 });
+    playRumble();
   }
 
   // Open across the whole hold at the top, plus the last of the climb and
@@ -423,6 +500,8 @@ export function initBoss(boss) {
                   : boss.bossKind === 'general' ? 90
                   : EXCAVATOR.advance;
   boss.collapses = 0;
+  boss.pits = 0;
+  boss.crackedThisCycle = false;
   boss.cycle = 0;
   boss.chargeDir = -1;
   boss.shotTimer = 90;

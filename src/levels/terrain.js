@@ -72,3 +72,35 @@ export function restoreCarvedGaps(level) {
 export function carveCount() {
   return carves.length;
 }
+
+
+// --- telegraphed pits ------------------------------------------------------
+//
+// The Terraformer opens the floor UNDER the player, which GAME_DESIGN asked
+// for and the level rules forbid in the same breath: "a hole opening where
+// you are standing isn't an attack you can answer, it's just a death." The
+// way out of that is to say it first. A crack appears, holds for ~50 frames
+// while the player reads it and steps off, and THEN the gap opens — where
+// the crack was, not where the player has moved to. Fair, because it was
+// announced; frightening, because it was under your feet.
+export function crackFloor(level, x, width, frames, opts = {}) {
+  level.pendingGaps = level.pendingGaps || [];
+  level.pendingGaps.push({ x, width, left: frames, total: frames, opts });
+}
+
+// Ticks the cracks and opens any that have run out. Returns the gaps that
+// opened this frame so the caller can make a noise about them.
+export function updateCracks(level) {
+  if (!level.pendingGaps || !level.pendingGaps.length) return [];
+  const opened = [];
+  for (const g of level.pendingGaps) {
+    if (--g.left > 0) continue;
+    if (carveGap(level, g.x, g.width, g.opts)) opened.push(g);
+  }
+  level.pendingGaps = level.pendingGaps.filter(g => g.left > 0);
+  return opened;
+}
+
+export function clearCracks(level) {
+  level.pendingGaps = [];
+}

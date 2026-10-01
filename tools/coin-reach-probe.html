@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#000;">
+<canvas id="game" width="800" height="450"></canvas><pre id="out">running…</pre>
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true, narrative: { seenCutscenes: {}, npcStage: 0, flags: {} } })); window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERROR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  // Can every coin be picked up?
+  //
+  // Reported from play: "there are still coins that are unreachable because
+  // they are in blocks." A coin inside a column, or floating higher than a
+  // jump from anything near it, is a coin a ten-year-old will spend five
+  // minutes failing to get and then decide the game is broken. Two checks:
+  // nothing solid overlaps the coin, and the coin's centre is within a
+  // jump's rise of some surface the player can stand on (the same reach
+  // numbers level-audit-probe.html uses — the feet rise 97 from a stand,
+  // ~117 at a run, and the player is 22 tall, so a coin up to ~135px above a
+  // surface is grabbed at the top of the arc).
+  import { levels } from '../src/levels/registry.js';
+
+  const COIN = 12;
+  const GRAB = 135;          // coin centre this far above a surface is collectable
+  const CARRY = 168;
+  const out = [];
+  let fails = 0;
+
+  setTimeout(() => {
+    levels.forEach((lv, i) => {
+      const ground = (lv.ground || []).map(g => ({ x: g.x, x2: g.x + g.width, y: g.y == null ? lv.groundY : g.y }));
+      const plats = (lv.platforms || []).filter(p => p.width > 1);
+      const travel = p => (p.move && p.move.y) || p.mover || 0;
+      const surfaces = [
+        ...ground.map(g => ({ x: g.x, x2: g.x2, top: g.y, bottom: g.y })),
+        // A platform that travels sweeps every height between its top and
+        // its base, and a coin anywhere in that band is taken from on board.
+        ...plats.map(p => ({ x: p.x, x2: p.x + p.width, top: p.y - travel(p), bottom: p.y }))
+      ];
+      let bad = 0;
+      for (const [cx, cy] of lv.coins || []) {
+        const box = { x: cx - COIN / 2, y: cy - COIN / 2, w: COIN };
+        const inside = plats.find(p =>
+          box.x < p.x + p.width && box.x + box.w > p.x &&
+          box.y < p.y + p.height && box.y + box.w > p.y);
+        if (inside) {
+          bad++; fails++;
+          out.push(`  FAIL level ${i + 1}: coin at [${cx}, ${cy}] is inside the block at ${inside.x}-${inside.x + inside.width} (y${inside.y}-${inside.y + inside.height})`);
+          continue;
+        }
+        const reach = surfaces.some(s => {
+          const gap = cx < s.x ? s.x - cx : (cx > s.x2 ? cx - s.x2 : 0);
+          return gap <= CARRY && cy >= s.top - GRAB && cy <= s.bottom + 20;
+        });
+        if (!reach) {
+          bad++; fails++;
+          out.push(`  FAIL level ${i + 1}: coin at [${cx}, ${cy}] is out of reach of every surface`);
+        }
+      }
+      if (!bad) out.push(`  ok   level ${i + 1}: all ${(lv.coins || []).length} coins collectable`);
+    });
+    out.push(fails ? `*** ${fails} FAILURE(S)` : 'PASS every coin in the game can be picked up');
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 250);
+</script></body></html>

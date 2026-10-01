@@ -16,8 +16,8 @@ import {
   resetProjectiles, consumePlayerHit, resetOctagonHint
 } from '../weapons/combat.js';
 import { loadLevel, getLevel, surfaceYAt } from '../levels/levelLoader.js';
-import { drawPlatforms, drawCheckpoints, drawHazards, drawWorldEdge } from '../levels/levelRenderer.js';
-import { restoreCarvedGaps } from '../levels/terrain.js';
+import { drawPlatforms, drawCheckpoints, drawHazards, drawWorldEdge, drawCracks } from '../levels/levelRenderer.js';
+import { restoreCarvedGaps, clearCracks } from '../levels/terrain.js';
 import { updateMovers, resetMovers } from '../levels/movers.js';
 import { drawBlockHouse } from './blockHouse.js';
 import { levels } from '../levels/registry.js';
@@ -32,7 +32,7 @@ import { updatePopups, drawPopups, resetPopups } from '../ui/popups.js';
 import { hitHazard, checkCheckpoints } from './playing/collisions.js';
 import { DEBUG } from '../engine/devflags.js';
 import {
-  startCutscene, updateCutscene, drawCutsceneWorld, drawCutsceneScreen,
+  startCutscene, updateCutscene, drawCutsceneWorld, drawCutsceneScreen, resetCutscenesForRespawn,
   skipCutscene, isCutsceneActive, activeCutsceneId, currentLocks,
   setWorldTransform, getWorldTransform, hasCompleted, resetCutscenes
 } from '../cutscenes/runner.js';
@@ -115,10 +115,19 @@ function bossActive() {
   return state.enemies.some(e => e.boss && e.alive && !e.restored);
 }
 
-function resetBossAndCutscene() {
-  resetCutscenes();
+function resetBossAndCutscene({ respawn = false } = {}) {
+  if (respawn) resetCutscenesForRespawn(); else resetCutscenes();
   state.rescueNPC = null;
   state.enemies.filter(e => e.boss).forEach(boss => {
+    // A boss that is beaten BY A SCENE (level 1's Foreman) stays beaten
+    // once that scene has played this attempt and the player is holding
+    // what it left behind. Reviving it replayed the whole showdown on
+    // every death after it. Fightable bosses still restart — a fight the
+    // player died in is a fight they get to have again.
+    if (respawn && boss.mode === 'cutscene' && hasCompleted('boss-showdown') && player.hasWeapon) {
+      boss.alive = false;
+      return;
+    }
     boss.alive = true;
     boss.squish = 0;
     boss.awake = false;
@@ -162,6 +171,7 @@ function resetBossAndCutscene() {
   state.weaponPickups = state.weaponPickups.filter(p => p.collected || !p.fromBoss);
   // and put back whatever ground the boss mined out
   restoreCarvedGaps(getLevel());
+  clearCracks(getLevel());
   // ...and put every moving platform back where the level author left it.
   resetMovers(getLevel());
 }
@@ -181,13 +191,35 @@ function loseLife() {
     switchTo('gameover');
   } else {
     resetPlayer();
-    // Wipes any cutscene mid-flight too. Not reachable with level 1's own
+    // Drops any cutscene mid-flight, keeps what has already played. Not reachable with level 1's own
     // geometry (nothing near the edge can hit the player during the
     // walk-up, and the boss cutscene is barred from digging into that
     // corridor), but a future level's ending could sit somewhere less
     // safe, and a stale scripted walk surviving a respawn would keep
     // driving the post-respawn player toward an edge they're nowhere near.
-    resetBossAndCutscene();
+    resetBossAndCutscene({ respawn: true });
+  }
+}
+
+// You cannot walk past a fight.
+//
+// Reported from play: "the bosses can be avoided by continuing to the end."
+// They could — the edge transition only ever asked whether the player was
+// near the edge. The level data now also asks `bossDefeated`, and this is
+// the part the player SEES: a shove back and a line, rather than an edge
+// that mysteriously does nothing.
+let edgeHoldToast = 0;
+function holdTheEdgeWhileBossLives() {
+  const level = getLevel();
+  const fightOn = state.enemies.some(e => e.boss && e.alive && !e.restored && e.mode === 'fight');
+  if (!fightOn) return;
+  const lip = level.worldEdgeX - 140;
+  if (player.x + player.width < lip) return;
+  player.x = lip - player.width;
+  if (player.velocityX > 0) player.velocityX = -2.5;
+  if (--edgeHoldToast <= 0) {
+    edgeHoldToast = 150;
+    showToast('FINISH THE FIGHT FIRST', 90);
   }
 }
 
@@ -237,9 +269,25 @@ function startLevel(index) {
   // story equipment rather than a level drop: once Quarrick hands it over
   // it stays handed over, so levels that come after the handoff give it
   // back at spawn (see `startsWith` in the level data).
-  player.weapon = level.startsWith || null;
+  // What you walk in holding is what you walked out of the last level
+  // holding. `startsWith` is the level's canonical loadout — what you get
+  // from the level picker, or if you somehow arrive empty-handed — not an
+  // override. Reported from play as "why do you randomly start with a
+  // sledgehammer": a player who skipped the Excavator arrived at level 3
+  // with a pickaxe and was handed a hammer by nobody.
+  //
+  // The Cornerstone is the exception and always was: it is story equipment,
+  // the only thing that restores a square, and level 7 cannot be finished
+  // without it. Any level authored around it re-arms it.
+  const carried = player.hasWeapon ? player.weapon : null;
+  const canonical = level.startsWith || null;
+  player.weapon = (canonical === 'cornerstone' || !carried) ? canonical : carried;
   player.hasWeapon = !!player.weapon;
-  player.ammo = level.startsWithAmmo || 0;
+  // Ammo likewise: never LESS than the level is authored to start with, so
+  // arriving low can't make a level unwinnable, and never thrown away.
+  player.ammo = player.weapon === 'cornerstone'
+    ? Math.max(player.ammo || 0, level.startsWithAmmo || 0)
+    : (level.startsWithAmmo || 0);
   player.weaponTimer = 0;
   player.weaponCooldown = 0;
   resetCamera();
@@ -250,6 +298,7 @@ function startLevel(index) {
 // Same level, fresh attempt — what a game-over retry does. Never sends the
 // player back to level 1 just because they ran out of lives.
 function retryCurrentLevel() {
+  player.weapon = null; player.hasWeapon = false; player.ammo = 0;
   state.score = 0;
   state.lives = 3;
   state.coinsCollected = 0;
@@ -263,6 +312,7 @@ function retryCurrentLevel() {
 // holding, which is why dropping into the middle of the game works at all.
 function startRunAt(index) {
   resetNarrative();
+  player.weapon = null; player.hasWeapon = false; player.ammo = 0;
   state.currentLevelIndex = Math.max(0, Math.min(index, levels.length - 1));
   state.score = 0;
   state.lives = 3;
@@ -321,6 +371,7 @@ export function drawWorldAndHUD() {
   if (level.house) drawBlockHouse(level.house.x, level.groundY, 1.1);
   drawPlatforms();
   if (!level.noWorldEdge) drawWorldEdge(state.frameCount);
+  drawCracks(state.frameCount);
   drawHazards();
   drawCheckpoints();
   drawCoins(state.frameCount);
@@ -406,6 +457,7 @@ export const playingScene = {
       }
 
       checkCheckpoints();
+      holdTheEdgeWhileBossLives();
     }
 
     // Start whatever this level says should be playing by now. Nothing

@@ -2,6 +2,33 @@ import { ctx } from '../engine/renderer.js';
 
 export let particles = [];
 
+// Chunks of a planet. Heavier, longer-lived and faster than an explosion's
+// sparks, thrown outward from a point along a cone so they read as the thing
+// coming apart rather than as a flash on top of it. For the opening.
+export function spawnDebris(x, y, count, color, opts = {}) {
+  const spread = opts.spread == null ? Math.PI * 2 : opts.spread;
+  const aim = opts.aim == null ? 0 : opts.aim;
+  const speed = opts.speed || 4;
+  const life = opts.life || 70;
+  for (let i = 0; i < count; i++) {
+    const a = aim + (Math.random() - 0.5) * spread;
+    const v = speed * (0.45 + Math.random() * 0.9);
+    particles.push({
+      x: x + (Math.random() - 0.5) * 8,
+      y: y + (Math.random() - 0.5) * 8,
+      vx: Math.cos(a) * v,
+      vy: Math.sin(a) * v,
+      life, maxLife: life,
+      size: 4 + Math.random() * 9,
+      color,
+      rotate: true,
+      spin: (Math.random() - 0.5) * 0.3,
+      shrink: true,
+      drag: 0.985
+    });
+  }
+}
+
 export function spawnExplosion(x, y, color) {
   for (let i = 0; i < 10; i++) {
     const angle = (Math.PI * 2 * i) / 10;
@@ -44,6 +71,10 @@ export function spawnDust(x, y, count, opts) {
 }
 
 export function updateParticles() {
+  for (const p of particles) {
+    if (p.drag) { p.vx *= p.drag; p.vy *= p.drag; }
+    if (p.spin) p.angle = (p.angle || 0) + p.spin;
+  }
   for (const p of particles) {
     p.x += p.vx;
     p.y += p.vy;

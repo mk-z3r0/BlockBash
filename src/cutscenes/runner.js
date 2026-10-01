@@ -194,10 +194,24 @@ export function hasCompleted(id) {
   return completed.has(id);
 }
 
-// Called on every level load and every respawn: nothing about a cutscene
-// should survive either.
+// Called on every level load: nothing about a cutscene survives it.
 export function resetCutscenes() {
   active = null;
   worldTransformState = null;
   completed = new Set();
+}
+
+// Called on a respawn. Whatever was mid-flight is dropped — a stale
+// scripted walk must not keep driving a respawned player toward an edge
+// they are nowhere near — but what has already PLAYED stays played.
+//
+// Reported from play: "cut scenes don't need to be repeated after the
+// player dies." Clearing the completed set here was what made level 1's
+// whole showdown run again for anyone who died past it: the Foreman is
+// revived on respawn, it comes into view, and the scene fires like the
+// first time. Scenes whose outcome has to be re-applied are gated on their
+// own state (lacksWeapon, quarrickLost) and still fire when they must.
+export function resetCutscenesForRespawn() {
+  active = null;
+  worldTransformState = null;
 }

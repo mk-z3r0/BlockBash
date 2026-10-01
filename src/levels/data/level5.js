@@ -43,10 +43,14 @@ export default {
     { x: 0,    width: 900 },
     { x: 990,  width: 700 },     // 90
     { x: 1750, width: 760 },     // 60
-    { x: 2660, width: 800 },     // 150 — run only
-    { x: 3550, width: 700, y: 370 },  // 90, and 40px up
+    { x: 2605, width: 855 },     // 95
+    { x: 3505, width: 745, y: 370 },  // 45, and 40px up — a step, not a leap
     { x: 4340, width: 720 },     // 90, back down
-    { x: 5220, width: 2080 }     // 160 — run only, then the Terraformer
+    // 120, not 160. Run-only gaps are the thing a sloppy player dies in
+    // over and over — tools/sloppy-play-probe.html put twelve of its
+    // twenty-five level-5 deaths in this one pit — and this one came right
+    // after the most expensive encounter in the level.
+    { x: 5155, width: 2145 }     // 95 — then the Terraformer
   ],
 
   platforms: [
@@ -106,7 +110,6 @@ export default {
     { type: 'spikes', x: 2100, width: 55 },
     { type: 'spikes', x: 3000, width: 60 },
     { type: 'spikes', x: 3900, width: 55 },
-    { type: 'spikes', x: 4700, width: 60 },
     { type: 'spikes', x: 5600, width: 55 },
     { type: 'spikes', x: 6000, width: 60 }
     // 6300 onward: the Terraformer's floor, left alone. It has other plans.
@@ -141,7 +144,7 @@ export default {
     // with everything else in the level.
     { id: 'l5-found',    when: { reachX: 4300, quarrickLost: true } },
     { id: 'l5-restored', when: { quarrickRestored: true } },
-    { id: 'edge-transition', when: { nearWorldEdge: 100 } }
+    { id: 'edge-transition', when: { nearWorldEdge: 100, bossDefeated: true } }
   ],
 
   enemies: [
@@ -150,19 +153,19 @@ export default {
     { x: 850,  y: GROUND_Y - 22, w: 22, minX: 820,  maxX: 878,  speed: 1.6, bounce: true },
     // Short span on purpose: an aggressor reaches 330px, and anything
     // wider put the checkpoint at 1770 inside it.
-    { x: 1360, y: GROUND_Y - 22, w: 22, minX: 1350, maxX: 1400, speed: 1.6,
+    { x: 1520, y: GROUND_Y - 22, w: 22, minX: 1480, maxX: 1560, speed: 1.6,
       tier: 'aggressor', shoots: true },
     { x: 2380, y: GROUND_Y - 22, w: 22, minX: 2320, maxX: 2460, speed: 1.7,
       tier: 'pursuer', weapon: 'pickaxe' },
     { x: 2160, y: GROUND_Y - 26, w: 26, minX: 2150, maxX: 2270, speed: 0.85,
       kind: 'octagon', restoreHits: 2 },
-    { x: 2760, y: GROUND_Y - 22, w: 22, minX: 2700, maxX: 2860, speed: 1.6, bounce: true },
-    { x: 2950, y: GROUND_Y - 22, w: 22, minX: 2900, maxX: 3020, speed: 1.6,
-      tier: 'aggressor', shoots: true },
-    { x: 3390, y: GROUND_Y - 22, w: 22, minX: 3340, maxX: 3420, speed: 1.7,
+        { x: 3390, y: GROUND_Y - 22, w: 22, minX: 3340, maxX: 3420, speed: 1.7,
       tier: 'pursuer', weapon: 'pickaxe' },
-    { x: 3850, y: 370 - 22,      w: 22, minX: 3790, maxX: 3900, speed: 1.6, bounce: true },
-    { x: 4180, y: 370 - 22,      w: 22, minX: 4100, maxX: 4240, speed: 1.6,
+    { x: 3740, y: 370 - 22,      w: 22, minX: 3700, maxX: 3790, speed: 1.6, bounce: true },   // between the flag at 3660 and the bed at 3900
+    // Back from the shelf's end: at 4100-4240 it stood over the landing
+    // of the pit below and shot down into the reunion. Reported by the
+    // sloppy-play bot as thirty deaths in one spot.
+    { x: 4060, y: 370 - 22,      w: 22, minX: 3990, maxX: 4130, speed: 1.6,
       tier: 'aggressor', shoots: true },
     // --- Quarrick ---
     // An ordinary corrupted square in the level data, flagged `quarrick`,
@@ -175,10 +178,8 @@ export default {
     // Four triangles, not the field's two and not the Sculptor's six. Enough
     // to be a decision with ten in the magazine; not so many that a player
     // who has been spending freely arrives unable to afford him.
-    { x: 4460, y: GROUND_Y - 44, w: 44, minX: 4400, maxX: 4620, speed: 0.55,
+    { x: 4520, y: GROUND_Y - 44, w: 44, minX: 4480, maxX: 4620, speed: 0.55,
       kind: 'octagon', quarrick: true, restoreHits: 4 },
-    { x: 4880, y: GROUND_Y - 22, w: 22, minX: 4820, maxX: 4980, speed: 1.7,
-      tier: 'pursuer', weapon: 'pickaxe' },
     { x: 5740, y: GROUND_Y - 22, w: 22, minX: 5680, maxX: 5820, speed: 1.6,
       tier: 'aggressor', shoots: true },
     { x: 6250, y: GROUND_Y - 26, w: 26, minX: 6180, maxX: 6320, speed: 0.85,
@@ -220,7 +221,7 @@ export default {
 
   checkpoints: [
     { x: 1960, y: GROUND_Y - 70, width: 8, height: 70 },
-    { x: 3660, y: 370 - 70,      width: 8, height: 70 },
+    { x: 3610, y: 370 - 70,      width: 8, height: 70 },
     { x: 5380, y: GROUND_Y - 70, width: 8, height: 70 }
   ]
 };

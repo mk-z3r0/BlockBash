@@ -204,6 +204,10 @@ function patrol(enemy) {
 // A fightable boss idles until the player is near enough for the fight to be
 // something they can see happening.
 function bossEngaged(boss, player) {
+  // A level can draw the arena's threshold explicitly. The Excavator's
+  // arena is entered over a block, and a boss that engages from the far
+  // side of it walks into the block and stays there.
+  if (boss.engageFromX != null && player.x + player.width < boss.engageFromX) return false;
   return Math.abs((player.x + player.width / 2) - (boss.x + boss.w / 2)) < BOSS_ENGAGE_RANGE;
 }
 
@@ -445,7 +449,7 @@ export function updateEnemies(player, cutsceneActive) {
       // AND an octagon, and what it is matters more than what rank it
       // holds: it shambles and it's beaten by being restored, exactly like
       // every other corrupted square.
-      if (playerIsNear(enemy, player, 200)) chase(enemy, player, OCTAGON_SPEED);
+      if (playerIsNear(enemy, player, enemy.quarrick ? 110 : 200)) chase(enemy, player, OCTAGON_SPEED);
       else patrol(enemy);
     } else if (enemy.boss && enemy.mode === 'fight') {
       // A real fight: the boss drives itself. Its own phase machine decides

@@ -92,7 +92,7 @@ export default {
 
   cutscenes: [
     { id: 'l2-arrival', when: { levelStart: true }, once: true },
-    { id: 'edge-transition', when: { nearWorldEdge: 100 } }
+    { id: 'edge-transition', when: { nearWorldEdge: 100, bossDefeated: true } }
   ],
 
   enemies: [
@@ -119,6 +119,11 @@ export default {
 
     // --- The Excavator ---
     { x: 6980, y: GROUND_Y - 33, w: 33, minX: 6770, maxX: 7130, speed: 1.5,
+      // The fight starts once the player is over the climb block at
+      // 6650-6716, not when they are within a screen of it. Engaging from
+      // the far side had it advancing into the block and standing there
+      // drilling the wall. Reported from play.
+      engageFromX: 6730,
       boss: true, mode: 'fight', bossKind: 'excavator', bossName: 'THE EXCAVATOR',
       // The rig it operates. Drawn, not swung — see `tool` in entities/enemy.js.
       tool: 'drill',

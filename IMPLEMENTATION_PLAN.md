@@ -627,6 +627,8 @@ What's in it, and what each thing is actually for:
 | `level-editor-probe` | That the editor edits: a drag moves the right object by the right amount, resize handles keep the opposite edge fixed, undo/redo counts match the gesture, and its change list round-trips |
 | `level-data-probe` | The boring stuff, read straight off level data: weapons and cutscene ids that exist, a level that can end, spawns and checkpoints over ground, hazards that don't run off a ledge. Found three of level 6's checkpoints floating in its pits |
 | `restored-exit-probe` | That a square the player just paid triangles to save leaves in one piece — walks the ground it's on, jumps what it has to, never ends up inside a wall |
+| `coin-reach-probe` | That every coin can be picked up: nothing solid overlaps it, and it is within a jump of some surface (a mover's whole sweep counts). Found two inside a level-4 cover block |
+| `sloppy-play-probe` | **Report-only.** A bot that runs, jumps late by a random few px, lets go early, reacts to spheres and spikes a little too late, and learns one thing per death. It found every real difficulty fix in the 2026-09-30 pass — the run-only pits, the beds that landed you on an enemy, the shooter over the reunion — and as a *gate* it is useless: its lives total swings 3× between seeds on level 1. Read its death map; don't trust the sum |
 | `stomp-probe` | That anything stompable can be stomped, from any height, including mid-swing. The armed enemies were the ones you couldn't land on, which is precisely backwards |
 | `respawn-state-probe` | What survives a death — and standing at all 24 checkpoints in the game for two seconds without touching the controls. The empirical partner to `checkpoint-siting-probe`'s static rule, and it has caught things the rule couldn't |
 | the older probes | Physics, coins, saves, cutscene contract — unchanged, and all still green |
@@ -801,6 +803,9 @@ way to simulate more than a frame or two.
 - **Wider hazards get crossed via platforms,** not jumped.
 - **Keep landing zones clear of the next hazard.** A hard jump carries 162px —
   don't let a full-power leap off a pit land in spikes.
+- **A sloppy player dies in run-only pits and on landings with something standing in them.** Both measured, 2026-09-30, by `sloppy-play-probe`. Every mid-level 150-160px gap on faces 3, 5, 6 and 7 is now 95px — a long walk-press clears it — and nothing stands within ~90px of where a spike bed drops you. The pattern that kept recurring across six rounds of fixes: move an enemy out of one landing and it is in the next one. Check the death map after every placement.
+- **Weapons carry between levels.** `startsWith` is a level's canonical loadout for the level picker and for arriving empty-handed, not an override — except the Cornerstone, which is story equipment and is always re-armed from face 4 on. Ammo is never thrown away and never below the level's authored start.
+- **A scene that has played this attempt does not play again after a death.** `resetCutscenesForRespawn` keeps the completed set; level 1's Foreman stays beaten once its showdown has run and the player holds the pickaxe. Scenes whose outcome must be re-applied are gated on state (`lacksWeapon`, `quarrickLost`) and still fire when they must.
 - **A checkpoint is somewhere you FALL into, not somewhere you appear.** A
   respawn puts the player ~90px above the flag's base and drops them, so on
   the way down they pass through every altitude between there and the

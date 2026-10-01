@@ -281,9 +281,15 @@ export function drawHazards() {
 // behind/below it. That interior band is also what the player lands on —
 // rotate the whole thing -PI/2 about the corner and the seam becomes the
 // new ground's surface line, with the band filling in beneath it.
-const EDGE_INTERIOR_DEPTH = 700; // becomes how far the new ground extends rightward once rotated
-const EDGE_INTERIOR_BACK = 320;  // becomes how far it extends downward once rotated
-const EDGE_SEAM_FADE = 520;      // how far down the corner glow reaches before it's gone
+// After the 90° turn, the seam IS the new face's ground line and the
+// interior is the ground under it — so both have to run at least a full
+// view further than the camera can see, or the player lands on a glowing
+// stub that dies out mid-screen. Reported from play: "the glowing edge
+// needs to be extended so it's uniform when the level rotates." It was
+// 520 with a fade to nothing, against an 800px view.
+const EDGE_INTERIOR_DEPTH = 1100; // becomes how far the new ground extends rightward once rotated
+const EDGE_INTERIOR_BACK = 320;   // becomes how far it extends downward once rotated
+const EDGE_SEAM_FADE = 1100;      // how far down the corner glow reaches — uniform, see below
 
 export function drawWorldEdge(frameCount) {
   const { worldEdgeX, groundY } = getLevel();
@@ -300,9 +306,12 @@ export function drawWorldEdge(frameCount) {
   // surface line of the face the player lands on, receding into the
   // distance — the same gradient works for both because it IS both.
   const pulse = 0.85 + Math.sin(frameCount * 0.05) * 0.15;
+  // Near-constant for its whole length, with only the final tenth
+  // feathered off so it doesn't end in a hard stop. Once rotated this is
+  // the surface line the player runs along for a full screen.
   const seam = ctx.createLinearGradient(0, groundY, 0, groundY + EDGE_SEAM_FADE);
   seam.addColorStop(0, `rgba(94, 231, 255, ${pulse})`);
-  seam.addColorStop(0.35, 'rgba(94, 231, 255, 0.45)');
+  seam.addColorStop(0.9, `rgba(94, 231, 255, ${pulse * 0.85})`);
   seam.addColorStop(1, 'rgba(94, 231, 255, 0)');
   ctx.fillStyle = seam;
   ctx.fillRect(worldEdgeX - 2, groundY, 4, EDGE_SEAM_FADE);
@@ -314,7 +323,7 @@ export function drawWorldEdge(frameCount) {
   bloom.addColorStop(0.5, `rgba(94, 231, 255, ${pulse * 0.28})`);
   bloom.addColorStop(1, 'rgba(94, 231, 255, 0)');
   ctx.fillStyle = bloom;
-  ctx.fillRect(worldEdgeX - 9, groundY, 18, EDGE_SEAM_FADE * 0.55);
+  ctx.fillRect(worldEdgeX - 9, groundY, 18, EDGE_SEAM_FADE * 0.92);
 }
 
 export function drawCheckpoints() {
@@ -327,5 +336,38 @@ export function drawCheckpoints() {
     ctx.lineTo(checkpoint.x + 4, checkpoint.y + 20);
     ctx.closePath();
     ctx.fill();
+  }
+}
+
+
+// The telegraph for a pit about to open: a jagged dark line across the floor
+// that widens and brightens as its time runs out, so "move" is legible from
+// across the room. See crackFloor() in levels/terrain.js.
+export function drawCracks(frameCount) {
+  const level = getLevel();
+  const cracks = level.pendingGaps;
+  if (!cracks || !cracks.length) return;
+  for (const c of cracks) {
+    const seg = level.platforms.find(p => p.ground && c.x >= p.x && c.x <= p.x + p.width);
+    if (!seg) continue;
+    const y = seg.y;
+    const urgency = 1 - c.left / c.total;         // 0 just cracked -> 1 about to drop
+    const flicker = (Math.floor(frameCount / 4) % 2 === 0) ? 1 : 0.6;
+    ctx.save();
+    ctx.strokeStyle = `rgba(255, ${Math.round(120 - urgency * 60)}, ${Math.round(140 - urgency * 100)}, ${(0.45 + urgency * 0.55) * flicker})`;
+    ctx.lineWidth = 2 + urgency * 3;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    const steps = 7;
+    for (let i = 0; i <= steps; i++) {
+      const px = c.x + (c.width * i) / steps;
+      const py = y + (i % 2 ? 4 + urgency * 5 : 1) + Math.sin(frameCount * 0.3 + i) * urgency * 2;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+    // a darker fill creeping up from below, as the floor gives
+    ctx.fillStyle = `rgba(10, 13, 28, ${urgency * 0.6})`;
+    ctx.fillRect(c.x, y, c.width, 6 + urgency * 14);
+    ctx.restore();
   }
 }

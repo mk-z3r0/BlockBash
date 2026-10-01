@@ -196,6 +196,12 @@
       // get to him" — both numbers were near zero, because the lift was a
       // plain cosine and a cosine does not stop at either end.
       {
+        // Up on the boss's own ledge for the measurement. The Terraformer
+        // cracks the FLOOR under a player standing on it, so a player pinned
+        // to the floor for 800 frames falls in, dies, and the respawn resets
+        // the fight — which read as "the window never opens".
+        player.x = boss.x - 60;
+        player.y = boss.y;
         const mv = lv.platforms.find(p => p.mover);
         let open = 0, longestOpen = 0, low = 0, longestLow = 0;
         const bottom = mv.baseY == null ? mv.y : mv.baseY;

@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#000;">
+<canvas id="game" width="800" height="450"></canvas><pre id="out">running…</pre>
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true, narrative: { seenCutscenes: {}, npcStage: 0, flags: {} } })); window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERROR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  // Can a kid who plays a little sloppy get through each level?
+  //
+  // REPORT-ONLY in run-probes.sh, on purpose. This bot found every real
+  // difficulty fix in the 2026-09-30 pass — the run-only pits, the spike
+  // beds that landed you on an enemy, the shooter over the reunion — and
+  // as a GATE it is unusable: its lives total swings 3x between seeds on
+  // level 1, which is finished and playtested, and every attempt to make
+  // it smarter made it noisier. Read the death map; don't trust the sum.
+  //
+  // "Please play through the game but not as what is theoretically possible
+  // but how someone playing a little sloppy could make it." The audit
+  // measures whether a jump CAN be made. This measures whether it gets made
+  // by someone who presses the button a bit late, lets go a bit early, runs
+  // into the odd sphere, and does not know the level.
+  //
+  // The bot: holds right, runs. Jumps when the floor ends or something is in
+  // the way — but LATE, by a random 0-18px past where it should, and with a
+  // random hold. Stomps if it happens to land on something. Never shoots.
+  // Dies like anyone. The question is not "does it reach the end" (bosses
+  // need a human) but "how many lives does the stretch before the boss
+  // cost", and the budget is three — a level a sloppy player cannot clear
+  // on one set of lives is a level a ten-year-old puts down.
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update, switchTo } from '../src/scenes/sceneManager.js';
+  import { getLevel, hasFooting, isBlocked } from '../src/levels/levelLoader.js';
+  import { levels } from '../src/levels/registry.js';
+  import { isCutsceneActive, skipCutscene } from '../src/cutscenes/runner.js';
+
+  const out = [];
+  let fails = 0;
+  const check = (ok, label) => { if (!ok) fails++; out.push(`  ${ok ? 'ok  ' : 'FAIL'} ${label}`); };
+  const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+
+  // Deterministic sloppiness, so a failure is a failure and not a dice roll.
+  let seed = 7;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+
+  // Eight, not three. Level 1 — finished, hand-tuned, and playtested with
+  // the actual kid — costs this bot seven lives, so the bot is roughly
+  // twice as clumsy as he is; eight bot-lives is about a real set of
+  // three. Level 1 is the calibration, and a level that costs the bot more
+  // than level 1 does is a level harder than the one the game teaches
+  // itself with.
+  const LIVES_BUDGET = 8;
+
+  function runLevel(i, s) {
+    seed = s;
+    state.currentLevelIndex = i;
+    switchTo('playing', { retry: true });
+    const lv = getLevel();
+    // The boss is a human's job; the stretch up to it is the bot's.
+    const boss = state.enemies.find(e => e.boss);
+    // Stop well short of a boss that comes to YOU: the core's arena is the
+    // fight, and an octagon boss shambles 200px toward anyone it sees.
+    const goal = boss ? boss.minX - (boss.kind === 'core' ? 460 : boss.kind === 'octagon' ? 420 : 260) : lv.worldEdgeX - 150;
+    state.lives = 99;
+    const lives0 = state.lives;
+    let held = 0, late = 0, furthest = 0, stuck = 0, lastX = 0;
+    let backing = 0;               // frames left of stepping back from a wall
+    const deaths = {};             // 50px bucket -> count, so a bad stretch has an address
+    let livesSeen = state.lives;
+    // What a kid learns after dying somewhere: jump earlier there next
+    // time. Without this the bot is deterministic, so a late press at one
+    // spot is the SAME late press after every respawn — one seed died
+    // eighteen times running at level 1's run-only bed, which is a number
+    // about the bot, not the level. Keyed by 50px address; each death
+    // there brings the next attempt's take-off 12px forward.
+    const learned = {};
+    const lessonAt = x => learned[Math.floor(x / 50) * 50] || 0;
+    let lastJumpX = 0, lastJumpWhy = 'gap';   // where the last take-off happened, and what for
+    key('keydown', 'ArrowRight'); key('keydown', 'Shift');
+    for (let f = 0; f < 9000; f++) {
+      if (isCutsceneActive()) { skipCutscene(); continue; }
+      const ahead = player.x + player.width + 26 + late + lessonAt(player.x);
+      const foot = player.y + player.height;
+      // ...and a sphere coming at you is a reason to jump. Over it or onto
+      // it — a kid does both; the bot doesn't aim, so it gets whichever
+      // happens. Sees it late like everything else.
+      const sphereAhead = state.enemies.some(e => e.alive && !e.restored && !e.boss &&
+        e.x > player.x && e.x < player.x + 70 + late && Math.abs(e.y - player.y) < 40);
+      // Spikes are seen a little way off, like a sphere is. The first
+      // version only noticed a bed when the bot's own box was already in it.
+      const bedAhead = getLevel().hazards.some(h =>
+        h.x > player.x && h.x < player.x + player.width + 44 + late + lessonAt(player.x) && Math.abs(h.hitbox.y - foot) < 30);
+      const needJump = !hasFooting(ahead, foot) || sphereAhead || bedAhead ||
+        isBlocked({ x: player.x + 12, y: player.y, width: player.width, height: player.height }, { hazards: true });
+      // Wedged against a wall with no speed: a kid steps back and runs at
+      // it. The first version teleported 60px backwards after four seconds,
+      // which is neither.
+      const wallAhead = isBlocked({ x: player.x + 6, y: player.y - 4, width: player.width, height: player.height - 4 }, { hazards: false });
+      if (backing > 0) {
+        backing--;
+        if (backing === 0) { key('keyup', 'ArrowLeft'); key('keydown', 'ArrowRight'); }
+      } else if (false) {   // wall-backing: tried, made the bot noisier, see the note at the top
+        backing = 22;
+        key('keyup', 'ArrowRight'); key('keydown', 'ArrowLeft');
+      }
+      if (player.isOnGround && held <= 0 && needJump && backing === 0) {
+        lastJumpX = player.x;
+        lastJumpWhy = sphereAhead ? 'sphere' : 'gap';
+        key('keydown', ' ');
+        held = 10 + Math.floor(rnd() * 14);          // sometimes lets go early
+        late = Math.floor(rnd() * 18);               // next time, react a bit later
+      }
+      if (held > 0 && --held === 0) key('keyup', ' ');
+      update();
+      if (state.lives < livesSeen) {
+        const b = Math.floor(furthest / 50) * 50;
+        deaths[b] = (deaths[b] || 0) + 1;
+        // The lesson is filed at the TAKE-OFF, not where the body ended up
+        // — that is 100px further on, and a lesson filed there changes
+        // nothing about the next approach.
+        // ...and the lesson has a SIGN. Died jumping a gap or a bed: you
+        // fell short, so take off CLOSER next time. Died jumping at a
+        // sphere: you ran into it, so go EARLIER. The first version always
+        // went earlier, which at a 160px bed means landing in the middle of
+        // it, forty-two times.
+        const at = Math.floor(lastJumpX / 50) * 50;
+        const step = lastJumpWhy === 'sphere' ? 12 : -10;
+        learned[at] = Math.max(-40, Math.min(72, (learned[at] || 0) + step));
+        livesSeen = state.lives;
+      }
+      if (state.gameState !== 'playing') break;
+      furthest = Math.max(furthest, player.x);
+      if (player.x >= goal - 10) break;
+      // Wedged against something for 4 seconds: back up and try again,
+      // which is what a kid does.
+      if (Math.abs(player.x - lastX) < 1) { if (++stuck > 240) { player.x -= 60; stuck = 0; } } else stuck = 0;
+      lastX = player.x;
+    }
+    key('keyup', ' '); key('keyup', 'ArrowRight'); key('keyup', 'ArrowLeft'); key('keyup', 'Shift');
+    const lost = lives0 - state.lives;
+    const reached = furthest >= goal - 10;
+    const where = Object.entries(deaths).sort((a, b) => b[1] - a[1]).slice(0, 6)
+      .map(([x, n]) => `${n}@${x}`).join(' ');
+    return { lost, reached, furthest: Math.round(furthest), goal: Math.round(goal), where, deaths };
+  }
+
+  setTimeout(() => {
+    // What this gate actually asserts, and why it isn't a lives total.
+    //
+    // The lives total swung by a factor of three between seeds on level 1,
+    // which is finished and hand-playtested — so as a number it describes
+    // the bot, not the level. What IS stable, and is what every real fix
+    // in this pass came from, is the death MAP: a spot that kills the bot
+    // over and over across seeds is a trap, whatever the total. So:
+    //   - every level is reachable to its boss on every seed (no stalls)
+    //   - no 50px address averages more than TRAP deaths across seeds
+    // The totals are still printed, for a human.
+    const SEEDS = [7, 13, 29];
+    // Calibrated on level 1, which is finished and was playtested with the
+    // actual kid: its three close-set beds at the end average 5.7 for this
+    // bot, which is clumsier than he is. Anything worse than that is a
+    // spot meaner than the hardest thing in the level the game teaches
+    // itself with.
+    const TRAP = 6;
+    for (let i = 0; i < levels.length; i++) {
+      const runs = SEEDS.map(s => runLevel(i, s));
+      const lost = runs.reduce((a, r) => a + r.lost, 0) / runs.length;
+      const reached = runs.every(r => r.reached);
+      const worst = runs.reduce((a, r) => r.lost > a.lost ? r : a, runs[0]);
+      const stalled = runs.find(r => !r.reached) || worst;
+      const sum = {};
+      runs.forEach(r => Object.entries(r.deaths).forEach(([x, n]) => { sum[x] = (sum[x] || 0) + n / runs.length; }));
+      const traps = Object.entries(sum).filter(([, n]) => n > TRAP).map(([x, n]) => `${n.toFixed(1)}@${x}`);
+      const label = `level ${i + 1}: ${reached ? 'reached the boss' : `stalled at x${stalled.furthest} of ${stalled.goal}`}, ${lost.toFixed(1)} lives on average (${runs.map(r => r.lost).join('/')})` +
+        (traps.length ? `  TRAPS: ${traps.join(' ')}` : (worst.where ? `  (worst run: ${worst.where})` : ''));
+      check(reached && traps.length === 0, label);
+    }
+    out.push(fails ? `*** ${fails} FAILURE(S)` : `PASS a sloppy player reaches every boss, and nowhere kills them over and over`);
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 250);
+</script></body></html>

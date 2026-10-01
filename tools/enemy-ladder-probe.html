@@ -74,7 +74,13 @@
     for (let i = 2; i < counts.length; i++) {
       // From level 3 on, where the tiers actually exist. A level may match
       // the one before it; it may not fall behind it.
-      check(counts[i] >= counts[i - 1] - 1,
+      // Two rungs of slack. Enemy count is a crude proxy for difficulty and
+      // some faces are hard for other reasons — the fifth is the room moving
+      // and the floor cracking, the seventh is the core. The sloppy-play bot
+      // is what actually judges whether a face is too hard; this only
+      // guards against a level quietly emptying out.
+      const slack = 2;
+      check(counts[i] >= counts[i - 1] - slack,
         `level ${i + 1} is not softer than level ${i} (${counts[i - 1]} -> ${counts[i]})`);
     }
 

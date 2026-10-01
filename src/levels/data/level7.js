@@ -42,9 +42,9 @@ export default {
   ground: [
     { x: 0,    width: 1100, y: 250 },
     { x: 1190, width: 1010, y: 300 },   // 90
-    { x: 2350, width: 1050, y: 350 },   // 150 — run only
+    { x: 2295, width: 1105, y: 350 },   // 95
     { x: 3490, width: 1110 },           // 90 — the floor
-    { x: 4760, width: 2540 }            // 160 — the cavity
+    { x: 4695, width: 2605 }            // 95 — the cavity
   ],
 
   platforms: [
@@ -132,7 +132,6 @@ export default {
     // --- the first ledge (no checkpoint: the level starts here) ---
     { x: 340,  y: 250 - 22, w: 22, minX: 280,  maxX: 410,  speed: 1.7,
       tier: 'pursuer', weapon: 'pickaxe' },
-    { x: 560,  y: 250 - 22, w: 22, minX: 500,  maxX: 780,  speed: 1.6, bounce: true },
     { x: 700,  y: 110,      w: 20, minX: 620,  maxX: 730,  speed: 1.3 },
     { x: 980,  y: 250 - 22, w: 22, minX: 900,  maxX: 1080, speed: 1.6,
       tier: 'aggressor', shoots: true },
@@ -143,10 +142,12 @@ export default {
     // Was a plain patroller on a ledge.
     { x: 1760, y: 160,      w: 20, minX: 1700, maxX: 1810, speed: 1.4,
       tier: 'pursuer', weapon: 'pickaxe' },
-    { x: 2060, y: 208,      w: 22, minX: 2020, maxX: 2120, speed: 1.4,
-      tier: 'aggressor', shoots: true },
-    { x: 2100, y: 300 - 26, w: 26, minX: 2040, maxX: 2190, speed: 0.85,
-      kind: 'octagon', restoreHits: 2 },
+    // A plain patroller on the ledge, not a shooter — and nothing on the
+    // floor between the bed at 1880 and the pit. The bed's landing used
+    // to put you a hundred pixels from a corrupted square with a shooter
+    // overhead at exactly engage height; seventeen of the sloppy bot's
+    // forty level-7 deaths were in that one spot.
+    { x: 2060, y: 208,      w: 22, minX: 2020, maxX: 2120, speed: 1.4 },
 
     // --- the third: checkpoint at 2390 ---
     // On the ledge at 2850, not the one at 2410. A respawn arrives 90px
@@ -157,15 +158,16 @@ export default {
     // was comparing enemy heights against the floor rather than against the
     // column the player drops through.
     { x: 2890, y: 210,      w: 20, minX: 2850, maxX: 2960, speed: 1.5, bounce: true },
-    { x: 2700, y: 350 - 22, w: 22, minX: 2680, maxX: 2830, speed: 1.6, bounce: true },
-    { x: 2900, y: 350 - 26, w: 26, minX: 2870, maxX: 2985, speed: 0.85,
-      kind: 'octagon', restoreHits: 2 },
+    { x: 2810, y: 350 - 22, w: 22, minX: 2790, maxX: 2900, speed: 1.6, bounce: true },
     { x: 3220, y: 260,      w: 20, minX: 3180, maxX: 3280, speed: 1.4,
       tier: 'pursuer', weapon: 'pickaxe' },
     { x: 3250, y: 350 - 22, w: 22, minX: 3120, maxX: 3380, speed: 1.7,
       tier: 'aggressor', shoots: true },
 
     // --- the floor of the crust: checkpoint at 3530 ---
+    // The bouncer from the first ledge lives here now. Up there it sat in
+    // the landing of the level's first spike bed, under a platform at head
+    // height, and one seed of the sloppy bot died to it seventy-four times.
     { x: 3880, y: GROUND_Y - 22, w: 22, minX: 3840, maxX: 4000, speed: 1.7,
       tier: 'pursuer', weapon: 'chainsaw' },
     { x: 4100, y: GROUND_Y - 22, w: 22, minX: 4030, maxX: 4170, speed: 1.6, bounce: true },
@@ -182,6 +184,7 @@ export default {
       tier: 'pursuer', weapon: 'pickaxe' },
     { x: 5300, y: GROUND_Y - 22, w: 22, minX: 5240, maxX: 5400, speed: 1.6,
       tier: 'aggressor', shoots: true },
+    { x: 5460, y: GROUND_Y - 22, w: 22, minX: 5420, maxX: 5510, speed: 1.6, bounce: true },
 
     // --- The Core ---
     // Twelve faces, twelve triangles, and no way to hurt it in between. No

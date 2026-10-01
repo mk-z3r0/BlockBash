@@ -50,7 +50,7 @@ export default {
     // --- open ground, and the first things worth standing behind ---
     cover(380, 110, 44),
     cover(760, 110, 66),
-    { x: 1000, y: 280, width: 100, height: 18 },
+    { x: 1080, y: 280, width: 100, height: 18 },   // clear of the bed at 950: it was a head-bonk over the take-off
 
     // --- the shelf: this is the shooting gallery ---
     shelfCover(1400, 120, 44),
@@ -62,7 +62,6 @@ export default {
     shelfCover(2760, 110, 66),
     // a slider carrying coins back and forth across the open middle — the
     // one place on the shelf with nothing to hide behind
-    { x: 3050, y: 274, width: 90, height: 18, move: { x: 170, period: 290 } },
     shelfCover(3380, 120, 44),
     { x: 3600, y: 230, width: 100, height: 18, chewed: true },
 
@@ -104,7 +103,7 @@ export default {
     // Halfway. Far enough in that the player has stopped expecting him at
     // the corner and started expecting him nowhere.
     { id: 'l4-glimpse', when: { reachX: 3400 }, once: true },
-    { id: 'edge-transition', when: { nearWorldEdge: 100 } }
+    { id: 'edge-transition', when: { nearWorldEdge: 100, bossDefeated: true } }
   ],
 
   enemies: [
@@ -113,7 +112,7 @@ export default {
       tier: 'pursuer', weapon: 'pickaxe' },
     // The first sphere in the game that shoots — parked on the shelf edge,
     // firing down the open run the player has to cross.
-    { x: 1700, y: SHELF - 22,    w: 22, minX: 1660, maxX: 1790, speed: 1.4,
+    { x: 1740, y: SHELF - 22,    w: 22, minX: 1720, maxX: 1790, speed: 1.4,
       tier: 'aggressor', shoots: true },
     { x: 1600, y: 230,           w: 20, minX: 1560, maxX: 1650, speed: 1.3 },
     // ...and the first that hops. Nothing has left the ground under its own
@@ -167,11 +166,11 @@ export default {
     [1440, 312], [1485, 312],
     [1595, 236],
     [1860, 290],
-    [2190, 352], [2235, 352],
+    [2190, 312], [2235, 312],
     [2360, 226],
     [2500, SHELF - 14],
     [2800, 290],
-    [3050, 260], [3095, 260],
+    
     [3420, 312],
     [3640, 216], [3685, 216],
     [3860, SHELF - 14],

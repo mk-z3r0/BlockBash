@@ -40,8 +40,8 @@ export default {
   ground: [
     { x: 0,    width: 1800 },   // arena 1
     { x: 1890, width: 1610 },   // 90  — arena 2, and the hammer
-    { x: 3650, width: 1550 },   // 150 — arena 3, run only
-    { x: 5360, width: 1940 }    // 160 — arena 4 and the General, run only
+    { x: 3595, width: 1605 },   // 95 — arena 3
+    { x: 5295, width: 2005 }    // 95 — arena 4 and the General
   ],
 
   platforms: [
@@ -108,7 +108,7 @@ export default {
     { id: 'l6-arrival', when: { levelStart: true }, once: true },
     // NOT the edge transition. Five faces of walking off an edge and having
     // the world turn under you is the setup; this is the one that doesn't.
-    { id: 'descent', when: { nearWorldEdge: 100 } }
+    { id: 'descent', when: { nearWorldEdge: 100, bossDefeated: true } }
   ],
 
   enemies: [
@@ -153,9 +153,11 @@ export default {
       kind: 'octagon', restoreHits: 2 },
 
     // --- arena 4 ---
-    { x: 5700, y: GROUND_Y - 22, w: 22, minX: 5650, maxX: 5800, speed: 1.8,
+    { x: 5660, y: GROUND_Y - 22, w: 22, minX: 5600, maxX: 5720, speed: 1.8,
       tier: 'pursuer', weapon: 'chainsaw' },
-    { x: 5840, y: GROUND_Y - 22, w: 22, minX: 5830, maxX: 5940, speed: 1.7,
+    // Past the bed at 5950, not packed against the sphere before it. The
+    // arena mouth was two spheres and a spike bed inside 300px.
+    { x: 6240, y: GROUND_Y - 22, w: 22, minX: 6200, maxX: 6310, speed: 1.7,
       tier: 'aggressor', shoots: true },
     { x: 6250, y: GROUND_Y - 22, w: 22, minX: 6240, maxX: 6350, speed: 1.7, bounce: true },
 
@@ -165,6 +167,10 @@ export default {
     { x: 6850, y: GROUND_Y - 36, w: 36, minX: 6400, maxX: 7220, speed: 1.9,
       boss: true, mode: 'fight', bossKind: 'general', bossName: 'THE GENERAL',
       weapon: 'sledgehammer',
+      // The fight starts once you are well inside the last arena. With
+      // the default engage range it was charging a player who had just
+      // landed from the pit at the arena's mouth.
+      engageFromX: 5700,
       hp: 6, stompProof: true, dropsAmmo: 8 }
   ],
 

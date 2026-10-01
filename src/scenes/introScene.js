@@ -16,7 +16,7 @@
 // distance as they approach possible at all; faking either in pure 2D was
 // what the first version did and it read as flat.
 import { ctx, VIEW_WIDTH, VIEW_HEIGHT, drawStickLegs, drawMuscleArm } from '../engine/renderer.js';
-import { spawnExplosion, spawnDust, updateParticles, drawParticles, resetParticles } from '../entities/particles.js';
+import { spawnExplosion, spawnDust, spawnDebris, updateParticles, drawParticles, resetParticles } from '../entities/particles.js';
 import { playExplosion, playSpaceAmbient, playApproach, playRumble, playSurprise, playDoorOpen } from '../audio/sfx.js';
 import { drawBlockHouse } from './blockHouse.js';
 import { switchTo } from './sceneManager.js';
@@ -110,7 +110,11 @@ function makeFace(axis, sign) {
   });
   const normal = { x: 0, y: 0, z: 0 };
   normal[axis] = sign;
-  return { verts, normal, craters: makeCraters(), damaged: false };
+  // `quad` is the face's ORIGINAL four corners, kept separately from
+  // `verts` so the crater texture can still be mapped after the chamfer
+  // turns three of these quads into pentagons. Reported from play: the
+  // planet's texture vanished from those faces the moment the corner blew.
+  return { verts, quad: verts.slice(), normal, craters: makeCraters(), damaged: false };
 }
 function makeCraters() {
   // Many small, fine specks rather than a few big holes — the original
@@ -160,8 +164,14 @@ function buildChamferedFaces(corner) {
     const prev = f.verts[(idx - 1 + n) % n];
     const next = f.verts[(idx + 1) % n];
     f.verts.splice(idx, 1, cutPointFor(prev), cutPointFor(next));
-    // craters never render on a 5-gon (see the f.verts.length===4 guard in
-    // drawPlanet), so there's nothing to clear here
+    // Keep the texture, minus the bit that was blown off. The removed
+    // chunk is the tetrahedron within CHAMFER_FRAC of the corner along
+    // each edge, which on a face is "L1 distance to the corner < 2*FRAC".
+    f.craters = f.craters.filter(c => {
+      const q = bilerp(f.quad, c.u, c.v);
+      const d = Math.abs(q.x - corner.x) + Math.abs(q.y - corner.y) + Math.abs(q.z - corner.z);
+      return d > CHAMFER_FRAC * 2 + 0.08;
+    });
   }
 
   faces.push({
@@ -184,6 +194,7 @@ let t = 0;
 let stars = [];
 let spheres = [];
 let cornerBlownOff = false;
+let blast = null;   // { x, y, t } while the corner is coming apart on screen
 let shakeUntil = 0;
 let bubbleActive = false;
 let walker = null;
@@ -299,10 +310,10 @@ function drawPlanet(angleY, scale) {
     ctx.lineWidth = f.damaged ? 1 : 1.5;
     ctx.stroke();
 
-    if (!f.damaged && f.verts.length === 4) {
+    if (!f.damaged) {
       const avgScale = proj.reduce((s, p) => s + p.scale, 0) / proj.length;
       for (const c of f.craters) {
-        const local = bilerp(f.verts, c.u, c.v);
+        const local = bilerp(f.quad, c.u, c.v);
         const camP = toCameraSpace(local, angleY, scale);
         const p = project(camP);
         ctx.fillStyle = `rgba(90, 65, 20, ${0.4 + intensity * 0.2})`;
@@ -382,6 +393,7 @@ export const introScene = {
     stars = makeStars();
     spheres = makeSpheres();
     cornerBlownOff = false;
+    blast = null;
     shakeUntil = 0;
     bubbleActive = false;
     walker = null;
@@ -399,17 +411,39 @@ export const introScene = {
       const scale = 90 + Math.min(1, t / EXPLOSION_FRAME) * 20;
       const cam = toCameraSpace(EXPLODED_CORNER, angleY, scale);
       const p = project(cam);
+      // Three bursts, a cone of planet thrown outward along the corner's own
+      // direction, and the screen whites out for a few frames. The old
+      // version was two sparkle rings over a shape change, which read as
+      // the planet quietly being replaced.
+      spawnExplosion(p.x, p.y, '#ffffff');
       spawnExplosion(p.x, p.y, '#ffdf7a');
       spawnExplosion(p.x, p.y, '#f2c14e');
+      const outward = Math.atan2(cam.y, cam.x);
+      spawnDebris(p.x, p.y, 34, '#c99a2e', { aim: outward, spread: Math.PI * 0.9, speed: 5.5, life: 95 });
+      spawnDebris(p.x, p.y, 18, '#5b3f1a', { aim: outward, spread: Math.PI * 1.3, speed: 3.5, life: 80 });
+      spawnDebris(p.x, p.y, 14, '#ffdf7a', { speed: 7, life: 40 });
+      blast = { x: p.x, y: p.y, t: 0 };
+      shakeUntil = t + 26;
       cornerBlownOff = true;
       playExplosion();
+    }
+    if (blast) {
+      blast.t++;
+      // two aftershocks as the chunk keeps coming apart
+      if (blast.t === 9 || blast.t === 19) {
+        spawnExplosion(blast.x + (Math.random() - 0.5) * 30, blast.y + (Math.random() - 0.5) * 30, '#ffdf7a');
+        spawnDebris(blast.x, blast.y, 8, '#c99a2e', { speed: 4, life: 60 });
+      }
+      if (blast.t > 50) blast = null;
     }
 
     if (t === P3_IMPACT_END) {
       shakeUntil = t + SHAKE_DURATION;
       playRumble();
     }
-    if (shakeUntil > t && (shakeUntil - t) % 6 === 0) {
+    // House dust only once the shock has reached the house; the planet
+    // beat has its own shake and the house isn't on screen for it.
+    if (t >= P3_IMPACT_END && shakeUntil > t && (shakeUntil - t) % 6 === 0) {
       spawnDust(VIEW_WIDTH / 2 + (Math.random() - 0.5) * 150, HOUSE_GROUND_Y - 90, 2,
         { spread: 1.8, size: 7, life: 34, color: 'rgba(200, 180, 150, 0.85)' });
     }
@@ -436,11 +470,34 @@ export const introScene = {
   draw() {
     if (t < P3_IMPACT_END) {
       // --- space: rotating planet, stars, descending spheres ---
+      // The whole space view jolts while the corner is coming apart. The
+      // only shake this scene had was at the house, where the shock
+      // arrives; the explosion itself was perfectly still.
+      ctx.save();
+      if (blast) {
+        const mag = 9 * (1 - blast.t / 50);
+        ctx.translate((Math.random() - 0.5) * mag, (Math.random() - 0.5) * mag);
+      }
       drawStarfield();
 
       const angleY = PLANET_BASE_ANGLE + t * ROT_SPEED;
       const scale = 90 + Math.min(1, t / EXPLOSION_FRAME) * 20;
       drawPlanet(angleY, scale);
+      if (blast) {
+        // an expanding ring, and a flash that falls off fast
+        const k = blast.t / 50;
+        ctx.save();
+        ctx.strokeStyle = `rgba(255, 235, 170, ${0.9 * (1 - k)})`;
+        ctx.lineWidth = 6 * (1 - k) + 1;
+        ctx.beginPath();
+        ctx.arc(blast.x, blast.y, 10 + k * 260, 0, Math.PI * 2);
+        ctx.stroke();
+        if (blast.t < 10) {
+          ctx.fillStyle = `rgba(255, 250, 230, ${0.85 * (1 - blast.t / 10)})`;
+          ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+        }
+        ctx.restore();
+      }
 
       if (t > 30) {
         const descentProgress = Math.min(1, Math.max(0, (t - P1_PLANET_END) / (EXPLOSION_FRAME - P1_PLANET_END)));
@@ -452,6 +509,7 @@ export const introScene = {
         ctx.fillStyle = `rgba(5, 7, 15, ${1 - t / 40})`;
         ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
       }
+      ctx.restore();
     } else {
       // --- ground: the house, hard-cut from space, no crossfade ---
       ctx.save();
