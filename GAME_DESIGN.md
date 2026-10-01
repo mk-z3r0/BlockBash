@@ -57,10 +57,17 @@ skippable, `scenes/endingScene.js`):
 Nothing new is introduced for it. The stick legs, the cube, the cyan, the
 triangle: the ending is made of the game. Techniques, for the record, since
 it's all `<canvas>` and no library: 3D projection with per-face lighting
-and a crater texture that survives the chamfer, additive compositing for
-the edge bloom and light rays, a few hundred converging particles, a
-procedural rising chord (`playEndingSwell`) with a tick per edge, a
-crossfade, and screen shake on the snap.
+and a crater texture that survives the chamfer; a **real bloom pass** (the
+glowing things are drawn a second time to an offscreen canvas, blurred with
+`ctx.filter`, and composited back additively — twice, at two radii);
+light rays; a star wind that streaks the whole field outward on the snap;
+rings from every edge as it completes; a few hundred converging particles
+with trails; a crossfade; screen shake and whiteouts on the breakout and
+the snap. Sound is its own score: the level music fades out, a rumble
+builds under the rise, a crack-and-whoosh on the breakout, a pop per
+sphere, a tick per edge up a scale, a rising chord through the
+restoration, a held major chord on the snap, a blip per three title blocks,
+and the win fanfare at the end.
 
 It's defeated with the **triangle restoration weapon** — the same mechanic used to restore octagons, scaled up: many hits, landed while the core actively reshapes the arena around the player. Each hit snaps one face back toward square. The final hit makes it **cubic again**, the planet stabilises, and the sphere threat collapses with it.
 

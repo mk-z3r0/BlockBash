@@ -1,4 +1,4 @@
-import { audioCtx, sfxGain, tone, noiseBurst } from './audio.js';
+import { audioCtx, sfxGain, musicGain, tone, noiseBurst } from './audio.js';
 
 export function playJump() {
   if (!audioCtx) return;
@@ -249,4 +249,64 @@ export function playEndingSnap(n) {
   const f = 523.25 * Math.pow(2, (n - 1) / 12);
   tone(f, t, 0.12, 'square', 0.14, sfxGain, 6000);
   tone(f * 2, t + 0.02, 0.08, 'triangle', 0.08, sfxGain, 8000);
+}
+
+// The level music gives way to the ending's own score.
+export function fadeMusicOut(seconds = 2) {
+  if (!audioCtx || !musicGain) return;
+  const t = audioCtx.currentTime;
+  musicGain.gain.cancelScheduledValues(t);
+  musicGain.gain.setValueAtTime(musicGain.gain.value, t);
+  musicGain.gain.linearRampToValueAtTime(0.0001, t + seconds);
+}
+export function restoreMusicLevel() {
+  if (!audioCtx || !musicGain) return;
+  musicGain.gain.cancelScheduledValues(audioCtx.currentTime);
+  musicGain.gain.setValueAtTime(0.22, audioCtx.currentTime);
+}
+
+// Under the rise: a low rumble that builds for the whole climb. Several
+// overlapping filtered noise bursts, each a little louder and a little
+// higher than the last.
+export function playEndingRumble() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  for (let i = 0; i < 10; i++) {
+    noiseBurst(t + i * 0.45, 0.6, 0.06 + i * 0.012, sfxGain, 'lowpass', 90 + i * 25);
+  }
+  tone(38, t, 4.6, 'sine', 0.10, sfxGain, 200, 55);
+}
+
+// Punching through the surface: a crack of noise and a rising whoosh.
+export function playBreakout() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  noiseBurst(t, 0.5, 0.3, sfxGain, 'lowpass', 2400);
+  noiseBurst(t + 0.05, 0.9, 0.18, sfxGain, 'highpass', 900);
+  tone(120, t, 0.7, 'sawtooth', 0.14, sfxGain, 1800, 520);
+}
+
+// A sphere leaving a face: a small, round, upward pop.
+export function playSphereLeave() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  tone(520, t, 0.11, 'sine', 0.09, sfxGain, 3000, 980);
+}
+
+// The corner back: a major chord held, with its octave arriving late.
+export function playEndingChord() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  [261.6, 329.6, 392.0, 523.3].forEach((f, i) => {
+    tone(f, t + i * 0.03, 2.6, 'triangle', 0.13, sfxGain, 5000);
+    tone(f * 1.004, t + i * 0.03, 2.6, 'triangle', 0.07, sfxGain, 5000);
+  });
+  tone(1046.5, t + 0.35, 2.0, 'sine', 0.07, sfxGain, 7000);
+}
+
+// One blip per title block as it lands, climbing across the word.
+export function playTitleBlip(i) {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  tone(440 * Math.pow(2, (i % 24) / 24), t, 0.05, 'square', 0.05, sfxGain, 5000);
 }

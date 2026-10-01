@@ -11,7 +11,7 @@
 import { update, draw, switchTo, getCurrentName } from '../src/scenes/sceneManager.js';
 const out=[]; let bad=0;
 setTimeout(()=>{
-  for (const [scene,frames] of [['intro',1100],['ending',1600]]) {
+  for (const [scene,frames] of [['intro',1100],['ending',1900]]) {
     switchTo(scene);
     for(let i=0;i<frames && getCurrentName()===scene;i++){
       try { update(); } catch(e){ out.push(`${scene} update THREW f${i}: ${e.message}`); bad++; break; }
