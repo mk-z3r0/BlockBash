@@ -396,6 +396,16 @@ function descendingOnto(player, enemy) {
   return prev <= enemy.y + enemy.w * 0.35;
 }
 
+// Is this boss in the part of its fight where it's YOUR turn? Touching it
+// then is harmless. See the contact rule in updateEnemies for why.
+function inItsWindow(enemy) {
+  if (!enemy.boss) return false;
+  if (enemy.strain) return true;                                   // the Excavator, jammed
+  if (enemy.bossKind === 'general' && enemy.phase === 'recover') return true;
+  if (enemy.bossKind === 'terraformer' && !enemy.invulnerable) return true;
+  return false;
+}
+
 // Boss movement/attack timing for level 1's Foreman is driven by its
 // cutscene, not by the AI here — see the `enemy.boss` branch, which just
 // backs off while a cutscene is in control. Later bosses declare a tier
@@ -524,10 +534,21 @@ export function updateEnemies(player, cutsceneActive) {
 
     const eBox = boxOf(enemy);
     if (isColliding(player, eBox)) {
-      if (enemy.invulnerable) {
-        // the unwinnable boss — bounce off harmlessly
+      if (enemy.invulnerable || inItsWindow(enemy)) {
+        // A closed boss — or an OPEN one. Bounce off harmlessly, away from
+        // it. A boss in its window is the thing you are supposed to be
+        // hitting, and the only way to hit it with a pickaxe is to stand
+        // next to it; touching it while you do was a death. The Excavator's
+        // kid-strategy probe found it: the swing landed, and nine frames
+        // later the player was dead. (The closed case: this used to This used to
+        // put the player on the boss's left whichever side they were on,
+        // which for someone past it was a teleport through it toward the
+        // edge of the world. Reported from play as the Excavator pushing
+        // people off the level.
         player.velocityY = P.STOMP_BOUNCE;
-        player.x = enemy.x - player.width - 5;
+        const pcx = player.x + player.width / 2, ecx = enemy.x + enemy.w / 2;
+        player.x = pcx < ecx ? enemy.x - player.width - 5 : enemy.x + enemy.w + 5;
+        player.velocityX = pcx < ecx ? -2 : 2;
       } else if (enemy.kind === 'octagon') {
         // A corrupted square can't be stomped: there's nothing to defeat.
         // Touching one hurts, and the only answer is the Cornerstone.

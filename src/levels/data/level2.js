@@ -118,7 +118,7 @@ export default {
     { x: 6340, y: 294,           w: 20, minX: 6300, maxX: 6410, speed: 1.3 },
 
     // --- The Excavator ---
-    { x: 6980, y: GROUND_Y - 33, w: 33, minX: 6770, maxX: 7130, speed: 1.5,
+    { x: 6980, y: GROUND_Y - 33, w: 33, minX: 6740, maxX: 7140, speed: 1.5,
       // The fight starts once the player is over the climb block at
       // 6650-6716, not when they are within a screen of it. Engaging from
       // the far side had it advancing into the block and standing there

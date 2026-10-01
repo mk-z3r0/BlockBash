@@ -14,6 +14,7 @@
   import { player } from '../src/entities/player.js';
   import { state } from '../src/state.js';
   import { update, switchTo } from '../src/scenes/sceneManager.js';
+  import { hasFooting } from '../src/levels/levelLoader.js';
   import { getLevel } from '../src/levels/levelLoader.js';
   import { levels } from '../src/levels/registry.js';
   import { startAttack } from '../src/weapons/combat.js';
@@ -138,6 +139,62 @@
       }
       const blocking = state.enemies.some(e => e.boss && e.alive);
       check(!blocking, 'no boss left alive, so the way to the edge is open');
+    });
+
+    // --- the Excavator, played the way a kid would ---
+    //
+    // Reported from play: "you jump over the block and it proceeds to push
+    // you over the edge; there is little time to engage, and the pit is
+    // always in front of it, where you are standing." The pinned-phase
+    // tests above can't see any of that. This plays the fight with the one
+    // strategy the fight is supposed to teach — stay off the crack, run in
+    // when it shouts, swing, back off — and requires it to win untouched.
+    runLevel(1, (boss, lv) => {
+      const left = boss.engageFromX;
+      player.x = left + 10;                       // just over the block
+      player.y = lv.groundY - player.height;
+      player.invincible = 0;                      // a real hit counts
+      const lives0 = state.lives;
+      let swings = 0, frames = 0, hop = 0;
+      const log = []; let livesSeen = state.lives;
+      const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+      for (; frames < 2400 && boss.alive; frames++) {
+        const cracks = lv.pendingGaps || [];
+        const pits = lv.platforms.filter(p => p.ground).map(p => p.x + p.width);
+        if (boss.phase === 'jammed') {
+          // go and hit it
+          const target = boss.x - player.width - 4;
+          if (player.x < target - 6) { key('keyup', 'ArrowLeft'); key('keydown', 'ArrowRight'); }
+          else if (player.x > target + 6) { key('keyup', 'ArrowRight'); key('keydown', 'ArrowLeft'); }
+          else {
+            key('keyup', 'ArrowRight'); key('keyup', 'ArrowLeft');
+            player.facing = 1;
+            if (player.weaponCooldown <= 0) { startAttack(player); swings++; if (log.length < 8) log.push(`swing f${frames} px${Math.round(player.x)} bx${Math.round(boss.x)} inv${boss.invulnerable?1:0} hp${boss.hp}`); }
+          }
+          // a pit between here and there: hop it. Held for a few frames by
+          // a counter — a setTimeout never fires inside this loop.
+          if (player.isOnGround && hop <= 0 && player.x < target - 6 &&
+              !hasFooting(player.x + player.width + 30, player.y + player.height)) {
+            key('keydown', ' '); hop = 18;
+          }
+        } else {
+          // stay off the crack and give it room
+          const onCrack = cracks.some(c => player.x + player.width > c.x - 20 && player.x < c.x + c.width + 20);
+          const tooClose = Math.abs((player.x + player.width / 2) - (boss.x + boss.w / 2)) < 90;
+          if (onCrack || tooClose) { key('keyup', 'ArrowRight'); key('keydown', 'ArrowLeft'); }
+          else { key('keyup', 'ArrowLeft'); key('keyup', 'ArrowRight'); }
+          // but never back into the entry block: it's a wall
+          if (player.x < left + 4) { key('keyup', 'ArrowLeft'); player.x = left + 4; }
+        }
+        if (hop > 0 && --hop === 0) key('keyup', ' ');
+        update();
+        if (state.lives < livesSeen) { livesSeen = state.lives; if (log.length < 8) log.push(`DIED f${frames} px${Math.round(player.x)} py${Math.round(player.y)} bx${Math.round(boss.x)} ${boss.phase} cracks${(lv.pendingGaps||[]).length}`); }
+      }
+      out.push('    ' + log.join(' | '));
+      key('keyup', 'ArrowRight'); key('keyup', 'ArrowLeft'); key('keyup', ' ');
+      check(!boss.alive, `a kid's strategy beats it (${swings} swings, ${frames} frames, hp ${boss.hp})`);
+      check(state.lives === lives0, `without losing a life (lost ${lives0 - state.lives})`);
+      check(boss.pits <= 2, `and the floor is still a floor (${boss.pits} pits)`);
     });
 
     // --- level 4: The Demolition Crew ---

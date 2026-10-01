@@ -85,53 +85,109 @@ function stepTo(boss, x) {
 // fast and open. Every hit has to land in that window. The pits it leaves
 // are the real pressure: the arena it's chasing you across is the thing
 // it's destroying, and they persist until the fight restarts.
+// --- level 2: The Excavator -------------------------------------------
+// "A sphere operating a drilling rig. Terrain deforms in real time during
+// the fight; the player wins by jamming the mechanism rather than out-
+// damaging it."
+//
+// REBUILT 2026-09-30, from play: "you jump over the block and it proceeds
+// to push you over the edge, as there is little time to engage, and the
+// pit it creates is always in front of it — where you are likely
+// standing." All true. The old one walked AT the player across a 480px
+// arena and dug on the side it was facing, which was by definition the
+// player's side. A boss that comes to you and digs where you stand is not
+// a pattern, it's a shove.
+//
+// So it's a machine on a track now. It works three fixed DRILL SPOTS across
+// the arena, in order, and never chases. Arriving at a spot it cracks the
+// floor there — the same red telegraph the Terraformer uses — and drills
+// into the crack; the pit opens where the crack was, and then the drill
+// binds and it is open for two and a half seconds. The whole fight is one
+// sentence a kid can learn in a single cycle: it goes where the crack is,
+// so don't be there, and hit it when it shouts.
+//
+// Two pits at most. Three spots over 330px of floor with 40px pits would
+// leave islands; two leaves a floor.
 const EXCAVATOR = {
-  advance: 150, drill: 84, jammed: 132,
-  // Narrow enough to clear at walk speed (max carry ~93.5px) — the floor
-  // getting worse must never become the floor becoming impossible.
-  pitWidth: 44
+  // Travel has to cover the longest trip at its speed — the far spot to
+  // the near one is ~210px at 1.5px a frame — or it drills where it
+  // happens to be, without a crack, which is the one thing it must never
+  // do. 200 is the budget; it usually arrives well inside it.
+  travel: 200, drill: 84, jammed: 150,
+  pitWidth: 40,
+  maxPits: 2,
+  // Where it drills, as offsets from the arena's left edge (the block it
+  // is entered over). Spaced so there is always floor on both sides of
+  // every pit — see maxPits.
+  spots: [80, 180, 280],
+  warn: 70
 };
+
+function excavatorArenaLeft(boss) {
+  // The arena starts where the fight is allowed to (engageFromX, set in the
+  // level data to just past the entry block), or at the boss's leash.
+  return boss.engageFromX == null ? boss.minX : boss.engageFromX;
+}
 
 function updateExcavator(boss, player) {
   const level = getLevel();
   boss.phaseTimer--;
+  const left = excavatorArenaLeft(boss);
+  const spotX = left + EXCAVATOR.spots[boss.spot % EXCAVATOR.spots.length];
 
   if (boss.phase === 'advance') {
+    // Travelling to the next spot. Not toward the player — toward the
+    // spot, whichever side of it they are on.
     boss.invulnerable = true;
     boss.mining = false;
     boss.strain = false;
-    // Rig carried level in front, bit spinning, walking it toward you. The
-    // drill's idle pose already points forward — this is the one phase where
-    // the frozen idle was the RIGHT picture, and the only thing it was
-    // missing was that the machine is running.
     pose(boss, 0);
-    const dir = Math.sign((player.x + player.width / 2) - (boss.x + boss.w / 2)) || 1;
-    boss.facing = dir;
     boss.swingPhase += 4;        // the bit, turning
-    stepTo(boss, boss.x + dir * Math.abs(boss.speed));
-    if (boss.phaseTimer <= 0) setPhase(boss, 'drill', EXCAVATOR.drill);
+    // It parks with the rig's bit over the spot: body to the left of it,
+    // facing right, so the pit opens in front of the rig and the entry
+    // side of the arena is never what it digs.
+    const park = spotX - boss.w - 6;
+    const dir = Math.sign(park - boss.x) || 1;
+    boss.facing = 1;
+    if (Math.abs(park - boss.x) > Math.abs(boss.speed)) {
+      stepTo(boss, boss.x + dir * Math.abs(boss.speed));
+    } else {
+      boss.x = Math.max(boss.minX, Math.min(park, boss.maxX - boss.w));
+      // Arrived. Say where, and start the clock on the floor.
+      if (!boss.cracked) {
+        boss.cracked = true;
+        if (boss.pits < EXCAVATOR.maxPits) {
+          crackFloor(level, spotX, EXCAVATOR.pitWidth, EXCAVATOR.warn, { margin: 30, maxX: level.worldEdgeX - 220 });
+          showToast("IT'S DRILLING THERE — MOVE", 70);
+        }
+        playRumble();
+        setPhase(boss, 'drill', EXCAVATOR.drill);
+      }
+    }
+    if (boss.phaseTimer <= 0 && !boss.cracked) {
+      // Took too long to get there (it can't — but a pinned timer in a
+      // probe can). Drill where it is.
+      boss.cracked = true;
+      setPhase(boss, 'drill', EXCAVATOR.drill);
+    }
     return;
   }
 
   if (boss.phase === 'drill') {
     boss.invulnerable = true;
     boss.mining = true;
-    // gathering toward the moment the drill binds and it opens up
     boss.telegraph = Math.max(0, 1 - boss.phaseTimer / 30);
     boss.swingPhase += 3;   // fast, mechanical — a rig, not a swing
     if (boss.phaseTimer % 7 === 0) {
       spawnDust(boss.x + boss.w / 2 + boss.facing * boss.w, boss.y + boss.w, 5, { spread: 3, size: 6, life: 22 });
     }
+    // The crack it opened runs out on its own clock and becomes the pit.
+    for (const g of updateCracks(level)) {
+      boss.pits++;
+      spawnDust(g.x + g.width / 2, level.groundY, 14, { spread: 5, size: 8, life: 30 });
+      playRumble();
+    }
     if (boss.phaseTimer <= 0) {
-      // The pit opens beside it, on the side it's facing — never under the
-      // player, and never so far along that it eats the walk-up to the
-      // world's edge (carveGap's own maxX guard, same one the level 1
-      // Foreman's dig uses).
-      const digX = boss.x + (boss.facing > 0 ? boss.w + 10 : -EXCAVATOR.pitWidth - 10);
-      if (carveGap(level, digX, EXCAVATOR.pitWidth, { margin: 30, maxX: level.worldEdgeX - 220 })) {
-        playRumble();
-        spawnDust(digX + EXCAVATOR.pitWidth / 2, level.groundY, 14, { spread: 5, size: 8, life: 30 });
-      }
       boss.mining = false;
       setPhase(boss, 'jammed', EXCAVATOR.jammed);
       showToast('THE DRILL IS STUCK — HIT IT!', 70);
@@ -143,17 +199,21 @@ function updateExcavator(boss, player) {
   boss.invulnerable = false;
   boss.mining = false;
   boss.telegraph = 0;
-  // Stuck fast, and it has to LOOK stuck — the window is two seconds long
-  // and a player who can't see it is playing a guessing game. It leans back
-  // on the rig hauling at it, the bit judders instead of turning, and it
-  // throws sparks. See the `strain` branch in entities/enemy.js.
+  // Stuck fast, and it has to LOOK stuck. It leans back on the rig hauling
+  // at it, the bit judders instead of turning, and it throws sparks. See
+  // the `strain` branch in entities/enemy.js.
   boss.strain = true;
   boss.swingPhase += 1.2;
   if (boss.phaseTimer % 9 === 0) {
     spawnDust(boss.x + boss.w / 2 + boss.facing * (boss.w * 0.9), boss.y + boss.w * 0.9,
       3, { spread: 4, size: 4, life: 14, color: '#ffd27a' });
   }
-  if (boss.phaseTimer <= 0) { boss.strain = false; setPhase(boss, 'advance', EXCAVATOR.advance); }
+  if (boss.phaseTimer <= 0) {
+    boss.strain = false;
+    boss.cracked = false;
+    boss.spot++;
+    setPhase(boss, 'advance', EXCAVATOR.travel);
+  }
 }
 
 // --- level 4: The Demolition Crew --------------------------------------
@@ -498,9 +558,11 @@ export function initBoss(boss) {
   boss.phase = OPENING_PHASE[boss.bossKind] || 'advance';
   boss.phaseTimer = boss.bossKind === 'core' ? CORE.shockwave
                   : boss.bossKind === 'general' ? 90
-                  : EXCAVATOR.advance;
+                  : EXCAVATOR.travel;
   boss.collapses = 0;
   boss.pits = 0;
+  boss.spot = 0;
+  boss.cracked = false;
   boss.crackedThisCycle = false;
   boss.cycle = 0;
   boss.chargeDir = -1;
