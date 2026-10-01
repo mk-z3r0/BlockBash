@@ -19,6 +19,10 @@ import { ctx, VIEW_WIDTH, VIEW_HEIGHT, drawStickLegs, drawMuscleArm } from '../e
 import { spawnExplosion, spawnDust, spawnDebris, updateParticles, drawParticles, resetParticles } from '../entities/particles.js';
 import { playExplosion, playSpaceAmbient, playApproach, playRumble, playSurprise, playDoorOpen } from '../audio/sfx.js';
 import { drawBlockHouse } from './blockHouse.js';
+import {
+  BASE_FACES, EXPLODED_CORNER, CHAMFER_FRAC, buildChamferedFaces, drawPlanet as drawPlanetShared,
+  toCameraSpace, project as projectP, bilerp, normalize3, lerp3, dot3, rotateX, rotateY, LIGHT, mixGold, CAM_DIST
+} from './planet.js';
 import { switchTo } from './sceneManager.js';
 import { markIntroSeen } from '../save.js';
 
@@ -44,151 +48,14 @@ const HOUSE_GROUND_Y = VIEW_HEIGHT * 0.78;
 // linear algebra for this one scene — not a general math module, since
 // nothing else needs 3D yet.
 // ============================================
-const CAM_DIST = 480;
-// ~30 degrees above the horizon, top-down. Positive, not negative: canvas Y
-// grows downward, so the face this makes front-facing (y=-1) is the one
-// that projects toward the TOP of the screen — the near/prominent surface
-// needs to be the one rendering up top, or it reads as looking up from
-// below instead of down from above. Confirmed by deriving where each pole's
-// face normal actually lands post-transform, not just by eye.
-const CAM_TILT = 0.52;
 const ROT_SPEED = 0.0004; // slow — a pan, not a spin (was 0.0021, an 81% cut)
-// Chosen so the exploding corner ends up well-framed (centered, and its
-// face pointing most directly at the camera) right at EXPLOSION_FRAME,
-// given the current ROT_SPEED — solved with tools/corner-angle-probe.html
-// rather than eyeballed. It also happens to frame the opening shot well;
-// if either ROT_SPEED or EXPLOSION_FRAME changes, re-run that probe.
 const PLANET_BASE_ANGLE = 2.1;
 
-function normalize3(x, y, z) {
-  const l = Math.hypot(x, y, z) || 1;
-  return { x: x / l, y: y / l, z: z / l };
-}
-const LIGHT = normalize3(-0.45, -0.6, 0.65);
-
-// The corner that blows off. On the y=-1 pole deliberately: with CAM_TILT
-// positive, that's the pole facing the camera (see CAM_TILT's comment) — a
-// corner on the far pole would only ever be visible edge-on. Re-run
-// tools/corner-angle-probe.html against this if CAM_TILT, ROT_SPEED, or
-// EXPLOSION_FRAME change; the best framing angle depends on all three.
-const EXPLODED_CORNER = { x: 1, y: -1, z: 1 };
-
-function rotateY(p, a) {
-  const c = Math.cos(a), s = Math.sin(a);
-  return { x: p.x * c + p.z * s, y: p.y, z: -p.x * s + p.z * c };
-}
-function rotateX(p, a) {
-  const c = Math.cos(a), s = Math.sin(a);
-  return { x: p.x, y: p.y * c - p.z * s, z: p.y * s + p.z * c };
-}
-function dot3(a, b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
-function lerp3(a, b, t) {
-  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t };
-}
-// projects a point already in camera space (post-rotation) to screen coords
-function project(p) {
-  const f = CAM_DIST / (CAM_DIST + p.z);
-  return { x: PLANET_CX + p.x * f, y: PLANET_CY + p.y * f, scale: f };
-}
-// applies the scene's current camera transform (pan + fixed tilt + zoom) to
-// a point in the cube's local unit space
-function toCameraSpace(p, angleY, scale) {
-  const scaled = { x: p.x * scale, y: p.y * scale, z: p.z * scale };
-  return rotateX(rotateY(scaled, angleY), CAM_TILT);
-}
-
-// One unit-cube face: 4 corners (consistent winding) + outward normal.
-function makeFace(axis, sign) {
-  const other = { x: ['y', 'z'], y: ['x', 'z'], z: ['x', 'y'] }[axis];
-  const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
-  const verts = corners.map(([a, b]) => {
-    const p = { x: 0, y: 0, z: 0 };
-    p[axis] = sign;
-    p[other[0]] = a * sign; // flips winding per sign so all faces point outward
-    p[other[1]] = b;
-    return p;
-  });
-  const normal = { x: 0, y: 0, z: 0 };
-  normal[axis] = sign;
-  // `quad` is the face's ORIGINAL four corners, kept separately from
-  // `verts` so the crater texture can still be mapped after the chamfer
-  // turns three of these quads into pentagons. Reported from play: the
-  // planet's texture vanished from those faces the moment the corner blew.
-  return { verts, quad: verts.slice(), normal, craters: makeCraters(), damaged: false };
-}
-function makeCraters() {
-  // Many small, fine specks rather than a few big holes — the original
-  // read as cheese, not a rocky/worn surface.
-  const n = 34 + Math.floor(Math.random() * 16);
-  const spots = [];
-  for (let i = 0; i < n; i++) {
-    spots.push({ u: 0.06 + Math.random() * 0.88, v: 0.06 + Math.random() * 0.88, r: 0.01 + Math.random() * 0.016 });
-  }
-  return spots;
-}
-
-const BASE_FACES = [
-  makeFace('x', 1), makeFace('x', -1),
-  makeFace('y', 1), makeFace('y', -1),
-  makeFace('z', 1), makeFace('z', -1)
-];
-
-// The corner that blows off — see EXPLODED_CORNER above for which one and
-// why. Truncating it replaces that vertex with 3 new points along its 3
-// edges, on the faces that share it, turning those quads into pentagons,
-// and adds one new triangular "raw" face where the corner used to be.
-//
-// The replacement order matters: each new point has to be spliced in next
-// to whichever original neighbor it's actually adjacent to, or the new
-// 5-gon's edges cross themselves — a bowtie, which is exactly what shipped
-// as "artifacting" the first time this was built, from hand-picking the
-// order per axis and getting 2 of 3 wrong. Deriving the order directly from
-// each face's actual prev/next vertex around the loop, as this does, can't
-// make that mistake — the order isn't a guess, it's read off the geometry.
-const CHAMFER_FRAC = 0.4;
-function buildChamferedFaces(corner) {
-  const edgeNeighbors = [
-    { x: -corner.x, y: corner.y, z: corner.z },
-    { x: corner.x, y: -corner.y, z: corner.z },
-    { x: corner.x, y: corner.y, z: -corner.z }
-  ];
-  const cutVerts = edgeNeighbors.map(n => lerp3(corner, n, CHAMFER_FRAC));
-  const sameVert = (a, b) => a.x === b.x && a.y === b.y && a.z === b.z;
-  const cutPointFor = neighbor => cutVerts[edgeNeighbors.findIndex(n => sameVert(n, neighbor))];
-
-  const faces = BASE_FACES.map(f => ({ ...f, verts: f.verts.slice() }));
-  for (const f of faces) {
-    const idx = f.verts.findIndex(v => sameVert(v, corner));
-    if (idx === -1) continue;
-    const n = f.verts.length;
-    const prev = f.verts[(idx - 1 + n) % n];
-    const next = f.verts[(idx + 1) % n];
-    f.verts.splice(idx, 1, cutPointFor(prev), cutPointFor(next));
-    // Keep the texture, minus the bit that was blown off. The removed
-    // chunk is the tetrahedron within CHAMFER_FRAC of the corner along
-    // each edge, which on a face is "L1 distance to the corner < 2*FRAC".
-    f.craters = f.craters.filter(c => {
-      const q = bilerp(f.quad, c.u, c.v);
-      const d = Math.abs(q.x - corner.x) + Math.abs(q.y - corner.y) + Math.abs(q.z - corner.z);
-      return d > CHAMFER_FRAC * 2 + 0.08;
-    });
-  }
-
-  faces.push({
-    verts: cutVerts,
-    normal: normalize3(corner.x, corner.y, corner.z),
-    craters: [],
-    damaged: true
-  });
-  return faces;
-}
-const CHAMFERED_FACES = buildChamferedFaces(EXPLODED_CORNER);
-
-function bilerp(corners, u, v) {
-  const top = lerp3(corners[0], corners[1], u);
-  const bot = lerp3(corners[3], corners[2], u);
-  return lerp3(top, bot, v);
-}
+// Everything about the cube itself — projection, faces, the chamfer, the
+// crater texture — lives in planet.js now, shared with the ending, which
+// draws the same planet and puts the corner back.
+const CHAMFERED_FACES = buildChamferedFaces(EXPLODED_CORNER, CHAMFER_FRAC);
+function project(p) { return projectP(p, PLANET_CX, PLANET_CY); }
 
 let t = 0;
 let stars = [];
@@ -275,11 +142,6 @@ function drawStarfield() {
   ctx.globalAlpha = 1;
 }
 
-function mixGold(intensity) {
-  const lo = [138, 106, 46], hi = [255, 224, 150];
-  const c = lo.map((v, i) => Math.round(v + (hi[i] - v) * intensity));
-  return `rgb(${c[0]},${c[1]},${c[2]})`;
-}
 
 // Draws the rotating cube: transforms + backface-culls + depth-sorts every
 // face, fills each with lighting-based shading, then a light crater texture
@@ -287,42 +149,7 @@ function mixGold(intensity) {
 // same 45-degree corner cut the game's damage language uses everywhere
 // else, once the explosion lands.
 function drawPlanet(angleY, scale) {
-  const faces = cornerBlownOff ? CHAMFERED_FACES : BASE_FACES;
-
-  const camFaces = faces.map(f => {
-    const camVerts = f.verts.map(v => toCameraSpace(v, angleY, scale));
-    const camNormal = rotateX(rotateY(f.normal, angleY), CAM_TILT);
-    const avgZ = camVerts.reduce((s, p) => s + p.z, 0) / camVerts.length;
-    return { ...f, camVerts, camNormal, avgZ };
-  }).filter(f => f.camNormal.z < -0.05); // visible faces point back toward the camera
-
-  camFaces.sort((a, b) => b.avgZ - a.avgZ); // paint far-to-near
-
-  for (const f of camFaces) {
-    const proj = f.camVerts.map(project);
-    const intensity = Math.max(0.12, dot3(f.camNormal, LIGHT));
-    ctx.fillStyle = f.damaged ? '#3a2a14' : mixGold(intensity);
-    ctx.beginPath();
-    proj.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = f.damaged ? '#1c1408' : '#5b3f1a';
-    ctx.lineWidth = f.damaged ? 1 : 1.5;
-    ctx.stroke();
-
-    if (!f.damaged) {
-      const avgScale = proj.reduce((s, p) => s + p.scale, 0) / proj.length;
-      for (const c of f.craters) {
-        const local = bilerp(f.quad, c.u, c.v);
-        const camP = toCameraSpace(local, angleY, scale);
-        const p = project(camP);
-        ctx.fillStyle = `rgba(90, 65, 20, ${0.4 + intensity * 0.2})`;
-        ctx.beginPath();
-        ctx.ellipse(p.x, p.y, c.r * scale * avgScale, c.r * scale * avgScale * 0.65, 0, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-  }
+  drawPlanetShared(cornerBlownOff ? CHAMFERED_FACES : BASE_FACES, angleY, scale, PLANET_CX, PLANET_CY);
 }
 
 function drawSpheres(angleY, scale, progress) {

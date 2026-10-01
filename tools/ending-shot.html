@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#0a0d1c;"><canvas id="game" width="800" height="450"></canvas>
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 6, bestScore: 0, hasSeenIntro: true, narrative: { seenCutscenes: {}, npcStage: 0, flags: {} } }));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  // Screenshot the ending at a given frame. ?frame=N.
+  import { update, draw, switchTo } from '../src/scenes/sceneManager.js';
+  const q = new URLSearchParams(location.search);
+  const frame = parseInt(q.get('frame') || '960', 10);
+  setTimeout(() => {
+    switchTo('ending');
+    for (let i = 0; i < frame; i++) update();
+    draw();
+    document.title = `ending f${frame}`;
+  }, 250);
+</script></body></html>

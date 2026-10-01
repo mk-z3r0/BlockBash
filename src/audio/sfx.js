@@ -226,3 +226,27 @@ export function playAmmoPickup() {
   tone(880, t, 0.1, 'triangle', 0.18, sfxGain, 6000);
   tone(1174.7, t + 0.07, 0.14, 'triangle', 0.16, sfxGain, 6000);
 }
+
+// --- the ending ---------------------------------------------------------------
+
+// A chord that rises over the whole restoration — four detuned triangles
+// gliding up a fifth across four seconds, the same intervals playRestore
+// uses, stretched out to the length of the corner growing back.
+export function playEndingSwell() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  [[261.6, 392.0], [329.6, 493.9], [392.0, 587.3], [523.3, 784.0]].forEach(([from, to], i) => {
+    tone(from, t + i * 0.15, 4.2, 'triangle', 0.10, sfxGain, 5200, to);
+    tone(from * 1.005, t + i * 0.15, 4.2, 'triangle', 0.06, sfxGain, 5200, to * 1.005);   // detune: width
+  });
+}
+
+// One tick per edge as the twelve light up, climbing. The twelfth is the
+// top of the scale, and playRestore lands on it.
+export function playEndingSnap(n) {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const f = 523.25 * Math.pow(2, (n - 1) / 12);
+  tone(f, t, 0.12, 'square', 0.14, sfxGain, 6000);
+  tone(f * 2, t + 0.02, 0.08, 'triangle', 0.08, sfxGain, 8000);
+}

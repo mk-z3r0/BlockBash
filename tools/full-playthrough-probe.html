@@ -20,7 +20,7 @@
   // bosses, level transitions, the ending, and anything that throws.
   import { player } from '../src/entities/player.js';
   import { state } from '../src/state.js';
-  import { update, switchTo, getCurrentName } from '../src/scenes/sceneManager.js';
+  import { update, switchTo, getCurrentName , handleKeyDown } from '../src/scenes/sceneManager.js';
   import { getLevel } from '../src/levels/levelLoader.js';
   import { levels } from '../src/levels/registry.js';
   import { isCutsceneActive, activeCutsceneId, skipCutscene } from '../src/cutscenes/runner.js';
@@ -146,7 +146,15 @@
     const missing = spine.filter(id => !allScenes.includes(id));
     check(missing.length === 0, `every story scene played (${missing.length ? 'missing: ' + missing.join(', ') : 'all ' + spine.length})`);
     check(state.gameState === 'win', `the run ends in a win (gameState: ${state.gameState})`);
-    check(getCurrentName() === 'win', `and lands on the win screen (scene: ${getCurrentName()})`);
+    check(getCurrentName() === 'ending', `and plays the ending (scene: ${getCurrentName()})`);
+    {
+      const ev = new KeyboardEvent('keydown', { key: ' ' });
+      // A press before the title skips TO the title; a press after a beat
+      // takes you on. Two presses two frames apart are both the first kind,
+      // on purpose — a kid mashing can't blow through the title.
+      handleKeyDown(ev, false); tick(40); handleKeyDown(ev, false); tick(2);
+      check(getCurrentName() === 'win', `and the ending lands on the win screen (scene: ${getCurrentName()})`);
+    }
     out.push(`  (${Math.round(performance.now() - t0)}ms of simulation)`);
 
     out.push(fails ? `*** ${fails} FAILURE(S)` : 'PASS the whole game can be played from the block house to the core');

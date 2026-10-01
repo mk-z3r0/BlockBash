@@ -101,8 +101,9 @@ function finishLevel() {
   } else {
     recordProgress(state.currentLevelIndex, state.score);
     state.gameState = 'win';
-    playWin();
-    switchTo('win');
+    // The ending plays the restoration at planetary scale and then hands
+    // over to the score screen. It takes its own fanfare at the title.
+    switchTo('ending');
   }
 }
 

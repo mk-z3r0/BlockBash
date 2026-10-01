@@ -7,6 +7,7 @@ import { introScene } from './scenes/introScene.js';
 import { titleScene } from './scenes/titleScene.js';
 import { playingScene } from './scenes/playingScene.js';
 import { winScene } from './scenes/winScene.js';
+import { endingScene } from './scenes/endingScene.js';
 import { gameOverScene } from './scenes/gameOverScene.js';
 import { P } from './engine/physics.js';
 import { initNarrative } from './narrative.js';
@@ -20,6 +21,7 @@ initNarrative();
 registerScene('intro', introScene);
 registerScene('title', titleScene);
 registerScene('playing', playingScene);
+registerScene('ending', endingScene);
 registerScene('win', winScene);
 registerScene('gameover', gameOverScene);
 

@@ -34,6 +34,34 @@ Its attacks are **geological**, not combat moves:
 - floor sections rounding off and collapsing underfoot
 - gravity distortion pulling the player toward it
 
+### After the core — the ending (built 2026-09-30)
+
+The last cutscene says the thesis in words — *"Eight corners. Twelve edges.
+Six flat faces."* — and until this the game then cut to a score. Now it is
+shown happening, at full volume, in four continuous movements (~25s,
+skippable, `scenes/endingScene.js`):
+
+1. **Rise.** The two of them on a lifted block — a restored one, cyan-edged
+   — going up through the crust. Strata scroll past in four layers of
+   parallax; the core's light is under them. *"Let's go up and see it."*
+2. **Surface.** They break out at the block house from the opening, and
+   the camera keeps pulling back until the ground is a face of the planet.
+3. **Put back.** The same cube the intro showed, with the same corner gone
+   (`scenes/planet.js` is shared by both scenes on purpose). The spheres
+   lift off every face. Triangles — the restore shot — stream in from
+   everywhere and the corner grows back; the twelve edges light one by one
+   as the line is counted out; then the bloom.
+4. **Title.** BLOCK BASH assembles itself out of small squares, which is
+   the verb, one last time. Any key → the score screen.
+
+Nothing new is introduced for it. The stick legs, the cube, the cyan, the
+triangle: the ending is made of the game. Techniques, for the record, since
+it's all `<canvas>` and no library: 3D projection with per-face lighting
+and a crater texture that survives the chamfer, additive compositing for
+the edge bloom and light rays, a few hundred converging particles, a
+procedural rising chord (`playEndingSwell`) with a tick per edge, a
+crossfade, and screen shake on the snap.
+
 It's defeated with the **triangle restoration weapon** — the same mechanic used to restore octagons, scaled up: many hits, landed while the core actively reshapes the arena around the player. Each hit snaps one face back toward square. The final hit makes it **cubic again**, the planet stabilises, and the sphere threat collapses with it.
 
 > The ending is a *restoration*, not a kill. That's the whole thesis of the game stated once, at full volume: the win condition for the entire story is the same verb the player has been practising on individual octagons all along.
