@@ -18,6 +18,7 @@
 import { state } from '../state.js';
 import { getLevel, surfaceYAt, isBlocked, hasFooting } from '../levels/levelLoader.js';
 import { carveGap, crackFloor, updateCracks } from '../levels/terrain.js';
+import { movePlatform } from '../levels/movers.js';
 import { spawnWeaponPickup, spawnAmmoPickup } from './weaponPickup.js';
 import { spawnExplosion, spawnDust } from './particles.js';
 import { spawnSphereShot, startAttack } from '../weapons/combat.js';
@@ -368,7 +369,14 @@ function breath(t) {
 const TERRA_WARN = 75;              // 1.25s to read it and step off
 const TERRA_PIT = 40;              // a hop, not a jump (walk carry ~93)
 const TERRA_MAX_PITS = 4;
-const TERRA_SWAY = 48;             // px the lifts drift sideways at the top
+// How far the lifts drift sideways at the top of the breath — ALL TOGETHER.
+// It was 48 with each lift on its own phase, which moved them up to 96px
+// relative to each other: the gap you were about to jump could be 90px or
+// 186, depending on when you looked. The room should look alive; it should
+// not change the jump under your feet. Same phase, smaller amplitude: the
+// lift-to-lift gaps never change, and the lift-to-ledge gap moves by 26 at
+// most.
+const TERRA_SWAY = 26;
 
 function updateTerraformer(boss, player) {
   const level = getLevel();
@@ -379,11 +387,13 @@ function updateTerraformer(boss, player) {
 
   for (const p of level.platforms) {
     if (!p.mover) continue;
-    p.y = p.baseY - p.mover * lift;
-    // Sideways drift, strongest at the top. Deterministic from the
-    // platform's own x so the two never move in lockstep.
-    const phase = (p.baseX % 7) / 7 * Math.PI * 2;
-    p.x = p.baseX + Math.sin(boss.cycle * 0.02 + phase) * TERRA_SWAY * lift;
+    const newY = p.baseY - p.mover * lift;
+    // Sideways drift, strongest at the top, the same for every lift.
+    const newX = p.baseX + Math.sin(boss.cycle * 0.02) * TERRA_SWAY * lift;
+    // Through movePlatform, so whoever is riding it goes with it. These were
+    // moved by direct assignment and carried nobody, which is what "keeps
+    // kicking you off the platforms" was.
+    movePlatform(level, p, newX, newY, player);
   }
 
   // Crack the floor under the player once per low phase, while they are

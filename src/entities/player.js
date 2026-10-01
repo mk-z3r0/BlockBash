@@ -76,6 +76,18 @@ function resolvePlatformsX(platforms) {
   for (const platform of platforms) {
     if (platform.width <= 1) continue; // a fully retracted ledge is not solid
     if (!isColliding(player, platform)) continue;
+    // A platform that MOVES can rise under a walking player's feet and
+    // overlap them by a pixel or two. That is a floor arriving, not a wall:
+    // step onto it. Without this the overlap was read as a side hit and the
+    // player was snapped to the platform's far side — a 74px teleport.
+    // Limited to movers on purpose; for a static platform a lip that shallow
+    // is something the level author put there.
+    if ((platform.move || platform.mover) && player.velocityY >= 0 &&
+        (player.y + player.height) - platform.y <= 8) {
+      player.y = platform.y - player.height;
+      player.velocityY = 0;
+      continue;
+    }
     if (player.velocityX >= 0) player.x = platform.x - player.width;
     else player.x = platform.x + platform.width;
     player.velocityX = 0;

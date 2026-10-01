@@ -439,8 +439,7 @@ export const playingScene = {
       // frame. A platform that rises into a standing player carries them up
       // for free that way; one that slides sideways has to hand back its
       // delta, since nothing about its x is in the player's.
-      const carry = updateMovers(getLevel(), state.frameCount, player);
-      if (carry) player.x += carry;
+      updateMovers(getLevel(), state.frameCount, player);
 
       const { fellInPit } = updatePlayer(locks.input === 'locked');
       updatePlayerWeapon(locks.input === 'locked');

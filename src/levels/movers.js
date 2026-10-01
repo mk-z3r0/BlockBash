@@ -1,3 +1,5 @@
+import { isColliding } from '../engine/physics.js';
+
 // Platforms that move, level-wide.
 //
 // The Terraformer's arena already lifted platforms, but that was owned by
@@ -30,31 +32,59 @@
 // before this runs.
 const STAND_TOLERANCE = 6;
 
-function standingOn(player, p) {
+export function standingOn(player, p) {
   if (!player.isOnGround) return false;
   const feet = player.y + player.height;
   if (feet < p.y - STAND_TOLERANCE || feet > p.y + STAND_TOLERANCE) return false;
   return player.x + player.width > p.x && player.x < p.x + p.width;
 }
 
-// Moves every `move` platform in the level and returns how far the one under
-// the player travelled horizontally this frame.
+// THE ONE WAY A PLATFORM MOVES. Whoever is standing on it goes with it.
+//
+// Reported from play, twice: "you just get kicked off of them, and it isn't
+// possible to get the coins or triangles." Traced frame by frame: a player
+// walking on a rising lift is on it at frame 12 and at frame 13 is 74px away
+// on the platform's far side. The lift had risen 0.9px into their feet, and
+// the player's horizontal collision — which runs AFTER the platforms move —
+// read that overlap as a wall, and snapped them clean out to the side of the
+// platform with their speed zeroed.
+//
+// Sideways sliders already carried their rider; nothing carried one
+// vertically, and the Terraformer's platforms (moved by direct assignment in
+// entities/bosses.js) carried nobody in either direction. Standing perfectly
+// still happened to work, which is why this survived: the first thing anyone
+// does on a lift is take a step. 16 of the game's 17 moving platforms failed
+// tools/moving-platform-probe.html.
+//
+// `standingOn` is judged BEFORE the platform moves, against where it was, and
+// the rider is moved by exactly what the platform moved. If carrying them would
+// put them inside something solid (a ceiling over the lift's top), they are
+// left where they are rather than shoved through it.
+export function movePlatform(level, p, newX, newY, player) {
+  const rider = player && standingOn(player, p);
+  const dx = newX - p.x, dy = newY - p.y;
+  p.x = newX;
+  p.y = newY;
+  if (!rider || (!dx && !dy)) return;
+  const moved = { x: player.x + dx, y: player.y + dy, width: player.width, height: player.height };
+  const blocked = level.platforms.some(o => o !== p && o.width > 1 && isColliding(moved, o));
+  if (blocked) return;
+  player.x = moved.x;
+  player.y = moved.y;
+}
+
+// Moves every `move` platform in the level, carrying its rider.
 export function updateMovers(level, frameCount, player) {
-  let carry = 0;
   for (const p of level.platforms) {
     if (!p.move) continue;
     const period = p.move.period || 240;
     const phase = (p.move.phase || 0) * Math.PI * 2;
     const t = Math.sin((frameCount / period) * Math.PI * 2 + phase);
-
-    if (p.move.y) p.y = p.baseY - p.move.y * (t * 0.5 + 0.5);
-    if (p.move.x) {
-      const before = p.x;
-      p.x = p.baseX + p.move.x * t;
-      if (standingOn(player, p)) carry += p.x - before;
-    }
+    const newY = p.move.y ? p.baseY - p.move.y * (t * 0.5 + 0.5) : p.y;
+    const newX = p.move.x ? p.baseX + p.move.x * t : p.x;
+    movePlatform(level, p, newX, newY, player);
   }
-  return carry;
+  return 0;   // the rider is carried inside movePlatform now
 }
 
 // Puts them back where the level data says they start. Called on load and on

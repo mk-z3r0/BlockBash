@@ -316,6 +316,91 @@
       }
     });
 
+    // --- the Terraformer, the way a careful kid plays it ---
+    //
+    // Reported from play: "the Terraformer still isn't real fair — it keeps
+    // kicking you off the platforms without much chance to keep your
+    // footing." It did: the horizontal collision ran AFTER the platforms
+    // moved, so a lift rising 1px into a walking player's feet read as a wall
+    // and teleported them ~75px to the platform's far side (see
+    // levels/movers.js). Nothing could see it, because every earlier test of
+    // this fight pinned the player to the boss's ledge.
+    //
+    // So: start on the floor, wait for the lift to come down, board it, walk
+    // to its edge, step across, ride the second one up, step onto the ledge,
+    // and shoot when it opens — from several different points in the room's
+    // cycle, with real hits counting.
+    {
+      const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+      const playTerraformer = (offset) => {
+        runLevelAgain(4);
+        const lvT = getLevel();
+        state.enemies.forEach(e => { if (!e.boss) e.alive = false; });
+        const tboss = state.enemies.find(e => e.bossKind === 'terraformer');
+        const [A, B] = lvT.platforms.filter(q => q.mover).sort((a, b) => a.baseX - b.baseX);
+        const ledge = lvT.platforms.find(q => q.y === 150 && !q.mover);
+        player.weapon = 'cornerstone'; player.hasWeapon = true; player.ammo = 12;
+        // let the room reach a different phase, standing clear of the cracks
+        let wx = 6150;
+        for (let f = 0; f < offset; f++) {
+          const c = (lvT.pendingGaps || [])[0];
+          if (c) wx = (c.x + c.width / 2 < 6150) ? c.x + c.width / 2 + 120 : c.x + c.width / 2 - 120;
+          player.x = wx; player.y = lvT.groundY - player.height; player.velocityX = 0; player.velocityY = 0;
+          player.invincible = 99999; update();
+        }
+        player.x = 6380; player.y = lvT.groundY - player.height; player.velocityX = 0; player.velocityY = 0;
+        player.invincible = 0; state.lives = 99;
+        const lives0 = state.lives;
+        let livesSeen = lives0, hop = 0, airDir = 0, f = 0;
+        const on = q => player.isOnGround && Math.abs(player.y + player.height - q.y) <= 4 &&
+          player.x + player.width > q.x && player.x < q.x + q.width;
+        for (; f < 4500 && tboss.alive; f++) {
+          const pcx = player.x + player.width / 2;
+          let left = false, right = false, jump = false, fire = false;
+          if (on(ledge)) {
+            player.facing = 1;
+            if (!tboss.invulnerable && player.ammo > 0 && player.weaponCooldown <= 0 &&
+                Math.abs((tboss.x + tboss.w / 2) - pcx) < 420) fire = true;
+            if (pcx < ledge.x + 40) right = true;
+          } else if (on(B)) {
+            const gap = ledge.x - (B.x + B.width), dy = B.y - ledge.y;
+            if (pcx < B.x + B.width - 26) right = true;
+            else if (gap <= 100 && dy <= 40 && dy >= -10 && hop <= 0) { right = true; jump = true; }
+          } else if (on(A)) {
+            const gap = B.x - (A.x + A.width), dy = A.y - B.y;
+            if (pcx < A.x + A.width - 26) right = true;
+            else if (gap <= 100 && Math.abs(dy) <= 30 && hop <= 0) { right = true; jump = true; }
+          } else if (player.isOnGround && player.y + player.height >= lvT.groundY - 2) {
+            const c = (lvT.pendingGaps || []).find(q => Math.abs((q.x + q.width / 2) - pcx) < 80);
+            if (c) { if (pcx < c.x + c.width / 2) left = true; else right = true; }
+            else {
+              const tx = A.x - 34;
+              if (pcx < tx - 6) right = true; else if (pcx > tx + 6) left = true;
+              else if (A.y >= 316 && hop <= 0) { right = true; jump = true; }
+            }
+          }
+          if (airDir !== 0 && !player.isOnGround) { if (airDir > 0) right = true; else left = true; } else airDir = 0;
+          if (jump) airDir = right ? 1 : (left ? -1 : 0);
+          if (fire) startAttack(player);
+          key(left ? 'keydown' : 'keyup', 'ArrowLeft'); key(right ? 'keydown' : 'keyup', 'ArrowRight');
+          if (jump && hop <= 0) { key('keydown', ' '); hop = 20; }
+          if (hop > 0 && --hop === 0) key('keyup', ' ');
+          update();
+          if (state.lives < livesSeen) {
+            livesSeen = state.lives;
+            player.x = 6380; player.y = lvT.groundY - player.height; player.velocityX = 0; player.velocityY = 0;
+          }
+        }
+        key('keyup', 'ArrowLeft'); key('keyup', 'ArrowRight'); key('keyup', ' ');
+        return { won: !tboss.alive, frames: f, lost: lives0 - state.lives };
+      };
+      for (const off of [0, 140, 300]) {
+        const r = playTerraformer(off);
+        check(r.won && r.lost <= 1,
+          `starting ${off} frames into the room's cycle, a careful kid ${r.won ? 'wins' : 'does not win'} in ${r.frames} frames, losing ${r.lost}`);
+      }
+    }
+
     // --- level 4: The Demolition Crew ---
     runLevel(3, () => {
       const crew = state.enemies.filter(e => e.crew === 'demo');

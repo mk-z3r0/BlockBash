@@ -98,9 +98,15 @@ export default {
     // `mover` (not `move`) is the boss-driven lift: these are raised by its
     // cycle rather than by the clock, so the moment they reach the ledge is
     // the same moment it's open. See entities/bosses.js.
-    { x: 6480, y: 330, width: 110, height: 18, mover: 150 },
-    { x: 6720, y: 330, width: 110, height: 18, mover: 150 },
-    { x: 6960, y: 150, width: 320, height: 18 }
+    //
+    // GAPS of 90, not 130. The lifts were 130px apart and the last one 130px
+    // from the boss's ledge: run-only jumps, off a 110px platform that is
+    // moving, in a boss fight, for a ten-year-old. 90 is a jump a plain walk
+    // clears (~93px carry), the same number every mid-level pit was brought
+    // down to. The ledge starts at 6900 to meet the second lift.
+    { x: 6500, y: 330, width: 110, height: 18, mover: 150 },
+    { x: 6700, y: 330, width: 110, height: 18, mover: 150 },
+    { x: 6900, y: 150, width: 380, height: 18 }
   ],
 
   hazards: [
@@ -216,7 +222,7 @@ export default {
     [5795, 300],
     [6165, 300], [6165, 230],
     [6350, 396], [6410, 396],
-    [6520, 316], [6760, 316]
+    [6555, 316], [6755, 316]
   ],
 
   checkpoints: [

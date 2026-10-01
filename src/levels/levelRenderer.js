@@ -20,29 +20,34 @@ function computeHazardStripes(platforms) {
   return stripes;
 }
 
+// One run of diagonal amber/dark hazard tape. Shared by the real pit edges
+// below and by the preview of a pit that is about to open (drawCracks), so
+// the two cannot drift apart.
+function drawStripeBar(x, y, width) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, width, 6);
+  ctx.clip();
+  ctx.fillStyle = '#1c2547';
+  ctx.fillRect(x, y, width, 6);
+  ctx.fillStyle = '#f2c14e';
+  const stripeSpacing = 8;
+  for (let sx = x - 6; sx < x + width + 6; sx += stripeSpacing) {
+    ctx.beginPath();
+    ctx.moveTo(sx, y + 6);
+    ctx.lineTo(sx + 4, y);
+    ctx.lineTo(sx + 8, y);
+    ctx.lineTo(sx + 4, y + 6);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 function drawHazardStripes(platforms) {
   // diagonal amber/dark hazard tape along the top edge of every ground
   // segment that borders a pit — visible well before the player reaches it
-  for (const h of computeHazardStripes(platforms)) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(h.x, h.y, h.width, 6);
-    ctx.clip();
-    ctx.fillStyle = '#1c2547';
-    ctx.fillRect(h.x, h.y, h.width, 6);
-    ctx.fillStyle = '#f2c14e';
-    const stripeSpacing = 8;
-    for (let sx = h.x - 6; sx < h.x + h.width + 6; sx += stripeSpacing) {
-      ctx.beginPath();
-      ctx.moveTo(sx, h.y + 6);
-      ctx.lineTo(sx + 4, h.y);
-      ctx.lineTo(sx + 8, h.y);
-      ctx.lineTo(sx + 4, h.y + 6);
-      ctx.closePath();
-      ctx.fill();
-    }
-    ctx.restore();
-  }
+  for (const h of computeHazardStripes(platforms)) drawStripeBar(h.x, h.y, h.width);
 }
 
 // --- Carved undersides ---------------------------------------------------
@@ -299,7 +304,16 @@ export function drawWorldEdge(frameCount) {
   // translucent so the background still reads through it as depth rather
   // than as a second slab of terrain.
   ctx.fillStyle = 'rgba(35, 47, 92, 0.38)';
-  ctx.fillRect(worldEdgeX - EDGE_INTERIOR_BACK, groundY, EDGE_INTERIOR_BACK, EDGE_INTERIOR_DEPTH);
+  // Starts at the BOTTOM of the floor, not its top. The floor is 40px thick
+  // (see the loader's ground segments), so a slab starting at groundY was
+  // laid over the whole last 320px of every level — and over any pit that
+  // opened in it, filling the pit with a translucent ground-coloured tint
+  // that washed out its walls and hazard tape. Reported from play as pits
+  // that "have some of the ground colouring but don't have the outline".
+  // Those two stretches are exactly where the Excavator and the Terraformer
+  // dig. Below the floor is where the interior is actually meant to show.
+  const FLOOR_BOTTOM = groundY + 40;
+  ctx.fillRect(worldEdgeX - EDGE_INTERIOR_BACK, FLOOR_BOTTOM, EDGE_INTERIOR_BACK, EDGE_INTERIOR_DEPTH - 40);
 
   // The corner itself: brightest exactly at the surface, fading with depth.
   // Reads as a glowing lip from here; after the world rotates it's the
@@ -391,11 +405,32 @@ export function drawCracks(frameCount) {
     }
 
     if (arrived) {
-      // At the target: the jagged line widens and brightens as its time
-      // runs out, and the floor darkens from beneath.
+      // At the target. How far through the final warning it is, 0..1.
       const k = c.originX == null ? urgency
         : Math.min(1, ((c.total - c.left) - c.travel) / Math.max(1, c.total - c.travel));
-      ctx.strokeStyle = `rgba(255, ${Math.round(120 - k * 60)}, ${Math.round(140 - k * 100)}, ${(0.45 + k * 0.55) * flicker})`;
+
+      // The pit, as it will be. Reported from play: the forming pits "have
+      // some of the ground colouring but don't have the outline, so it
+      // doesn't read as a pit" — a faint dark band and a red line, no walls,
+      // no hazard tape. By the time it looked like one it was already open.
+      // So the warning draws the real thing coming: a dark opening that
+      // deepens, the same outlined walls, and the same amber tape on both
+      // lips as drawHazardStripes puts on a finished pit.
+      const depth = seg.height * (0.3 + 0.7 * k);
+      ctx.fillStyle = `rgba(8, 11, 24, ${0.5 + 0.45 * k})`;
+      ctx.fillRect(c.x, y + 1, c.width, depth);
+      ctx.strokeStyle = `rgba(58, 74, 130, ${0.55 + 0.45 * k})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(c.x + 1, y + 1); ctx.lineTo(c.x + 1, y + depth);
+      ctx.moveTo(c.x + c.width - 1, y + 1); ctx.lineTo(c.x + c.width - 1, y + depth);
+      ctx.stroke();
+      drawStripeBar(c.x - HAZARD_WIDTH, y, HAZARD_WIDTH);
+      drawStripeBar(c.x + c.width, y, HAZARD_WIDTH);
+
+      // ...and the crack, running across the top of it: wider and brighter
+      // as the time runs out.
+      ctx.strokeStyle = `rgba(255, ${Math.round(120 - k * 60)}, ${Math.round(140 - k * 100)}, ${(0.55 + k * 0.45) * flicker})`;
       ctx.lineWidth = 2 + k * 3;
       ctx.beginPath();
       const steps = 7;
@@ -405,8 +440,6 @@ export function drawCracks(frameCount) {
         if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
       }
       ctx.stroke();
-      ctx.fillStyle = `rgba(10, 13, 28, ${k * 0.6})`;
-      ctx.fillRect(c.x, y, c.width, 6 + k * 14);
     }
     ctx.restore();
   }
