@@ -22,7 +22,7 @@ import { keys } from '../engine/input.js';
 import { isColliding } from '../engine/physics.js';
 import { getWeapon } from './registry.js';
 import { spawnExplosion, spawnDust } from '../entities/particles.js';
-import { playStomp, playOctagonThud, playRestore, playSphereShot } from '../audio/sfx.js';
+import { playStomp, playOctagonThud, playRestore, playSphereShot, playDeflect } from '../audio/sfx.js';
 import {
   TRIANGLE_SPEED, TRIANGLE_SIZE, TRIANGLE_LIFE, drawRestoreProjectile
 } from './cornerstone.js';
@@ -69,8 +69,17 @@ export function canAttack(owner) {
 export function startAttack(owner) {
   if (!canAttack(owner)) return false;
   const weapon = getWeapon(owner.weapon);
-  owner.weaponCooldown = weapon.cooldown;
-  owner.weaponTimer = weapon.duration;
+  // An enemy's swing is SLOWER than the same weapon in the player's hands
+  // (`enemyScale` in the registry), and its hitbox opens later (see
+  // swingReach). The player's own numbers are tuned so that a swing lands
+  // reliably — a 20-frame hammer, hitbox live from frame 8 — and that is the
+  // right shape for the person swinging and a terrible one for the person
+  // being swung at: about 0.14s of warning. Reported from play as the
+  // Demolition Crew's "hit window seems really short".
+  const scale = owner === player ? 1 : (weapon.enemyScale || 1);
+  owner.swingLen = Math.max(1, Math.round(weapon.duration * scale));
+  owner.weaponCooldown = Math.round(weapon.cooldown * scale);
+  owner.weaponTimer = owner.swingLen;
   // A melee swing's hitbox is live for its whole animation (see the note in
   // weapons/pickaxe.js on why), so it needs to remember who it has already
   // hit — otherwise one swing lands `duration` times.
@@ -101,17 +110,22 @@ export function startAttack(owner) {
 // on the next one. A window that opens late and stays open to the end of the
 // animation keeps that fixed while still looking like the hit it draws.
 function swingReach(owner, weapon) {
-  const progress = weapon.duration ? 1 - owner.weaponTimer / weapon.duration : 1;
-  const from = weapon.activeFrom == null ? 0.35 : weapon.activeFrom;
-  if (progress < from) return 0;                       // still winding up
-  const out = from >= 1 ? 1 : Math.min(1, (progress - from) / (1 - from));
+  const len = owner.swingLen || weapon.duration;
+  const progress = len ? 1 - owner.weaponTimer / len : 1;
+  const own = owner === player || weapon.enemyActiveFrom == null;
+  const from = (own ? weapon.activeFrom : weapon.enemyActiveFrom);
+  const open = from == null ? 0.35 : from;
+  if (progress < open) return 0;                       // still winding up
+  const out = open >= 1 ? 1 : Math.min(1, (progress - open) / (1 - open));
   return weapon.reach * (0.55 + 0.45 * out);
 }
 
 // Shared with the stomp test in entities/enemy.js, and deliberately the
 // same shape: "was above it when the frame started, and is falling".
 function comingDownOn(who, target) {
-  if (who.velocityY <= 0) return false;
+  // See descendingOnto in entities/enemy.js: `falling` is fixed at the top
+  // of the enemy update, before any stomp this frame launches the player.
+  if (who.falling == null ? who.velocityY <= 0 : !who.falling) return false;
   const b = boxOf(target);
   const prev = who.prevBottom == null ? who.y + who.height : who.prevBottom;
   return prev <= b.y + b.height * 0.35;
@@ -120,11 +134,19 @@ function comingDownOn(who, target) {
 function meleeHitbox(owner, weapon, reach) {
   const b = boxOf(owner);
   const dir = owner.facing >= 0 ? 1 : -1;
+  // An ENEMY's swing doesn't reach the top 6px of its own height, so a
+  // player who hops it isn't hit for grazing it with their boots. Found by
+  // playing the Demolition Crew: the bot stomped one bruiser, was launched
+  // by the bounce, and in the same frame was hit by the other's hammer on
+  // the last frame of its swing — overlapping the player's feet by 2px. A
+  // swing should be something you can jump, and a graze isn't a hit. A
+  // standing player still overlaps the box by 20px.
+  const inset = owner === player ? 0 : 6;
   return {
     x: dir > 0 ? b.x + b.width : b.x - reach,
-    y: b.y,
+    y: b.y + inset,
     width: reach,
-    height: b.height
+    height: b.height - inset
   };
 }
 
@@ -401,6 +423,20 @@ export function updateProjectiles() {
       for (const enemy of state.enemies) {
         if (!enemy.alive || enemy.restored) continue;
         if (!isColliding(projectileBox(p), boxOf(enemy))) continue;
+        // A shielded crew member does not stop a triangle; it passes
+        // through, with a clink. Shots used to be CONSUMED by a shielded
+        // bruiser doing nothing, and the crew's bruisers stand between you
+        // and the shooter — so the only target you could damage was behind
+        // a wall that ate your ammunition. Reported from play.
+        if (enemy.shielded) {
+          p.passed = p.passed || new Set();
+          if (!p.passed.has(enemy)) {
+            p.passed.add(enemy);
+            spawnDust(p.x, p.y, 4, { spread: 3, size: 4, life: 14, color: 'rgba(150, 215, 255, 0.95)' });
+            playDeflect();
+          }
+          continue;
+        }
         p.dead = true;
         if (enemy.kind === 'octagon' || enemy.kind === 'core') restoreTarget(enemy);
         else damageEnemy(enemy, { damage: 1, score: 150 }, Math.sign(p.vx) || 1);

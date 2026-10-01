@@ -160,7 +160,7 @@ export default {
     { x: 1430, y: 180,           w: 20, minX: 1400, maxX: 1500, speed: 1.2 },
     { x: 1960, y: GROUND_Y - 22, w: 22, minX: 1920, maxX: 2005, speed: 1.8,
       tier: 'pursuer', weapon: 'pickaxe' },
-    { x: 2260, y: 210,           w: 20, minX: 2230, maxX: 2340, speed: 1.2 },
+    { x: 2260, y: 228,           w: 20, minX: 2230, maxX: 2340, speed: 1.2 },
     // The first corrupted square in the game, on the open ground before the
     // clearing. The sledgehammer bounces off it. That is the entire reason
     // it is standing here, 200px before anyone explains what it is.

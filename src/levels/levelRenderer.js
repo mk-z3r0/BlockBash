@@ -353,21 +353,61 @@ export function drawCracks(frameCount) {
     const y = seg.y;
     const urgency = 1 - c.left / c.total;         // 0 just cracked -> 1 about to drop
     const flicker = (Math.floor(frameCount / 4) % 2 === 0) ? 1 : 0.6;
+    const arrived = c.originX == null || (c.total - c.left) >= c.travel;
     ctx.save();
-    ctx.strokeStyle = `rgba(255, ${Math.round(120 - urgency * 60)}, ${Math.round(140 - urgency * 100)}, ${(0.45 + urgency * 0.55) * flicker})`;
-    ctx.lineWidth = 2 + urgency * 3;
     ctx.lineCap = 'round';
-    ctx.beginPath();
-    const steps = 7;
-    for (let i = 0; i <= steps; i++) {
-      const px = c.x + (c.width * i) / steps;
-      const py = y + (i % 2 ? 4 + urgency * 5 : 1) + Math.sin(frameCount * 0.3 + i) * urgency * 2;
-      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+
+    if (c.originX != null) {
+      // The fissure itself: a jagged line racing out of the drill to where
+      // the player was standing. Drawn fat and bright at its head, thinning
+      // behind it, so the DIRECTION it's travelling reads at a glance.
+      const x0 = c.originX, x1 = c.headX;
+      const steps = Math.max(2, Math.round(Math.abs(x1 - x0) / 9));
+      ctx.strokeStyle = `rgba(255, 96, 96, ${0.85 * flicker})`;
+      ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      for (let i = 0; i <= steps; i++) {
+        const px = x0 + ((x1 - x0) * i) / steps;
+        const py = y + 1 + (i % 2 ? 4 : 0) + Math.sin(frameCount * 0.4 + i * 1.7) * 1.2;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+      // a hot glow along it, and a bright spark at the head
+      ctx.strokeStyle = 'rgba(255, 190, 150, 0.35)';
+      ctx.lineWidth = 8;
+      ctx.stroke();
+      if (!arrived) {
+        ctx.fillStyle = 'rgba(255, 240, 210, 0.95)';
+        ctx.beginPath(); ctx.arc(x1, y + 2, 5, 0, Math.PI * 2); ctx.fill();
+      }
+      // and the spot it is heading for, faintly, from the start — so the
+      // player knows what is about to happen to the floor, not just that
+      // something is coming.
+      ctx.strokeStyle = `rgba(255, 96, 96, ${0.25 + 0.25 * flicker})`;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 5]);
+      ctx.strokeRect(c.x, y - 1, c.width, 10);
+      ctx.setLineDash([]);
     }
-    ctx.stroke();
-    // a darker fill creeping up from below, as the floor gives
-    ctx.fillStyle = `rgba(10, 13, 28, ${urgency * 0.6})`;
-    ctx.fillRect(c.x, y, c.width, 6 + urgency * 14);
+
+    if (arrived) {
+      // At the target: the jagged line widens and brightens as its time
+      // runs out, and the floor darkens from beneath.
+      const k = c.originX == null ? urgency
+        : Math.min(1, ((c.total - c.left) - c.travel) / Math.max(1, c.total - c.travel));
+      ctx.strokeStyle = `rgba(255, ${Math.round(120 - k * 60)}, ${Math.round(140 - k * 100)}, ${(0.45 + k * 0.55) * flicker})`;
+      ctx.lineWidth = 2 + k * 3;
+      ctx.beginPath();
+      const steps = 7;
+      for (let i = 0; i <= steps; i++) {
+        const px = c.x + (c.width * i) / steps;
+        const py = y + (i % 2 ? 4 + k * 5 : 1) + Math.sin(frameCount * 0.3 + i) * k * 2;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+      ctx.fillStyle = `rgba(10, 13, 28, ${k * 0.6})`;
+      ctx.fillRect(c.x, y, c.width, 6 + k * 14);
+    }
     ctx.restore();
   }
 }

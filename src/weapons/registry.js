@@ -46,6 +46,9 @@ const WEAPONS = {
     // The chop travels from over the shoulder to level with the ground, so
     // the head is only out front for the back two thirds of it.
     activeFrom: 0.34,
+    // Slower and later in an ENEMY's hands: see startAttack in weapons/combat.js.
+    enemyScale: 1.6,
+    enemyActiveFrom: 0.5,
     damage: 1,
     knockback: 0,
     score: 150,
@@ -89,6 +92,9 @@ const WEAPONS = {
     // shoulder, which is the complaint that started all of this; later and
     // the weapon whiffs at anything that is moving.
     activeFrom: 0.42,
+    // Slower and later in an ENEMY's hands: see startAttack in weapons/combat.js.
+    enemyScale: 3,
+    enemyActiveFrom: 0.45,
     damage: 2,
     knockback: 11,
     score: 200,
@@ -126,6 +132,13 @@ const WEAPONS = {
     knockback: 5,
     // Frames of contact it takes to bore through a chewed block.
     bores: 34,
+    // A drill is held against the work and pushed, never swung. entities/
+    // enemy.js reads this to draw the Excavator with the bit POINTED AT THE
+    // GROUND while it bores and hauling back on it when it binds. It was
+    // dropped when this entry was rewritten as the player's weapon, and the
+    // Excavator silently went back to swinging its drill like a pickaxe —
+    // reported from play twice, now.
+    bracedMining: true,
     score: 150,
     ammo: null,
     sound: playChainsawStart,
@@ -151,6 +164,9 @@ const WEAPONS = {
     // A thrust, not a swing: out fast and then held, so it's live early and
     // stays live. That long active window is the point of the weapon.
     activeFrom: 0.15,
+    // Slower and later in an ENEMY's hands: see startAttack in weapons/combat.js.
+    enemyScale: 1.4,
+    enemyActiveFrom: 0.3,
     damage: 1,
     knockback: 4,
     score: 150,

@@ -82,7 +82,29 @@ function activeBoss() {
     if (e.x + e.w < camera.x - 40 || e.x > camera.x + VIEW_WIDTH + 40) continue;
     if (!best || e.x < best.x) best = e;
   }
+  // The Demolition Crew is three bosses and the bar speaks for one. It used
+  // to be the LEFTMOST — always a shielded bruiser — so the bar read
+  // ARMOURED for nearly the whole fight and the one you could actually hurt
+  // was never the one it described. Reported from play as "can't find any
+  // openings". Speak for the shooter while it lives.
+  if (best && best.crew) {
+    const shooter = state.enemies.find(e => e.crew === best.crew && e.role === 'shooter' && e.alive);
+    if (shooter) best = shooter;
+  }
   return best;
+}
+
+// The crew shares one bar: everyone's remaining hp, and an instruction.
+function crewBar(boss) {
+  if (!boss.crew) return null;
+  const crew = state.enemies.filter(e => e.crew === boss.crew);
+  const total = crew.reduce((a, e) => a + (e.baseHp || 1), 0);
+  const left = crew.reduce((a, e) => a + (e.alive ? Math.max(0, e.hp) : 0), 0);
+  const shooterUp = crew.some(e => e.role === 'shooter' && e.alive);
+  return {
+    total, left,
+    hint: shooterUp ? 'HIT THE ONE AT THE BACK — SHOTS PASS THE SHIELDS' : 'SHIELDS DOWN — STOMP THEM!'
+  };
 }
 
 function drawBossBar() {
@@ -90,8 +112,9 @@ function drawBossBar() {
   if (!boss) return;
 
   const restoring = boss.restoreTotal != null && (boss.kind === 'octagon' || boss.kind === 'core');
-  const total = restoring ? boss.restoreTotal : (boss.baseHp || 1);
-  const left = restoring ? boss.restoreHits : Math.max(0, boss.hp);
+  const crew = crewBar(boss);
+  const total = crew ? crew.total : restoring ? boss.restoreTotal : (boss.baseHp || 1);
+  const left = crew ? crew.left : restoring ? boss.restoreHits : Math.max(0, boss.hp);
   // A restoration bar FILLS as you work; a health bar empties. They're
   // opposite jobs and should not look like the same thing running backwards.
   const frac = restoring ? 1 - left / total : left / total;
@@ -110,7 +133,7 @@ function drawBossBar() {
   ctx.textAlign = 'center';
   ctx.fillStyle = restoring ? '#5ee7ff' : '#ff9fc4';
   ctx.font = 'bold 11px Trebuchet MS, Arial, sans-serif';
-  const label = boss.bossName || BOSS_LABELS[boss.bossKind] ||
+  const label = crew ? 'THE DEMOLITION CREW' : boss.bossName || BOSS_LABELS[boss.bossKind] ||
                 (boss.kind === 'octagon' ? 'THE SCULPTOR' : 'BOSS');
   ctx.fillText(label, VIEW_WIDTH / 2, y - 6);
 
@@ -123,7 +146,15 @@ function drawBossBar() {
 
   // Whether it can be hurt RIGHT NOW is the thing the player most needs and
   // is least able to see, so the bar says it outright.
-  if (boss.invulnerable) {
+  if (crew) {
+    // The bar is for the crew as a whole and the thing to DO is the point.
+    ctx.strokeStyle = '#ffd9a0';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    ctx.fillStyle = '#ffd9a0';
+    ctx.font = 'bold 9px Trebuchet MS, Arial, sans-serif';
+    ctx.fillText(crew.hint, VIEW_WIDTH / 2, y + h + 11);
+  } else if (boss.invulnerable) {
     ctx.strokeStyle = 'rgba(232, 236, 247, 0.5)';
     ctx.lineWidth = 1;
     ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);

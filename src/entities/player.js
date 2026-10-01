@@ -26,6 +26,7 @@ export const player = {
   hitThisSwing: null,   // targets already struck by the current swing
   weaponTimer: 0,
   prevBottom: 0,
+  falling: false,
   weaponCooldown: 0,
   bazookaCooldown: 0, // unused while the bazooka is parked — see weapons/bazooka.js
   coyoteTimer: 0,

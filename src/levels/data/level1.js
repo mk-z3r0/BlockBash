@@ -175,7 +175,7 @@ export default {
     { x: 700,  y: GROUND_Y - 22, w: 22, minX: 650,  maxX: 950,  speed: 1.95 },
     { x: 660,  y: 300 - 20,      w: 20, minX: 655,  maxX: 750,  speed: 1.26 },
     { x: 1600, y: GROUND_Y - 22, w: 22, minX: 1580, maxX: 1800, speed: 1.83 },
-    { x: 1760, y: 200 - 20,      w: 20, minX: 1755, maxX: 1830, speed: 1.15 },
+    { x: 1760, y: 218 - 20,      w: 20, minX: 1755, maxX: 1830, speed: 1.15 },
     { x: 2360, y: 260 - 20,      w: 20, minX: 2355, maxX: 2460, speed: 1.26 },
     // Two additions (2026-09-20) filling the thinnest stretch of the
     // spheres half: the wide 2040-2230 platform had coins but nothing
@@ -183,8 +183,8 @@ export default {
     { x: 2100, y: 300 - 20,      w: 20, minX: 2045, maxX: 2225, speed: 1.26 },
     { x: 2900, y: GROUND_Y - 22, w: 22, minX: 2760, maxX: 2980, speed: 1.6 },
     { x: 3400, y: GROUND_Y - 22, w: 22, minX: 3300, maxX: 3480, speed: 1.72 },
-    { x: 3750, y: 300 - 20,      w: 20, minX: 3700, maxX: 3810, speed: 1.15 },
-    { x: 4550, y: 290 - 20,      w: 20, minX: 4500, maxX: 4610, speed: 1.26 },
+    { x: 3750, y: 314 - 20,      w: 20, minX: 3700, maxX: 3810, speed: 1.15 },
+    { x: 4550, y: 314 - 20,      w: 20, minX: 4500, maxX: 4610, speed: 1.26 },
     { x: 6150, y: 300 - 20,      w: 20, minX: 6100, maxX: 6220, speed: 1.37 },
     // 50% larger than the standard 22px sphere (33px) — the boss should
     // read as visibly bigger than anything else on screen before it even

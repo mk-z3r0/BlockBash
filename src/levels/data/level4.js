@@ -147,15 +147,29 @@ export default {
     // the threat, not any one. While all three are up they shield each other
     // and only the shooter can be hurt — and the shooter is the one hanging
     // back, which is exactly what instinct says to ignore.
-    { x: 6800, y: GROUND_Y - 26, w: 26, minX: 6660, maxX: 7200, speed: 1.5,
+    //
+    // LAYOUT, rebuilt after play ("how are you supposed to beat them?"):
+    //   - the fight starts when you are over the entry (engageFromX) and the
+    //     crew starts DEEP in the arena, so landing from the cover block is a
+    //     moment to read the room rather than an ambush
+    //   - the bruisers' leash starts at 6720 and the shooter's at 6980, so
+    //     the shooter is always at the back and the bruisers always between
+    //     you and it — which is fine, because your shots pass through their
+    //     shields
+    //   - none of them is stompProof any more. updateCrew sets it from the
+    //     shield, so a bruiser is stompable the moment its link breaks.
+    { x: 6990, y: GROUND_Y - 26, w: 26, minX: 6720, maxX: 7200, speed: 1.5,
+      engageFromX: 6700,
       boss: true, mode: 'fight', bossKind: 'crew', bossName: 'THE DEMOLITION CREW',
-      crew: 'demo', role: 'bruiser', weapon: 'sledgehammer', hp: 2, stompProof: true },
-    { x: 6950, y: GROUND_Y - 26, w: 26, minX: 6660, maxX: 7200, speed: 1.6,
+      crew: 'demo', role: 'bruiser', weapon: 'sledgehammer', hp: 2 },
+    { x: 7080, y: GROUND_Y - 26, w: 26, minX: 6720, maxX: 7200, speed: 1.6,
+      engageFromX: 6700,
       boss: true, mode: 'fight', bossKind: 'crew', crew: 'demo', role: 'bruiser',
-      weapon: 'sledgehammer', hp: 2, stompProof: true },
-    { x: 7120, y: GROUND_Y - 26, w: 26, minX: 6700, maxX: 7250, speed: 1.2,
+      weapon: 'sledgehammer', hp: 2 },
+    { x: 7200, y: GROUND_Y - 26, w: 26, minX: 6980, maxX: 7250, speed: 1.2,
+      engageFromX: 6700,
       boss: true, mode: 'fight', bossKind: 'crew', crew: 'demo', role: 'shooter',
-      hp: 2, stompProof: true, dropsAmmo: 6 }
+      hp: 2, dropsAmmo: 6 }
   ],
 
   coins: [

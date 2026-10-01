@@ -127,7 +127,7 @@ export default {
       boss: true, mode: 'fight', bossKind: 'excavator', bossName: 'THE EXCAVATOR',
       // The rig it operates. Drawn, not swung — see `tool` in entities/enemy.js.
       tool: 'drill',
-      hp: 4, stompProof: true, drops: 'drill' }
+      hp: 3, stompProof: true, drops: 'drill' }
   ],
 
   coins: [

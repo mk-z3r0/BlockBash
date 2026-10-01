@@ -83,9 +83,18 @@ export function carveCount() {
 // while the player reads it and steps off, and THEN the gap opens — where
 // the crack was, not where the player has moved to. Fair, because it was
 // announced; frightening, because it was under your feet.
+//
+// With `originX` the crack is not simply there: it STARTS at that x — the tip
+// of a drill, say — and races along the floor to the target over `travel`
+// frames, so the player watches it coming rather than being told it exists.
+// Without it (the Terraformer's) it appears in place, as before.
 export function crackFloor(level, x, width, frames, opts = {}) {
   level.pendingGaps = level.pendingGaps || [];
-  level.pendingGaps.push({ x, width, left: frames, total: frames, opts });
+  const { originX = null, travel = 0, noCarve = false, ...carveOpts } = opts;
+  level.pendingGaps.push({
+    x, width, left: frames, total: frames, opts: carveOpts, noCarve,
+    originX, travel, headX: originX == null ? x + width / 2 : originX
+  });
 }
 
 // Ticks the cracks and opens any that have run out. Returns the gaps that
@@ -94,8 +103,17 @@ export function updateCracks(level) {
   if (!level.pendingGaps || !level.pendingGaps.length) return [];
   const opened = [];
   for (const g of level.pendingGaps) {
+    if (g.originX != null) {
+      // Where the leading tip of the fissure has got to this frame.
+      const k = g.travel > 0 ? Math.min(1, (g.total - g.left) / g.travel) : 1;
+      g.headX = g.originX + ((g.x + g.width / 2) - g.originX) * k;
+    }
     if (--g.left > 0) continue;
-    if (carveGap(level, g.x, g.width, g.opts)) opened.push(g);
+    // `noCarve`: a telegraph with nothing behind it (a boss out of floor to
+    // break). It still reports as having run out, so the caller can make its
+    // noise, but nothing is cut.
+    if (g.noCarve) { g.carved = false; opened.push(g); }
+    else if (carveGap(level, g.x, g.width, g.opts)) { g.carved = true; opened.push(g); }
   }
   level.pendingGaps = level.pendingGaps.filter(g => g.left > 0);
   return opened;

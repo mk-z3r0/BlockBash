@@ -132,7 +132,7 @@ export default {
     // --- the first ledge (no checkpoint: the level starts here) ---
     { x: 340,  y: 250 - 22, w: 22, minX: 280,  maxX: 410,  speed: 1.7,
       tier: 'pursuer', weapon: 'pickaxe' },
-    { x: 700,  y: 110,      w: 20, minX: 620,  maxX: 730,  speed: 1.3 },
+    { x: 700,  y: 134,      w: 20, minX: 620,  maxX: 730,  speed: 1.3 },
     { x: 980,  y: 250 - 22, w: 22, minX: 900,  maxX: 1080, speed: 1.6,
       tier: 'aggressor', shoots: true },
 
@@ -140,7 +140,7 @@ export default {
     { x: 1620, y: 300 - 22, w: 22, minX: 1560, maxX: 1760, speed: 1.7,
       tier: 'pursuer', weapon: 'chainsaw' },
     // Was a plain patroller on a ledge.
-    { x: 1760, y: 160,      w: 20, minX: 1700, maxX: 1810, speed: 1.4,
+    { x: 1760, y: 184,      w: 20, minX: 1700, maxX: 1810, speed: 1.4,
       tier: 'pursuer', weapon: 'pickaxe' },
     // A plain patroller on the ledge, not a shooter — and nothing on the
     // floor between the bed at 1880 and the pit. The bed's landing used
@@ -157,7 +157,7 @@ export default {
     // standing still there and dying; the siting tool couldn't, because it
     // was comparing enemy heights against the floor rather than against the
     // column the player drops through.
-    { x: 2890, y: 210,      w: 20, minX: 2850, maxX: 2960, speed: 1.5, bounce: true },
+    { x: 2890, y: 234,      w: 20, minX: 2850, maxX: 2960, speed: 1.5, bounce: true },
     { x: 2810, y: 350 - 22, w: 22, minX: 2790, maxX: 2900, speed: 1.6, bounce: true },
     { x: 3220, y: 260,      w: 20, minX: 3180, maxX: 3280, speed: 1.4,
       tier: 'pursuer', weapon: 'pickaxe' },
@@ -171,7 +171,7 @@ export default {
     { x: 3880, y: GROUND_Y - 22, w: 22, minX: 3840, maxX: 4000, speed: 1.7,
       tier: 'pursuer', weapon: 'chainsaw' },
     { x: 4100, y: GROUND_Y - 22, w: 22, minX: 4030, maxX: 4170, speed: 1.6, bounce: true },
-    { x: 4380, y: 280,      w: 20, minX: 4340, maxX: 4440, speed: 1.4,
+    { x: 4380, y: 294,      w: 20, minX: 4340, maxX: 4440, speed: 1.4,
       tier: 'aggressor', shoots: true },
     { x: 4400, y: GROUND_Y - 26, w: 26, minX: 4340, maxX: 4520, speed: 0.85,
       kind: 'octagon', restoreHits: 2 },

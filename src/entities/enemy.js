@@ -389,11 +389,31 @@ function settle(enemy, wasX, wasY) {
 // "was above the top of it, is now inside it" is a fact rather than an
 // estimate, and it cannot be outrun.
 function descendingOnto(player, enemy) {
-  if (player.velocityY <= 0) return false;
+  // `falling` is decided ONCE, at the top of updateEnemies, before any stomp
+  // this frame has launched the player upward. Reading velocityY here meant
+  // that landing across two overlapping enemies stomped the first and was
+  // HURT by the second — the first stomp had already set the velocity to
+  // -8. Found playing the Demolition Crew, whose bruisers queue shoulder to
+  // shoulder. Landing on two things is a double stomp.
+  if (!player.falling) return false;
   const prev = player.prevBottom == null ? player.y + player.height : player.prevBottom;
   // A little slack on the lip, so clipping the very top corner still counts
   // as a stomp rather than as a hit.
   return prev <= enemy.y + enemy.w * 0.35;
+}
+
+// Put the player just outside an enemy's body on whichever side they are
+// already on, unless that spot is a wall — in which case leave them where
+// they are rather than push them through it. Returns -1 / 1 for the side
+// (0 if it couldn't move them).
+function separateFrom(player, enemy, margin) {
+  const pcx = player.x + player.width / 2, ecx = enemy.x + enemy.w / 2;
+  const dir = pcx < ecx ? -1 : 1;
+  const nx = dir > 0 ? enemy.x + enemy.w + margin : enemy.x - player.width - margin;
+  const box = { x: nx, y: player.y, width: player.width, height: player.height };
+  if (isBlocked(box, { hazards: false })) return 0;
+  player.x = nx;
+  return dir;
 }
 
 // Is this boss in the part of its fight where it's YOUR turn? Touching it
@@ -411,6 +431,7 @@ function inItsWindow(enemy) {
 // backs off while a cutscene is in control. Later bosses declare a tier
 // like anything else and fight for themselves.
 export function updateEnemies(player, cutsceneActive) {
+  player.falling = player.velocityY > 0;
   for (const enemy of state.enemies) {
     if (!enemy.alive) {
       // The frame a fightable boss goes down: drop what it was carrying and
@@ -539,21 +560,19 @@ export function updateEnemies(player, cutsceneActive) {
         // and the only way to hit it with a melee weapon is to stand next
         // to it. Touching it used to be a death; then it was a bounce, and
         // the bounce launched the player upward, so their next swing went
-        // over its head — the kid-strategy probe landed one hit in four.
-        // So: a nudge. Separate horizontally, keep their feet where they
-        // are, and let them swing.
-        const pcx = player.x + player.width / 2, ecx = enemy.x + enemy.w / 2;
-        player.x = pcx < ecx ? enemy.x - player.width - 2 : enemy.x + enemy.w + 2;
+        // over its head. So: a nudge. Separate horizontally, keep their
+        // feet where they are, and let them swing.
+        separateFrom(player, enemy, 2);
       } else if (enemy.invulnerable) {
-        // A closed boss — bounce off harmlessly, away from it. (This used to This used to
-        // put the player on the boss's left whichever side they were on,
-        // which for someone past it was a teleport through it toward the
-        // edge of the world. Reported from play as the Excavator pushing
-        // people off the level.
+        // A closed boss (a shielded bruiser, the Excavator mid-bore) is
+        // harmless to touch: bounce off it, AWAY from it, never through it
+        // and never into a wall. This used to teleport the player to a fixed
+        // side of the boss whichever side they were on, and the Demolition
+        // Crew's bruisers — which walked into the player — dragged them the
+        // whole width of the arena. Landing ON one is just a hop.
+        const onTop = player.velocityY >= 0 && (player.y + player.height) - enemy.y < enemy.w * 0.5;
         player.velocityY = P.STOMP_BOUNCE;
-        const pcx = player.x + player.width / 2, ecx = enemy.x + enemy.w / 2;
-        player.x = pcx < ecx ? enemy.x - player.width - 5 : enemy.x + enemy.w + 5;
-        player.velocityX = pcx < ecx ? -2 : 2;
+        if (!onTop) player.velocityX = separateFrom(player, enemy, 5) * 2;
       } else if (enemy.kind === 'octagon') {
         // A corrupted square can't be stomped: there's nothing to defeat.
         // Touching one hurts, and the only answer is the Cornerstone.
@@ -802,6 +821,23 @@ export function drawEnemies(frameCount, cutsceneDone) {
       ctx.fill();
     }
 
+    // A SHIELD, drawn. `linkedVisual` was set for the Demolition Crew for
+    // weeks and never drawn, so a shielded bruiser looked exactly like the
+    // shooter that could be hurt — and the one thing the fight asks of the
+    // player is to tell them apart. A pulsing blue bubble means "nothing
+    // you do will work on this one".
+    if (enemy.shielded && !squashed) {
+      const r = enemy.w / 2;
+      const pulse = 0.6 + 0.4 * Math.sin(frameCount * 0.14 + enemy.x);
+      ctx.fillStyle = `rgba(110, 190, 255, ${0.10 + 0.06 * pulse})`;
+      ctx.strokeStyle = `rgba(150, 215, 255, ${0.55 + 0.3 * pulse})`;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 1.7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+
     const grad = ctx.createRadialGradient(-enemy.w * 0.2, -enemy.w * 0.2, 2, 0, 0, enemy.w * 0.7);
     if (enemy.hitFlash > 0) {
       grad.addColorStop(0, '#ffffff');
@@ -870,7 +906,7 @@ export function drawEnemies(frameCount, cutsceneDone) {
         // ordinary sphere sets neither and rests at 0, which is where it
         // always was.
         const progress = enemy.weaponTimer > 0
-          ? 1 - enemy.weaponTimer / carried.duration
+          ? 1 - enemy.weaponTimer / (enemy.swingLen || carried.duration)
           : (enemy.posePhase || 0);
         const fist = carried.fistAt(r, r, facing, progress);
         const hand = drawMuscleArm(0, -r * 0.1, fist.x, fist.y);
@@ -996,6 +1032,26 @@ export function drawEnemies(frameCount, cutsceneDone) {
 
     ctx.restore();
     ctx.restore();
+
+    // The one you're supposed to hit. A bouncing arrow over the crew's
+    // shooter while the bruisers are shielded — the crew puzzle is "work out
+    // which one is the target", and a ten-year-old shouldn't have to be a
+    // detective to play a boss fight.
+    if (enemy.role === 'shooter' && enemy.alive && enemy.markTarget) {
+      const bob = Math.sin(frameCount * 0.16) * 4;
+      const ax = cx, ay = cy - enemy.w * 1.1 - 16 + bob;
+      ctx.save();
+      ctx.fillStyle = '#ffd24a';
+      ctx.strokeStyle = '#5a3d00';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(ax, ay + 12); ctx.lineTo(ax - 9, ay - 2); ctx.lineTo(ax - 3, ay - 2);
+      ctx.lineTo(ax - 3, ay - 12); ctx.lineTo(ax + 3, ay - 12); ctx.lineTo(ax + 3, ay - 2);
+      ctx.lineTo(ax + 9, ay - 2);
+      ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
 
     // surprise! a little exclamation bubble pops up above the body during the hop
     if (enemy.shout > 0) {

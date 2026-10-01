@@ -99,13 +99,26 @@ function stepTo(boss, x) {
 // It drops the drill, because it's a drill. That is now the player's
 // level-2 weapon — see weapons/drill.js.
 const EXCAVATOR = {
-  aim: 60,          // turn, rev: the crack appears at the end of this
-  warn: 80,         // how long the crack holds before the floor goes
-  jammed: 150,
+  aim: 50,          // turn, rev; the bit dips to the floor for the last 14 frames
+  hold: 42,         // the fissure has arrived and the floor is about to go
+  // Long enough to walk up to it AND land three pickaxe swings (30-frame
+  // cooldown) with slack. It was 150 and hp 4, which is four swings in the
+  // ~100 frames left after the walk — a knife-edge that the kid-strategy
+  // probe fell off the moment the fissure shortened the cycle by 24 frames.
+  jammed: 175,
   pitWidth: 40,
-  maxPits: 2,
+  maxPits: 3,
   reach: 150        // where it stands off you to drill
 };
+
+// Where the bit meets the floor: just in front of the body, on the side it's
+// facing. The fissure starts HERE — reported from play, the pit forming under
+// the player was liked but nothing connected it to the machine, so the
+// Excavator looked like it was doing something else. A line racing out from
+// the drill tip to where you stand says what is happening and who is doing it.
+function drillTipX(boss) {
+  return boss.x + boss.w / 2 + boss.facing * (boss.w / 2 + 16);
+}
 
 function updateExcavator(boss, player) {
   const level = getLevel();
@@ -122,6 +135,9 @@ function updateExcavator(boss, player) {
     pose(boss, 0);
     boss.swingPhase += 4;                           // the bit, turning
     boss.telegraph = Math.max(0, 1 - boss.phaseTimer / EXCAVATOR.aim);
+    // The last stretch of the aim, it lowers the bit to the floor — so the
+    // moment the fissure appears, the drill is already in the ground.
+    boss.mining = boss.phaseTimer < 14;
     // Walk to working distance — toward you if far, away if you're on it.
     const want = pcx - dir * EXCAVATOR.reach - boss.w / 2;
     if (Math.abs(want - boss.x) > 4) stepTo(boss, boss.x + Math.sign(want - boss.x) * Math.abs(boss.speed));
@@ -132,12 +148,22 @@ function updateExcavator(boss, player) {
       const right = level.worldEdgeX - 200;
       const at = Math.max(left, Math.min(right - EXCAVATOR.pitWidth, pcx - EXCAVATOR.pitWidth / 2));
       boss.boreX = at;
-      if (boss.pits < EXCAVATOR.maxPits) {
-        crackFloor(level, at, EXCAVATOR.pitWidth, EXCAVATOR.warn, { margin: 30, maxX: right });
-        showToast("IT'S DRILLING UNDER YOU — MOVE", 70);
-      }
+      boss.facing = Math.sign((at + EXCAVATOR.pitWidth / 2) - bcx) || boss.facing;
+      const originX = drillTipX(boss);
+      // The fissure covers the ground between the bit and you at ~4.5px a
+      // frame (never faster than the player can read it, never so slow it
+      // drags), then holds at the target while the floor goes.
+      const travel = Math.max(22, Math.min(58, Math.round(Math.abs((at + EXCAVATOR.pitWidth / 2) - originX) / 4.5)));
+      const total = travel + EXCAVATOR.hold;
+      // At the cap it still bores and the fissure still runs — a boss that
+      // visibly does nothing for a cycle teaches the player the pattern is
+      // random — but the floor holds. `noCarve` makes it a telegraph only.
+      crackFloor(level, at, EXCAVATOR.pitWidth, total, {
+        margin: 30, maxX: right, originX, travel, noCarve: boss.pits >= EXCAVATOR.maxPits
+      });
+      showToast("IT'S DRILLING UNDER YOU — MOVE", 70);
       playRumble();
-      setPhase(boss, 'bore', EXCAVATOR.warn + 10);
+      setPhase(boss, 'bore', total + 12);
     }
     return;
   }
@@ -148,11 +174,17 @@ function updateExcavator(boss, player) {
     boss.facing = Math.sign((boss.boreX + EXCAVATOR.pitWidth / 2) - bcx) || boss.facing;
     boss.telegraph = 0;
     boss.swingPhase += 3;                           // fast, mechanical
-    if (boss.phaseTimer % 7 === 0) {
-      spawnDust(boss.boreX + EXCAVATOR.pitWidth / 2, level.groundY, 4, { spread: 3, size: 5, life: 20 });
+    // Dust at the bit, and at the head of the fissure as it races out.
+    if (boss.phaseTimer % 4 === 0) {
+      spawnDust(drillTipX(boss), level.groundY, 2, { spread: 3, size: 5, life: 16, color: 'rgba(255, 190, 150, 0.9)' });
+    }
+    for (const g of (level.pendingGaps || [])) {
+      if (g.originX != null && g.headX != null && (g.total - g.left) < g.travel && boss.phaseTimer % 3 === 0) {
+        spawnDust(g.headX, level.groundY, 2, { spread: 2.5, size: 4, life: 14, color: 'rgba(255, 140, 120, 0.9)' });
+      }
     }
     for (const g of updateCracks(level)) {
-      boss.pits++;
+      if (g.carved) boss.pits++;
       spawnDust(g.x + g.width / 2, level.groundY, 14, { spread: 5, size: 8, life: 30 });
       playRumble();
     }
@@ -210,6 +242,14 @@ function updateCrew(boss, player) {
 
   boss.invulnerable = linked && boss.role !== 'shooter';
   boss.linkedVisual = linked;
+  // What the rest of the game reads: `shielded` is drawn as a bubble and lets
+  // player shots pass through; `markTarget` puts the arrow over the one that
+  // can be hurt. And a bruiser whose link has broken is an ordinary enemy,
+  // stompable like every other — the design doc always said "break the link
+  // and the others are ordinary", and the data had them stompProof forever.
+  boss.shielded = boss.invulnerable;
+  boss.markTarget = linked && boss.role === 'shooter';
+  boss.stompProof = boss.shielded;
 
   const dir = Math.sign((player.x + player.width / 2) - (boss.x + boss.w / 2)) || 1;
   boss.facing = dir;
@@ -221,7 +261,11 @@ function updateCrew(boss, player) {
   const pressing = clock < CREW_PRESS;
 
   if (boss.role === 'shooter') {
-    // hangs back and fires — reachable, which is the point
+    // Hangs back and fires — reachable, which is the point — and stays at
+    // the BACK of the arena (its leash starts well inside it, in the level
+    // data). It used to follow the player at a fixed 260px, so a player
+    // shoved toward the entry dragged the shooter and the whole fight with
+    // them, out of the arena.
     const wanted = player.x + player.width / 2 - dir * 260;
     stepTo(boss, boss.x + Math.sign(wanted - boss.x) * Math.abs(boss.speed) * 0.7);
     if (--boss.shotTimer <= 0) {
@@ -244,9 +288,18 @@ function updateCrew(boss, player) {
   if (pressing) {
     // Closing — at the speed they were authored, not a quarter faster. The
     // 1.25 was the whole of "the pursuit is too good".
-    stepTo(boss, boss.x + dir * Math.abs(boss.speed));
+    // ...and stops short of the player rather than walking into them. It
+    // used to walk straight through, and the contact rule then shoved the
+    // player along in front of it — the whole width of the arena.
+    // The second bruiser queues a body-length behind the first instead of
+    // standing inside it — two spheres stacked into one blob read as one
+    // enemy, and the player can't tell there are two hammers.
+    const queue = crew.filter(e => e.role === 'bruiser').indexOf(boss) * 34;
+    const nx = boss.x + dir * Math.abs(boss.speed);
+    const touching = nx < player.x + player.width + 4 + queue && nx + boss.w > player.x - 4 - queue;
+    if (!touching) stepTo(boss, nx);
     pose(boss, 0);
-    if (withinSwing(boss, player, 46)) startAttack(boss);
+    if (withinSwing(boss, player, 54)) startAttack(boss);
     return;
   }
   // Regrouping: back off to a flank position either side of the shooter
@@ -537,6 +590,10 @@ export function initBoss(boss) {
   boss.strain = false;
   boss.conducting = 0;
   boss.charge = 0;
+  boss.shielded = false;
+  boss.markTarget = false;
+  boss.crewClock = 0;
+  boss.flank = 0;
 }
 
 export function updateBossBehaviour(boss, player) {

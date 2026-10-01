@@ -19,7 +19,7 @@
   import { player } from '../src/entities/player.js';
   import { state } from '../src/state.js';
   import { update, switchTo } from '../src/scenes/sceneManager.js';
-  import { getLevel, isBlocked, hasFooting } from '../src/levels/levelLoader.js';
+  import { getLevel, isBlocked, hasFooting, floorUnder } from '../src/levels/levelLoader.js';
   import { levels } from '../src/levels/registry.js';
 
   const out = [];
@@ -37,6 +37,7 @@
 
       const worst = new Map();
       const floating = new Map();
+      const hovering = new Map();
       const FRAMES = 900;
       for (let f = 0; f < FRAMES; f++) {
         // Sweep the player across the level so every enemy gets a turn at
@@ -70,6 +71,22 @@
           // of a hollow planet on purpose; asking it to stand on something
           // is asking the wrong question.
           const foot = grounded.y + e.w;
+          // STRICT: its feet are ON the surface under it, not near one.
+          //
+          // The version above only asks whether a surface exists within 26px
+          // below the leading edge — which is how a ledge is detected, and is
+          // also exactly the tolerance that let enemies walk on air. When 35
+          // platforms were brought down into jumping range, the enemies
+          // standing on them stayed where they were; any that ended up under
+          // 26px above their platform passed. Reported from play.
+          if (e.speed !== 0 && e.kind !== 'core') {
+            const under = floorUnder(e.x + e.w / 2, foot - 3);
+            const gap = under == null ? 999 : under - foot;
+            if (gap > 3) {
+              const key = `${e.boss ? 'boss' : e.kind || 'sphere'}@${Math.round(e.baseX)}`;
+              if (!hovering.has(key)) hovering.set(key, `${Math.round(gap)}px above its surface`);
+            }
+          }
           if (e.speed !== 0 &&
               (!hasFooting(grounded.x, foot) || !hasFooting(grounded.x + e.w, foot))) {
             const key = `${e.boss ? 'boss' : e.kind || 'sphere'}@${Math.round(e.baseX)}`;
@@ -78,8 +95,11 @@
         }
       }
 
-      if (worst.size || floating.size) {
-        fails += worst.size + floating.size;
+      if (worst.size || floating.size || hovering.size) {
+        fails += worst.size + floating.size + hovering.size;
+        for (const [who, why] of hovering) {
+          out.push(`  FAIL level ${i + 1}: ${who} is walking on air — ${why}`);
+        }
         for (const [who, where] of worst) {
           out.push(`  FAIL level ${i + 1}: ${who} ended up inside terrain at x${where}`);
         }

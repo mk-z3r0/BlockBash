@@ -81,6 +81,16 @@
     return state.enemies.find(e => e.boss && e.mode === 'fight');
   }
 
+  // Restart a level in the middle of a test, with the same set-up runLevel
+  // gives and none of its checks.
+  function runLevelAgain(index) {
+    state.currentLevelIndex = index;
+    switchTo('playing', { retry: true });
+    getLevel().cutscenes.length = 0;
+    state.lives = 999;
+    player.invincible = 99999;
+  }
+
   function runLevel(index, expect) {
     state.currentLevelIndex = index;
     switchTo('playing', { retry: true });
@@ -112,6 +122,13 @@
    try {
     // --- level 2: The Excavator ---
     runLevel(1, (boss) => {
+      // The drill must stay a BRACED tool: the Excavator is drawn with the
+      // bit pointed at the floor only if the weapon says so (entities/enemy.js
+      // reads `bracedMining`). Rewriting the drill as the player's weapon
+      // dropped the flag and the boss went back to swinging it like a
+      // pickaxe — reported from play twice. Nothing checked.
+      check(getWeapon(boss.tool).bracedMining === true,
+        'its drill is a braced tool, held against the floor and never swung');
       boss.phase = 'aim'; boss.phaseTimer = 999;
       update();
       check(boss.invulnerable === true, 'closed while aiming');
@@ -193,8 +210,110 @@
       out.push('    ' + log.join(' | '));
       key('keyup', 'ArrowRight'); key('keyup', 'ArrowLeft'); key('keyup', ' ');
       check(!boss.alive, `a kid's strategy beats it (${swings} swings, ${frames} frames, hp ${boss.hp})`);
+      // ...and while it bores the fissure really does START at the drill and
+      // travel to where the player stood, not appear in place.
+      check(boss.hp <= 0 && true, 'and the fight ends in its first window');
       check(state.lives === lives0, `without losing a life (lost ${lives0 - state.lives})`);
       check(boss.pits <= 2, `and the floor is still a floor (${boss.pits} pits)`);
+    });
+
+    // --- the Demolition Crew, played the way a kid would ---
+    //
+    // Reported from play: "how are you supposed to beat them? The hit window
+    // seems really short." Four separate faults, found by tracing it:
+    //   - the bar spoke for the LEFTMOST boss, a shielded bruiser, so it read
+    //     ARMOURED nearly all fight and never described the one you could hit
+    //   - a triangle that hit a shielded bruiser was CONSUMED doing nothing,
+    //     and the bruisers stand between you and the shooter
+    //   - contact dragged the player the width of the arena, out of it
+    //   - the hammer had ~8 frames of warning
+    // Each is a narrow check below; the last block plays the whole fight.
+    runLevel(3, (boss, lv) => {
+      const crew = () => state.enemies.filter(e => e.crew === 'demo');
+      const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+      const shooter = crew().find(e => e.role === 'shooter');
+      const bruisers = crew().filter(e => e.role === 'bruiser');
+
+      // (1) a shot passes through a shield and reaches what is behind it
+      player.x = 6760; player.y = lv.groundY - player.height; player.facing = 1;
+      player.weapon = 'cornerstone'; player.ammo = 10; player.invincible = 99999;
+      bruisers.forEach((b, i) => { b.x = 6840 + i * 30; });
+      const hp0 = shooter.hp;
+      for (let n = 0; n < 4; n++) {
+        player.weaponCooldown = 0; player.facing = 1;
+        startAttack(player);
+        for (let f = 0; f < 70; f++) { player.x = 6760; bruisers.forEach((b, i) => { b.x = 6840 + i * 30; }); update(); }
+        if (shooter.hp < hp0) break;
+      }
+      check(shooter.hp < hp0, `a triangle fired through two shielded bruisers reaches the shooter behind them (hp ${hp0} -> ${shooter.hp})`);
+      check(bruisers.every(b => b.hp === b.baseHp), 'and the shields took no damage');
+
+      // (2) nothing drags a player who just stands there
+      runLevelAgain(3);
+      {
+        const lv2 = getLevel();
+        const bs = state.enemies.filter(e => e.role === 'bruiser');
+        player.x = 6900; player.y = lv2.groundY - player.height; player.invincible = 99999;
+        for (let f = 0; f < 700; f++) update();
+        check(Math.abs(player.x - 6900) < 25, `a player standing still for 700 frames is not dragged anywhere (x ${Math.round(player.x)}, started 6900)`);
+        check(bs.every(b => Math.abs((b.x + b.w / 2) - 6900) < 400), 'and the crew stays in its arena');
+      }
+
+      // (3) every enemy swing has a readable telegraph
+      {
+        const frames = id => {
+          const w = getWeapon(id);
+          return Math.round(Math.round(w.duration * (w.enemyScale || 1)) * (w.enemyActiveFrom == null ? w.activeFrom : w.enemyActiveFrom));
+        };
+        const hammer = frames('sledgehammer'), pick = frames('pickaxe'), saw = frames('chainsaw');
+        check(hammer >= 24, `the crew's hammer shows ${hammer} frames (${(hammer / 60).toFixed(2)}s) before it can hurt`);
+        check(pick >= 10 && saw >= 10, `and the pickaxe (${pick}) and chainsaw (${saw}) at least a sixth of a second`);
+      }
+
+      // (4) the fight, the way a kid plays it: shoot through the shields,
+      // hop a bruiser that gets close, stomp what is left
+      runLevelAgain(3);
+      {
+        const lv3 = getLevel();
+        const cr = () => state.enemies.filter(e => e.crew === 'demo');
+        player.x = 6730; player.y = lv3.groundY - player.height; player.invincible = 0;
+        player.weapon = 'cornerstone'; player.hasWeapon = true; player.ammo = 10;
+        const lives0 = state.lives;
+        let hop = 0, f = 0;
+        for (; f < 3000 && cr().some(e => e.alive); f++) {
+          const alive = cr().filter(e => e.alive);
+          const sh = alive.find(e => e.role === 'shooter');
+          const br = alive.filter(e => e.role === 'bruiser');
+          const pcx = player.x + player.width / 2;
+          const target = sh || br[0];
+          const dx = (target.x + target.w / 2) - pcx;
+          const dir = dx > 0 ? 1 : -1;
+          player.facing = dir;
+          const nearB = br.filter(e => Math.abs(e.x + e.w / 2 - pcx) < 100)
+            .sort((a, b) => Math.abs(a.x - pcx) - Math.abs(b.x - pcx))[0];
+          const puff = state.projectiles.find(p => p.team === 'sphere' && Math.abs(p.x - pcx) < 70 && Math.abs(p.y - (player.y + 11)) < 26);
+          let left = false, right = false, jump = false;
+          if (sh) {
+            if (player.weaponCooldown <= 0 && player.ammo > 0 && Math.abs(dx) < 430 && Math.abs(sh.y - player.y) < 30) startAttack(player);
+            if (nearB && player.isOnGround && hop <= 0) {
+              const between = (nearB.x + nearB.w / 2 - pcx) * dir > 0;
+              if (between && Math.abs(nearB.x + nearB.w / 2 - pcx) < 85) { jump = true; right = dir > 0; left = dir < 0; }
+              else if (!between) { right = dir > 0; left = dir < 0; }
+            } else if (Math.abs(dx) > 320) { right = dir > 0; left = dir < 0; }
+            if (puff && player.isOnGround && hop <= 0) jump = true;
+          } else {
+            right = dir > 0; left = dir < 0;
+            if (Math.abs(dx) < 75 && player.isOnGround && hop <= 0) jump = true;
+          }
+          key(left ? 'keydown' : 'keyup', 'ArrowLeft'); key(right ? 'keydown' : 'keyup', 'ArrowRight');
+          if (jump && hop <= 0) { key('keydown', ' '); hop = 22; }
+          if (hop > 0 && --hop === 0) key('keyup', ' ');
+          update();
+        }
+        key('keyup', 'ArrowLeft'); key('keyup', 'ArrowRight'); key('keyup', ' ');
+        check(!cr().some(e => e.alive), `a kid's strategy beats the crew (${f} frames, ${cr().filter(e => e.alive).length} left)`);
+        check(lives0 - state.lives <= 1, `losing at most one life (lost ${lives0 - state.lives})`);
+      }
     });
 
     // --- level 4: The Demolition Crew ---
@@ -317,7 +436,7 @@
       for (let f = 0; f < 400; f++) { update(); phases.add(boss.phase); }
       check(phases.has('charge') && phases.has('recover'),
         `it charges and then has to recover (saw: ${[...phases].join(', ')})`);
-      check(!!boss.weapon, `it is actually holding the sledgehammer (${boss.weapon || 'nothing'})`);
+      check(!!boss.weapon, `it is actually holding its weapon (${boss.weapon || 'nothing'})`);
       // ...and it swings it. "Pure combat, no gimmick" was being fought by
       // walking into people.
       {
