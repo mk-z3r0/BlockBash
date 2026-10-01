@@ -57,7 +57,7 @@
     state.lives = 999;
     player.invincible = 999999;   // this probe is about the story, not survival
     out.push(`== level 3 (${lv.name}) ==`);
-    check(player.weapon === 'sledgehammer', `arrives with the sledgehammer (${player.weapon})`);
+    check(player.weapon === 'drill', `arrives with the drill (${player.weapon})`);
 
     // 1. a corrupted square cannot be beaten, only restored
     const octagon = state.enemies.find(e => e.kind === 'octagon' && !e.boss);
@@ -66,7 +66,7 @@
       const hp0 = octagon.hp;
       swingAt(octagon, 3);
       check(octagon.alive && octagon.hp === hp0,
-        `the sledgehammer does nothing to it (alive ${octagon.alive}, hp ${octagon.hp})`);
+        `the drill does nothing to it (alive ${octagon.alive}, hp ${octagon.hp})`);
     }
 
     // 2. walking past the clearing starts the handoff
@@ -135,9 +135,9 @@
     check(!!sculptor, 'the Sculptor is present');
     if (sculptor) {
       const wasCornerstone = player.weapon;
-      player.weapon = 'sledgehammer';
+      player.weapon = 'drill';
       swingAt(sculptor, 3);
-      check(sculptor.alive && !sculptor.restored, 'the sledgehammer does nothing to the Sculptor');
+      check(sculptor.alive && !sculptor.restored, 'the drill does nothing to the Sculptor');
       player.weapon = wasCornerstone;
       // Putting the hammer in the player's hands for three swings made
       // `lacksWeapon: 'cornerstone'` true, which re-armed level 3's handoff
@@ -228,10 +228,11 @@
       if (isCutsceneActive()) skipCutscene();
     }
 
-    // --- level 6: the choice ---
-    // The sledgehammer on the shelf is the only place in the game where the
-    // player gives something up to gain something. It has to actually be
-    // both: a real trade, and a level that is still finishable either way.
+    // --- level 6: no trade, and the General's own weapon ---
+    // There used to be a sledgehammer on a shelf here, and a probe for the
+    // trade. The hammer left the player's roster (it was a slower pickaxe);
+    // what this face asks is only that the Cornerstone arrives loaded, and
+    // that the General carries the thing its troops do.
     state.currentLevelIndex = 5;
     switchTo('playing', { retry: true });
     const lv6 = getLevel();
@@ -241,20 +242,11 @@
     out.push(`== level 6 (${lv6.name}) ==`);
     check(player.weapon === 'cornerstone' && player.ammo >= 12,
       `arrives with the Cornerstone loaded (${player.weapon}, ${player.ammo})`);
-    const hammer = state.weaponPickups.find(w => w.type === 'sledgehammer');
-    check(!!hammer, 'a sledgehammer is lying in the level');
-    if (hammer) {
-      check(!hammer.fromBoss, 'placed by the level, not dropped by a boss');
-      // it should not be collectable by accident — it's up on a shelf
-      check(hammer.y < lv6.groundY - 40, `it's up on a shelf (y ${hammer.y} vs ground ${lv6.groundY})`);
-      player.x = hammer.x - 4;
-      player.y = hammer.y - player.height - 2;
-      tick(6);
-      check(player.weapon === 'sledgehammer', `taking it swaps weapons (${player.weapon})`);
-      // and nothing in the level forces the verb it just gave up
-      const mustRestore = state.enemies.some(e => e.boss && (e.kind === 'octagon' || e.kind === 'core'));
-      check(!mustRestore, 'nothing in the level has to be restored, so the trade is survivable');
-    }
+    // Ammo caches are weaponPickups too; they top up, they don't trade.
+    const WEAPONS = ['pickaxe', 'drill', 'sledgehammer', 'chainsaw', 'cornerstone'];
+    check(!state.weaponPickups.some(w => !w.collected && WEAPONS.includes(w.type)), 'nothing is lying around to trade it for');
+    const general = state.enemies.find(e => e.bossKind === 'general');
+    check(general && general.weapon === 'chainsaw', `the General carries a chainsaw (${general && general.weapon})`);
 
     // --- level 7: the core, and the end of the game ---
     state.currentLevelIndex = 6;
@@ -274,7 +266,7 @@
       check(core.restoreHits === 12, `twelve faces to put back (${core.restoreHits})`);
       // nothing can hurt it
       const wasWeapon = player.weapon;
-      player.weapon = 'sledgehammer';
+      player.weapon = 'drill';
       swingAt(core, 3);
       check(core.alive && !core.restored && core.restoreHits === 12,
         'no weapon in the game can damage it');

@@ -57,6 +57,11 @@ const WEAPONS = {
     drawIcon: drawPickaxeIcon
   },
 
+  // The Demolition Crew's. Was the player's level-2 weapon, and cut from
+  // the player's roster on the note that it was a slower pickaxe — which it
+  // was. As an ENEMY weapon the overhead smash is a different problem from
+  // a chop (a long, visible wind-up and a hit that shoves), and demolition
+  // is what a sledgehammer is for.
   sledgehammer: {
     id: 'sledgehammer',
     label: 'SLEDGEHAMMER',
@@ -95,23 +100,32 @@ const WEAPONS = {
     drawIcon: drawSledgehammerIcon
   },
 
-  // The Excavator's rig. Enemy kit; nothing swings it at anyone.
+  // The Excavator's rig, and from level 2 the PLAYER's weapon.
+  //
+  // Reported from play: "why should we continue with the sledgehammer, it
+  // doesn't add any new gameplay than the pickaxe" — and "if he had a drill
+  // shouldn't he drop a drill". Both right. The hammer was a slower swing;
+  // this is not a swing at all. It's HELD: it comes up fast, stays live for
+  // most of a second, and pushes. You lean into things with it rather than
+  // chopping at them, which is a different verb from the pickaxe and the
+  // first weapon in the game that is.
+  //
+  // And it's the land-mover. Held against a block the spheres have sanded
+  // (`chewed` in the level data), it bores through — their own tool turned
+  // on their own work. See `bores` in weapons/combat.js.
   drill: {
     id: 'drill',
     label: 'DRILL',
     kind: 'melee',
-    cooldown: 60,
-    duration: 30,
-    reach: 60,
-    activeFrom: 0.2,
-    // Held against the work, not swung through it. Without this the
-    // Excavator drove its rig into the ground with a pickaxe's chopping
-    // arc, which is not what a drill does and read as the wrong tool
-    // playing the right animation. See the mining branch in
-    // entities/enemy.js.
-    bracedMining: true,
+    cooldown: 8,
+    duration: 36,
+    reach: 46,
+    // Out fast and then held. The window is the weapon.
+    activeFrom: 0.1,
     damage: 1,
-    knockback: 6,
+    knockback: 5,
+    // Frames of contact it takes to bore through a chewed block.
+    bores: 34,
     score: 150,
     ammo: null,
     sound: playChainsawStart,

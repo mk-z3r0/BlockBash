@@ -112,11 +112,11 @@
    try {
     // --- level 2: The Excavator ---
     runLevel(1, (boss) => {
-      boss.phase = 'advance'; boss.phaseTimer = 999;
+      boss.phase = 'aim'; boss.phaseTimer = 999;
       update();
-      check(boss.invulnerable === true, 'closed while advancing');
+      check(boss.invulnerable === true, 'closed while aiming');
       const noDamage = swingAt(boss, 2);
-      check(noDamage === 0, `takes no damage while advancing (lost ${noDamage})`);
+      check(noDamage === 0, `takes no damage while aiming (lost ${noDamage})`);
 
       boss.phase = 'jammed'; boss.phaseTimer = 999;
       update();
@@ -130,12 +130,12 @@
       swingAt(boss, 6);
       check(!boss.alive, `dies to sustained hits while jammed (hp ${boss.hp})`);
       for (let f = 0; f < 4; f++) update();
-      const drop = state.weaponPickups.find(p => p.type === 'sledgehammer');
-      check(!!drop, 'drops a sledgehammer');
+      const drop = state.weaponPickups.find(p => p.type === 'drill');
+      check(!!drop, 'drops its drill');
       if (drop) {
         player.x = drop.x - 4; player.y = getLevel().groundY - player.height - 2;
         for (let f = 0; f < 6; f++) update();
-        check(player.weapon === 'sledgehammer', `walking onto it arms the sledgehammer (weapon: ${player.weapon})`);
+        check(player.weapon === 'drill', `walking onto it arms the drill (weapon: ${player.weapon})`);
       }
       const blocking = state.enemies.some(e => e.boss && e.alive);
       check(!blocking, 'no boss left alive, so the way to the edge is open');

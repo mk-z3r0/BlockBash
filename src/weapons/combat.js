@@ -142,6 +142,7 @@ function applyMeleeHits(owner, weapon) {
       if (owner.hitThisSwing) owner.hitThisSwing.add(enemy);
       damageEnemy(enemy, weapon, dir);
     }
+    if (weapon.bores) boreTerrain(hitbox, weapon);
     return;
   }
 
@@ -162,6 +163,36 @@ function applyMeleeHits(owner, weapon) {
   if (comingDownOn(player, owner)) return;
   if (owner.hitThisSwing) owner.hitThisSwing.add(player);
   hitThePlayer();
+}
+
+// The drill against a sanded block.
+//
+// Only `chewed` platforms — the ones the spheres have been at — and only
+// floating ones, never the ground or the climbing columns a level is built
+// out of. Holding the drill on one for `bores` frames takes it out, with
+// the same debris a boss's dig throws. That's the land-moving the weapon
+// is for: optional shortcuts and reach, authored into levels by marking a
+// block chewed, and a reason to carry the thing that isn't "hit sphere".
+function boreTerrain(hitbox, weapon) {
+  const level = getLevel();
+  for (const p of level.platforms) {
+    if (p.ground || !p.chewed || p.width <= 1) continue;
+    if (!isColliding(hitbox, p)) continue;
+    p.bored = (p.bored || 0) + 1;
+    if (p.bored % 6 === 0) {
+      spawnDust(hitbox.x + (player.facing > 0 ? hitbox.width : 0), hitbox.y + hitbox.height / 2, 2,
+        { spread: 2.5, size: 4, life: 14, color: 'rgba(120, 140, 190, 0.9)' });
+    }
+    if (p.bored >= weapon.bores) {
+      spawnDust(p.x + p.width / 2, p.y + p.height / 2, 16, { spread: 5, size: 8, life: 32, color: 'rgba(90, 110, 170, 0.9)' });
+      addShake(4);
+      playOctagonThud();
+      level.platforms.splice(level.platforms.indexOf(p), 1);
+      state.score += 50;
+      addPopup(p.x + p.width / 2, p.y, '+50  BORED THROUGH', '#9fb4ff');
+      return;
+    }
+  }
 }
 
 // Ticks timers and keeps a live melee hitbox swinging. Call once per frame

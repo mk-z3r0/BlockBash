@@ -534,13 +534,18 @@ export function updateEnemies(player, cutsceneActive) {
 
     const eBox = boxOf(enemy);
     if (isColliding(player, eBox)) {
-      if (enemy.invulnerable || inItsWindow(enemy)) {
-        // A closed boss — or an OPEN one. Bounce off harmlessly, away from
-        // it. A boss in its window is the thing you are supposed to be
-        // hitting, and the only way to hit it with a pickaxe is to stand
-        // next to it; touching it while you do was a death. The Excavator's
-        // kid-strategy probe found it: the swing landed, and nine frames
-        // later the player was dead. (The closed case: this used to This used to
+      if (inItsWindow(enemy)) {
+        // A boss in its window is the thing you're supposed to be hitting,
+        // and the only way to hit it with a melee weapon is to stand next
+        // to it. Touching it used to be a death; then it was a bounce, and
+        // the bounce launched the player upward, so their next swing went
+        // over its head — the kid-strategy probe landed one hit in four.
+        // So: a nudge. Separate horizontally, keep their feet where they
+        // are, and let them swing.
+        const pcx = player.x + player.width / 2, ecx = enemy.x + enemy.w / 2;
+        player.x = pcx < ecx ? enemy.x - player.width - 2 : enemy.x + enemy.w + 2;
+      } else if (enemy.invulnerable) {
+        // A closed boss — bounce off harmlessly, away from it. (This used to This used to
         // put the player on the boss's left whichever side they were on,
         // which for someone past it was a teleport through it toward the
         // edge of the world. Reported from play as the Excavator pushing

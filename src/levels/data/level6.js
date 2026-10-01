@@ -9,16 +9,13 @@
 //
 // Only three gaps in the whole level. Every other level has six or seven.
 //
-// --- the choice in the middle ---
-// There is a sledgehammer lying in arena 2. The player is carrying the
-// Cornerstone and can only hold one weapon, so taking it means trading every
-// triangle they have for a heavy melee weapon that never runs out — and
-// giving up the ability to restore anything for the rest of the level.
-//
-// That's the honest version of "all weapon types": not a loadout screen, a
-// decision with a cost. Nothing in this level REQUIRES restoring — the
-// corrupted squares here can all be walked past — so either answer finishes
-// it, and level 7 hands the Cornerstone back at its spawn regardless.
+// --- no trade in the middle, any more ---
+// There used to be a sledgehammer lying in arena 2: take it and give up
+// every triangle for a heavy melee weapon. It went when the hammer left the
+// player's roster (2026-09-30 — it was a slower pickaxe, and the Excavator
+// drops its own drill now). The weapon arc is pickaxe -> drill ->
+// Cornerstone, carried between levels, and this face asks nothing of it
+// except that you still have the Cornerstone when you go down.
 //
 // The architecture is barely square any more. Almost every platform is
 // chewed; this is the end of the degradation arc before the descent.
@@ -101,7 +98,6 @@ export default {
   // The choice. Sitting on the shelf in arena 2, impossible to miss and
   // impossible to take by accident — it has to be climbed to.
   weapons: [
-    { x: 3050, y: 280, type: 'sledgehammer' }
   ],
 
   cutscenes: [
@@ -166,7 +162,7 @@ export default {
     // Open the whole time, and it tells you before every charge.
     { x: 6850, y: GROUND_Y - 36, w: 36, minX: 6400, maxX: 7220, speed: 1.9,
       boss: true, mode: 'fight', bossKind: 'general', bossName: 'THE GENERAL',
-      weapon: 'sledgehammer',
+      weapon: 'chainsaw',
       // The fight starts once you are well inside the last arena. With
       // the default engage range it was charging a player who had just
       // landed from the pit at the arena's mouth.

@@ -7,8 +7,8 @@
 // solid stacks that have to be jumped onto, stepped up, and dropped off.
 //
 // Structurally it's in three parts:
-//   0-3100     the pillars, with the sledgehammer. And the first corrupted
-//              square, which the hammer does nothing to. That lesson has to
+//   0-3100     the pillars, with the drill. And the first corrupted
+//              square, which the drill does nothing to. That lesson has to
 //              land BEFORE the weapon that answers it exists.
 //   3100       Quarrick hands over the Cornerstone and immediately corrupts.
 //              The clearing here is deliberately the flattest, emptiest
@@ -52,7 +52,9 @@ export default {
   groundY: GROUND_Y,
   playerSpawn: { x: 80, y: 300 },
 
-  startsWith: 'sledgehammer',
+  // The Excavator's drill, taken off it at the end of level 2. (The level
+  // picker hands it over; a continuous run arrives already holding it.)
+  startsWith: 'drill',
   quarrickDamage: 3,
 
   // Six gaps, not seven, and wider ground between them. The vertical work is
