@@ -192,6 +192,12 @@ function loseLife() {
     switchTo('gameover');
   } else {
     resetPlayer();
+    // Never respawn into a fight you can no longer win. Dying keeps your
+    // weapon, but a player who spent their triangles and died in a boss fight
+    // came back with none — and on Hard, where each Crew member takes three
+    // hits, that is a soft lock. Top up to what the level starts you with
+    // (never down).
+    if (player.weapon === 'cornerstone') player.ammo = Math.max(player.ammo || 0, getLevel().startsWithAmmo || 0);
     // Drops any cutscene mid-flight, keeps what has already played. Not reachable with level 1's own
     // geometry (nothing near the edge can hit the player during the
     // walk-up, and the boss cutscene is barred from digging into that

@@ -89,7 +89,13 @@ export function spawnEnemies(spawns) {
   const dk = getDifficulty();
   // Speeds scale here, once, so patrol, chase, charge and the respawn reset
   // (which restores `baseSpeed`) all agree without the AI knowing.
-  spawns = spawns.map(e => e.speed ? { ...e, speed: e.speed * (e.boss ? dk.boss : dk.enemy) } : e);
+  spawns = spawns.map(e => {
+    const out = e.speed ? { ...e, speed: e.speed * (e.boss ? dk.boss : dk.enemy) } : { ...e };
+    // Fightable bosses only; baseHp below is read from this, so a restarted
+    // fight comes back at the scaled value too.
+    if (e.boss && e.mode === 'fight' && e.hp != null) out.hp = Math.ceil(e.hp * dk.bossHp);
+    return out;
+  });
   const built = spawns.map(e => ({
     tier: 'passive',
     kind: 'sphere',

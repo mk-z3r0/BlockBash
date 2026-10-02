@@ -330,7 +330,7 @@ Note the intended shape of the progression: it escalates through **mechanic vari
 
 ### Difficulty (2026-10-01)
 
-Three presets on the title screen (↑/↓, remembered): **Easy** (bosses 0.8×, enemies 0.9×), **Normal** (the game as tuned for a ten-year-old, and the one every probe measures), **Hard** (bosses 1.35×, enemies 1.15×, the player 1.1× so a faster world stays controllable, and the Demolition Crew swings and fires faster). Added because the Crew, once it was made fair, read as too easy to a grown-up. Speeds only: no hp, geometry or reach changes, so every level audit holds on all three (the player's jump carry only grows or stays put). A kid-style bot beats the Crew on Normal in 198 frames losing nothing and on Hard in 420 losing two.
+Three presets on the title screen (↑/↓, remembered): **Easy** (bosses 0.8×, enemies 0.9×), **Normal** (the game as tuned for a ten-year-old, and the one every probe measures), **Hard** (bosses 1.35× speed **and 1.5× hit points**, enemies 1.15×, the player 1.1× so a faster world stays controllable, and the Demolition Crew swings and fires faster). Added because the Crew, once it was made fair, read as too easy to a grown-up. Speeds only: no hp, geometry or reach changes, so every level audit holds on all three (the player's jump carry only grows or stays put). Restoration targets (the Core, the Sculptor) are won with triangles, not hp, and are unchanged. A kid-style bot beats the Crew on Normal in 198 frames losing nothing; on Hard (every Crew member 3 hp) the same simple bot can still kill the shooter but dies to the bruisers — demanding, not impossible, and nobody has played it by hand yet.
 
 ### A boss has to be visibly doing the thing
 

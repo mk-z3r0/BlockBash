@@ -26,6 +26,16 @@
       check(Math.abs(s.enemy / N.enemy - d.enemy) < 1e-6, `${id}: enemies at ${d.enemy}x (${(s.enemy / N.enemy).toFixed(2)})`);
       check(Math.abs(s.walk / N.walk - d.player) < 1e-6, `${id}: player at ${d.player}x`);
     }
+    // Hard gives fightable bosses 1.5x hp, rounded up; nothing else.
+    const hps = () => { switchTo('playing', { retry: true }); return state.enemies.filter(e => e.boss && e.mode === 'fight' && e.hp != null).map(e => e.hp); };
+    for (const lvl of [1, 3, 4, 5]) {
+      setDifficulty('normal'); state.currentLevelIndex = lvl; const nh = hps();
+      setDifficulty('hard'); state.currentLevelIndex = lvl; const hh = hps();
+      check(nh.every((h, i) => hh[i] === Math.ceil(h * 1.5)), `hard boss hp on level ${lvl + 1}: ${nh.join(',')} -> ${hh.join(',')}`);
+    }
+    setDifficulty('normal'); state.currentLevelIndex = 1; const nHp = hps();
+    setDifficulty('easy'); state.currentLevelIndex = 1;
+    check(hps().join() === nHp.join(), 'easy leaves boss hp alone');
     // cycling many times must not compound
     setDifficulty('normal'); for (let i = 0; i < 9; i++) cycleDifficulty(1);
     setDifficulty('normal'); const again = speeds();
