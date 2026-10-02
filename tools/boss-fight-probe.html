@@ -19,6 +19,7 @@
   import { levels } from '../src/levels/registry.js';
   import { startAttack } from '../src/weapons/combat.js';
   import { getWeapon } from '../src/weapons/registry.js';
+  import { setDifficulty } from '../src/difficulty.js';
 
   const out = [];
   let fails = 0;
@@ -270,8 +271,16 @@
         check(pick >= 10 && saw >= 10, `and the pickaxe (${pick}) and chainsaw (${saw}) at least a sixth of a second`);
       }
 
+      // Easy is not run through this bot: it is tuned to Normal's timing (a
+      // jump-in distance chosen against Normal's bruiser speed), and Easy only
+      // makes everything slower, so the speed checks in difficulty-probe are
+      // what vouch for it.
       // (4) the fight, the way a kid plays it: shoot through the shields,
-      // hop a bruiser that gets close, stomp what is left
+      // hop a bruiser that gets close, stomp what is left — on every
+      // difficulty. Normal must stay easy for a ten-year-old; Hard is the
+      // answer to "the Crew is too easy" and must still be beatable.
+      for (const dname of ['normal', 'hard']) {
+      setDifficulty(dname);
       runLevelAgain(3);
       {
         const lv3 = getLevel();
@@ -308,12 +317,23 @@
           key(left ? 'keydown' : 'keyup', 'ArrowLeft'); key(right ? 'keydown' : 'keyup', 'ArrowRight');
           if (jump && hop <= 0) { key('keydown', ' '); hop = 22; }
           if (hop > 0 && --hop === 0) key('keyup', ' ');
+          const before = state.lives;
           update();
+          // A death sends the player back to the start of the LEVEL, which
+          // is not what a person retrying the fight does. Put them back at
+          // the arena's mouth, so lives lost counts the fight and not the
+          // walk back through six thousand pixels of level.
+          if (state.lives < before) {
+            player.x = 6730; player.y = lv3.groundY - player.height; player.velocityX = 0; player.velocityY = 0;
+          }
         }
         key('keyup', 'ArrowLeft'); key('keyup', 'ArrowRight'); key('keyup', ' ');
-        check(!cr().some(e => e.alive), `a kid's strategy beats the crew (${f} frames, ${cr().filter(e => e.alive).length} left)`);
-        check(lives0 - state.lives <= 1, `losing at most one life (lost ${lives0 - state.lives})`);
+        check(!cr().some(e => e.alive), `[${dname}] a kid's strategy beats the crew (${f} frames, ${cr().filter(e => e.alive).length} left)`);
+        const allowed = dname === 'hard' ? 3 : 1;
+        check(lives0 - state.lives <= allowed, `[${dname}] losing at most ${allowed} (lost ${lives0 - state.lives})`);
       }
+      }
+      setDifficulty('normal');
     });
 
     // --- the Terraformer, the way a careful kid plays it ---

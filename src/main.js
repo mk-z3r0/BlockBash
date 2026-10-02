@@ -1,5 +1,6 @@
 import { initInput } from './engine/input.js';
 import { pollGamepad } from './engine/gamepad.js';
+import { initDifficulty } from './difficulty.js';
 import { initAudio, resumeAudioIfSuspended, toggleMute } from './audio/audio.js';
 import { bufferJump } from './entities/player.js';
 import { registerScene, switchTo, update, draw, handleKeyDown } from './scenes/sceneManager.js';
@@ -17,6 +18,7 @@ import { START_LEVEL } from './engine/devflags.js';
 // cutscene marked `once` knows on the very first frame whether it has
 // already been seen.
 initNarrative();
+initDifficulty();
 
 registerScene('intro', introScene);
 registerScene('title', titleScene);

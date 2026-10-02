@@ -328,6 +328,10 @@ Note the intended shape of the progression: it escalates through **mechanic vari
 
 **You cannot walk past a fight** (2026-09-30). The edge transition on every face with a fightable boss now also requires `bossDefeated`, and a player who reaches the edge with the boss standing is shoved back with *FINISH THE FIGHT FIRST*. Before this every boss from the Excavator to the General could be skipped by walking to the corner — reported from play, and the reason a player could arrive on face 3 "randomly" holding a sledgehammer they never earned. Each boss also has an **arena threshold** (`engageFromX`) so it doesn't start fighting from the far side of the block you climb to reach it.
 
+### Difficulty (2026-10-01)
+
+Three presets on the title screen (↑/↓, remembered): **Easy** (bosses 0.8×, enemies 0.9×), **Normal** (the game as tuned for a ten-year-old, and the one every probe measures), **Hard** (bosses 1.35×, enemies 1.15×, the player 1.1× so a faster world stays controllable, and the Demolition Crew swings and fires faster). Added because the Crew, once it was made fair, read as too easy to a grown-up. Speeds only: no hp, geometry or reach changes, so every level audit holds on all three (the player's jump carry only grows or stays put). A kid-style bot beats the Crew on Normal in 198 frames losing nothing and on Hard in 420 losing two.
+
 ### A boss has to be visibly doing the thing
 
 *(Added 2026-09-28, from play — "the boss' weapon isn't visible", then "the

@@ -1,0 +1,44 @@
+<!DOCTYPE html><html><body style="margin:0;background:#000"><canvas id="game" width="800" height="450"></canvas><pre id="out">running…</pre>
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true, narrative: { seenCutscenes: {}, npcStage: 0, flags: {} } })); window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERROR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  // Difficulty scales speeds and nothing else, never compounds, and Normal is
+  // exactly the game every other probe measures.
+  import { state } from '../src/state.js';
+  import { switchTo } from '../src/scenes/sceneManager.js';
+  import { P } from '../src/engine/physics.js';
+  import { levels } from '../src/levels/registry.js';
+  import { setDifficulty, cycleDifficulty, getDifficultyId, DIFFICULTIES } from '../src/difficulty.js';
+  const out = []; let fails = 0;
+  const check = (ok, l) => { if (!ok) fails++; out.push(`  ${ok ? 'ok  ' : 'FAIL'} ${l}`); };
+  setTimeout(() => {
+    const speeds = () => {
+      state.currentLevelIndex = 3; switchTo('playing', { retry: true });
+      const b = state.enemies.find(e => e.crew && e.role === 'bruiser');
+      const n = state.enemies.find(e => !e.boss && e.speed);
+      return { boss: Math.abs(b.speed), enemy: Math.abs(n.speed), walk: P.walkMax, run: P.runMax };
+    };
+    setDifficulty('normal'); const N = speeds();
+    check(N.walk === 2.8 && N.run === 4, `normal leaves the player at ${N.walk}/${N.run}`);
+    for (const id of ['easy', 'hard']) {
+      setDifficulty(id); const s = speeds(), d = DIFFICULTIES[id];
+      check(Math.abs(s.boss / N.boss - d.boss) < 1e-6, `${id}: bosses at ${d.boss}x (${(s.boss / N.boss).toFixed(2)})`);
+      check(Math.abs(s.enemy / N.enemy - d.enemy) < 1e-6, `${id}: enemies at ${d.enemy}x (${(s.enemy / N.enemy).toFixed(2)})`);
+      check(Math.abs(s.walk / N.walk - d.player) < 1e-6, `${id}: player at ${d.player}x`);
+    }
+    // cycling many times must not compound
+    setDifficulty('normal'); for (let i = 0; i < 9; i++) cycleDifficulty(1);
+    setDifficulty('normal'); const again = speeds();
+    check(again.walk === 2.8 && again.boss === N.boss, 'cycling back to normal restores exactly the original speeds');
+    // a respawn keeps a boss at its scaled speed
+    setDifficulty('hard'); const h = speeds();
+    const b = state.enemies.find(e => e.crew && e.role === 'bruiser'); b.speed = -b.speed * 0.3;
+    switchTo('playing', { retry: true });
+    const b2 = state.enemies.find(e => e.crew && e.role === 'bruiser');
+    check(Math.abs(Math.abs(b2.speed) - h.boss) < 1e-6, 'a restarted fight keeps the scaled boss speed');
+    setDifficulty('normal');
+    out.push(fails ? `*** ${fails} FAILURE(S)` : 'PASS difficulty scales speeds only, and normal is untouched');
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 250);
+</script></body></html>

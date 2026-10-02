@@ -16,6 +16,7 @@
 // special case in the weapon logic.
 
 import { state } from '../state.js';
+import { getDifficulty } from '../difficulty.js';
 import { getLevel } from '../levels/levelLoader.js';
 import { player } from '../entities/player.js';
 import { keys } from '../engine/input.js';
@@ -76,7 +77,8 @@ export function startAttack(owner) {
   // right shape for the person swinging and a terrible one for the person
   // being swung at: about 0.14s of warning. Reported from play as the
   // Demolition Crew's "hit window seems really short".
-  const scale = owner === player ? 1 : (weapon.enemyScale || 1);
+  // Difficulty speeds an enemy's swing up or down by dividing its scale.
+  const scale = owner === player ? 1 : (weapon.enemyScale || 1) / getDifficulty().tempo;
   owner.swingLen = Math.max(1, Math.round(weapon.duration * scale));
   owner.weaponCooldown = Math.round(weapon.cooldown * scale);
   owner.weaponTimer = owner.swingLen;

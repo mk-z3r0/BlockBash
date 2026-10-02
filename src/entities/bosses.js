@@ -16,6 +16,7 @@
 // Everything else — hp, speed, patrol bounds — is ordinary enemy data.
 
 import { state } from '../state.js';
+import { getDifficulty } from '../difficulty.js';
 import { getLevel, surfaceYAt, isBlocked, hasFooting } from '../levels/levelLoader.js';
 import { carveGap, crackFloor, updateCracks } from '../levels/terrain.js';
 import { movePlatform } from '../levels/movers.js';
@@ -272,7 +273,7 @@ function updateCrew(boss, player) {
     if (--boss.shotTimer <= 0) {
       // 130, not 95. With the bruisers pressing in waves the shots are the
       // thing that fills the gaps, and at 95 they filled them completely.
-      boss.shotTimer = 130;
+      boss.shotTimer = Math.round(130 / getDifficulty().tempo);
       boss.charge = 0;
       spawnSphereShot(boss);
     } else {

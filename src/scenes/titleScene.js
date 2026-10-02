@@ -4,6 +4,7 @@ import { switchTo } from './sceneManager.js';
 import { loadSave } from '../save.js';
 import { levels } from '../levels/registry.js';
 import { DEBUG } from '../engine/devflags.js';
+import { getDifficulty, cycleDifficulty } from '../difficulty.js';
 
 let save = null;
 // Which level the arrows have landed on. Kept across visits to the title so
@@ -58,6 +59,14 @@ export const titleScene = {
       ctx.fillText('\u2190 \u2192 to choose', VIEW_WIDTH / 2, VIEW_HEIGHT / 2 + 80);
     }
 
+    // Difficulty: bosses and the world speed up or slow down. Normal is the
+    // game as designed for a ten-year-old.
+    const dk = getDifficulty();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = dk.label === 'HARD' ? '#ff8f8f' : dk.label === 'EASY' ? '#8effc0' : '#e8ecf7';
+    ctx.font = 'bold 13px Trebuchet MS, Arial, sans-serif';
+    ctx.fillText(`\u25c2 ${dk.label} \u25b8   (\u2191 \u2193 to change difficulty)`, VIEW_WIDTH / 2, VIEW_HEIGHT - 28);
+
     if (save && (save.furthestLevelIndex > 0 || save.bestScore > 0)) {
       ctx.textAlign = 'center';
       ctx.fillStyle = '#5ee7ff';
@@ -71,6 +80,8 @@ export const titleScene = {
   },
 
   handleKeyDown(e) {
+    if (e.key === 'ArrowUp' || e.key === 'w') { cycleDifficulty(1); return; }
+    if (e.key === 'ArrowDown' || e.key === 's') { cycleDifficulty(-1); return; }
     const top = highestSelectable();
     if (e.key === 'ArrowLeft' || e.key === 'a') { selected = Math.max(0, selected - 1); return; }
     if (e.key === 'ArrowRight' || e.key === 'd') { selected = Math.min(top, selected + 1); return; }

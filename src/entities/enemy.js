@@ -10,6 +10,7 @@ import { addShake, addHitStop } from '../engine/impact.js';
 import { addPopup } from '../ui/popups.js';
 import { isBlocked, hasFooting, surfaceYAt, solidTopAt, floorUnder } from '../levels/levelLoader.js';
 import { state } from '../state.js';
+import { getDifficulty } from '../difficulty.js';
 
 // --- enemy tiers (GAME_DESIGN's "Enemies evolve across levels") ---------
 //
@@ -85,6 +86,10 @@ function spread(x, base, range) {
 
 // Builds live enemies from a level's raw spawn data.
 export function spawnEnemies(spawns) {
+  const dk = getDifficulty();
+  // Speeds scale here, once, so patrol, chase, charge and the respawn reset
+  // (which restores `baseSpeed`) all agree without the AI knowing.
+  spawns = spawns.map(e => e.speed ? { ...e, speed: e.speed * (e.boss ? dk.boss : dk.enemy) } : e);
   const built = spawns.map(e => ({
     tier: 'passive',
     kind: 'sphere',
