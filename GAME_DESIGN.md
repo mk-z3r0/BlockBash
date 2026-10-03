@@ -332,6 +332,19 @@ Note the intended shape of the progression: it escalates through **mechanic vari
 
 Three presets on the title screen (↑/↓, remembered): **Easy** (bosses 0.8×, enemies 0.9×), **Normal** (the game as tuned for a ten-year-old, and the one every probe measures), **Hard** (bosses 1.35× speed **and 1.5× hit points**, enemies 1.15×, the player 1.1× so a faster world stays controllable, and the Demolition Crew swings and fires faster). Added because the Crew, once it was made fair, read as too easy to a grown-up. Speeds only: no hp, geometry or reach changes, so every level audit holds on all three (the player's jump carry only grows or stays put). Restoration targets (the Core, the Sculptor) are won with triangles, not hp, and are unchanged. A kid-style bot beats the Crew on Normal in 198 frames losing nothing; on Hard (every Crew member 3 hp) the same simple bot can still kill the shooter but dies to the bruisers — demanding, not impossible, and nobody has played it by hand yet.
 
+### The release once-over (2026-10-02)
+
+What "wrap it up as a game" turned out to mean, in order of what a player meets:
+
+- **A song per level.** Seven songs (`audio/audio.js`, `SONGS`), not seven tempos of one loop: a work-song for the Quarry, a climbing arpeggio for the columns, sixteenth-note hats for the first face that shoots back, a waltz for the room that moves, a march with a snare roll for the General, and a drone with a drip of water for the cavity. A level change dips the music for a quarter second and swaps at step zero; a respawn changes nothing.
+- **A sky per level** (`engine/backdrop.js`): palette, horizon glow, drifting motes and a far skyline of what the level is made of — cubes, terraces, columns, shelves, slabs that bob, a fortress wall, stalactites with embers. Silhouettes have no outline so they never read as platforms.
+- **Cutscenes can't hurt you.** Nothing lands a hit while a scene runs, and the frame one hands control back the player gets a one-second blink of invincibility — the same as a respawn — because the silent lead-in beats keep the world alive while the player is locked, and a sphere can be standing on them when the bar drops. `cutscene-ambush-probe` plays every scene from its trigger with the level's enemies live.
+- **A chase you can always walk away from.** Hunters are capped at 92% of the player's walk speed on every difficulty (`pursuit-probe` measures all 37 of them). The leash ends a chase; the cap keeps it survivable.
+- **Quarrick's "Don't."** now answers something: the player starts to say "your corner—" and he cuts them off. On its own it read as him warning the player off nothing.
+- **Level 3's two 100px columns after spike beds are 88 now** (1270, 4180), the platforms above them 12px lower with them. From the 95px of floor a bed leaves, a 100 landed on 12 of 42 jump inputs, every one a full-held jump within eight pixels; an 88 lands on 26. The sloppy bot's level 3 went from a stall to the cheapest level in the game.
+- **Level 3's fourth octagon is gone.** It patrolled the 95px landing zone after the last spike bed with the column right behind it; the sloppy-play bot died there four times and stalled.
+- **Easy and Hard say so** on the level toast.
+
 ### A boss has to be visibly doing the thing
 
 *(Added 2026-09-28, from play — "the boss' weapon isn't visible", then "the

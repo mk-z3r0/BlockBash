@@ -79,12 +79,16 @@ export default {
     { x: 700, y: 200, width: 110, height: 18 },
 
     // --- the first real columns ---
-    // Two per stretch from here on. The 176 is the tallest thing in the
-    // level's first half and it is deliberately the SECOND column, so the
-    // player arrives at it having already made the shorter version.
+    // Two per stretch from here on, and none taller than 88 when it has to
+    // be climbed from the floor. The second column of this stretch and of
+    // the one at 4180 were 100, with 95px of floor before them after a
+    // spike bed: measured, that landed on 12 of 42 jump inputs, all of them
+    // a full-held jump pressed within eight pixels. An 88 from the same
+    // run-up lands on 25. The platforms above came down 12px with them so
+    // the step up from the column top stayed what it was.
     pillar(1020, 76, { chewed: true }),
-    pillar(1270, 100),
-    { x: 1400, y: 200, width: 100, height: 18, chewed: true },
+    pillar(1270, 88),
+    { x: 1400, y: 212, width: 100, height: 18, chewed: true },
 
     pillar(1760, 76, { chewed: true }),
     pillar(2010, 66),
@@ -97,8 +101,8 @@ export default {
 
     // --- after the handoff, the columns come back taller ---
     pillar(3930, 76, { chewed: true }),
-    pillar(4180, 100, { chewed: true }),
-    { x: 4400, y: 200, width: 110, height: 18 },
+    pillar(4180, 88, { chewed: true }),
+    { x: 4400, y: 212, width: 110, height: 18 },
 
     pillar(4730, 76, { chewed: true }),
     pillar(4980, 76),
@@ -157,7 +161,7 @@ export default {
     { x: 200,  y: GROUND_Y - 22, w: 22, minX: 150,  maxX: 290,  speed: 1.7 },
     { x: 740,  y: 180,           w: 20, minX: 700,  maxX: 810,  speed: 1.2 },
     { x: 1180, y: GROUND_Y - 22, w: 22, minX: 1175, maxX: 1265, speed: 1.6 },
-    { x: 1430, y: 180,           w: 20, minX: 1400, maxX: 1500, speed: 1.2 },
+    { x: 1430, y: 192,           w: 20, minX: 1400, maxX: 1500, speed: 1.2 },
     { x: 1960, y: GROUND_Y - 22, w: 22, minX: 1920, maxX: 2005, speed: 1.8,
       tier: 'pursuer', weapon: 'pickaxe' },
     { x: 2260, y: 228,           w: 20, minX: 2230, maxX: 2340, speed: 1.2 },
@@ -176,17 +180,20 @@ export default {
     // walk the rest of the level not knowing what the B button does.
     { x: 3500, y: GROUND_Y - 26, w: 26, minX: 3450, maxX: 3620, speed: 0.8,
       kind: 'octagon', restoreHits: 2 },
-    { x: 4420, y: 180,           w: 20, minX: 4400, maxX: 4510, speed: 1.3 },
+    { x: 4420, y: 192,           w: 20, minX: 4400, maxX: 4510, speed: 1.3 },
     { x: 4540, y: GROUND_Y - 22, w: 22, minX: 4500, maxX: 4640, speed: 1.7,
       tier: 'pursuer', weapon: 'pickaxe' },
     { x: 5150, y: 200,           w: 20, minX: 5120, maxX: 5230, speed: 1.3 },
     { x: 5740, y: GROUND_Y - 26, w: 26, minX: 5710, maxX: 5795, speed: 0.8,
       kind: 'octagon', restoreHits: 2 },
     { x: 6450, y: 294,           w: 20, minX: 6420, maxX: 6530, speed: 1.3 },
-    // Kept back from the last checkpoint at 6340 — an octagon shambles after
-    // you from 200px away, so anything closer is a respawn into contact.
-    { x: 6010, y: GROUND_Y - 26, w: 26, minX: 5990, maxX: 6090, speed: 0.8,
-      kind: 'octagon', restoreHits: 2 },
+    // There was a fourth octagon here, patrolling 5990-6116. It stood in
+    // the 95px of floor after the last spike bed — the landing zone the
+    // rebuild above promises is clear — with the 88px column at 6100 right
+    // behind it, so a player coming off the bed landed on it or was penned
+    // against the column by it. The sloppy-play bot died there four times
+    // running and never got past. Three octagons before the Sculptor is
+    // the lesson taught three times, which is plenty.
 
     // --- The Sculptor ---
     // Nothing in the arsenal can hurt it. Six triangles put it back.
@@ -203,7 +210,7 @@ export default {
     [1050, 320],
     [1200, 396], [1240, 396],
     [1300, 296],
-    [1430, 186], [1470, 186],
+    [1430, 198], [1470, 198],
     [1550, 396],
     // second stretch
     [1790, 320],
@@ -219,7 +226,7 @@ export default {
     [3960, 320],
     [4120, 396], [4160, 396],
     [4210, 296],
-    [4430, 186], [4470, 186],
+    [4430, 198], [4470, 198],
     [4760, 320],
     [4920, 396], [4960, 396],
     [5010, 320],

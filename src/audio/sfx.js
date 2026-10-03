@@ -1,4 +1,4 @@
-import { audioCtx, sfxGain, musicGain, tone, noiseBurst } from './audio.js';
+import { audioCtx, sfxGain, musicGain, tone, noiseBurst, MUSIC_LEVEL } from './audio.js';
 
 export function playJump() {
   if (!audioCtx) return;
@@ -262,7 +262,7 @@ export function fadeMusicOut(seconds = 2) {
 export function restoreMusicLevel() {
   if (!audioCtx || !musicGain) return;
   musicGain.gain.cancelScheduledValues(audioCtx.currentTime);
-  musicGain.gain.setValueAtTime(0.22, audioCtx.currentTime);
+  musicGain.gain.setValueAtTime(MUSIC_LEVEL, audioCtx.currentTime);
 }
 
 // Under the rise: a low rumble that builds for the whole climb. Several

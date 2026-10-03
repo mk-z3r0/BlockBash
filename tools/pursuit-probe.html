@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#000;">
+<canvas id="game" width="800" height="450"></canvas><pre id="out">running…</pre>
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true, narrative: { seenCutscenes: {}, npcStage: 0, flags: {} } })); window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERROR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  // Is the pursuit fair?
+  //
+  // "Enemies are moving as expected, the pursuit not being too hard core."
+  // The rule that makes a chase fair is simple and is asserted here on
+  // every difficulty: a sphere that is after you is never faster than you
+  // WALKING. Turn around and walk off and it falls behind. The leash
+  // (minX/maxX) ends the chase; the cap keeps it survivable while it lasts.
+  //
+  // Measured, not computed from the tables: every pursuer and aggressor in
+  // the game is woken with the player just inside its range, the player
+  // walks away, and the gap has to grow.
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update, switchTo } from '../src/scenes/sceneManager.js';
+  import { getLevel, surfaceYAt } from '../src/levels/levelLoader.js';
+  import { levels } from '../src/levels/registry.js';
+  import { P } from '../src/engine/physics.js';
+  import { setDifficulty } from '../src/difficulty.js';
+
+  const out = [];
+  let fails = 0;
+  const check = (ok, label) => { if (!ok) fails++; out.push(`  ${ok ? 'ok  ' : 'FAIL'} ${label}`); };
+  const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+
+  setTimeout(() => {
+    for (const d of ['normal', 'hard', 'easy']) {
+      setDifficulty(d);
+      let hunters = 0, worstRatio = 0, worstLabel = '';
+      for (let i = 0; i < levels.length; i++) {
+        state.currentLevelIndex = i;
+        switchTo('playing', { retry: true });
+        const lv = getLevel();
+        lv.cutscenes.length = 0; state.lives = 999;
+        const hunterList = state.enemies.filter(e => e.alive && !e.boss && e.tier && e.tier !== 'passive');
+        for (const h of hunterList) {
+          // Everyone else out of the way; this is a two-body measurement.
+          state.enemies.forEach(e => { if (e !== h) e.alive = false; });
+          h.alive = true;
+          // Stand 120px to its right, level with it, and walk right.
+          player.invincible = 999999;
+          player.x = h.x + h.w + 120; player.y = h.y + h.w - player.height;
+          player.velocityX = 0; player.velocityY = 0;
+          const gap0 = player.x - (h.x + h.w);
+          let maxStep = 0, lastX = h.x;
+          key('keydown', 'ArrowRight');
+          for (let f = 0; f < 90; f++) {
+            update();
+            maxStep = Math.max(maxStep, Math.abs(h.x - lastX)); lastX = h.x;
+          }
+          key('keyup', 'ArrowRight');
+          hunters++;
+          const ratio = maxStep / P.walkMax;
+          if (ratio > worstRatio) { worstRatio = ratio; worstLabel = `level ${i + 1} ${h.tier} at x${Math.round(h.baseX ?? h.x)}: ${maxStep.toFixed(2)}px/frame vs walk ${P.walkMax.toFixed(2)}`; }
+          // Reset for the next hunter in this level.
+          hunterList.forEach(e => { e.alive = true; });
+        }
+      }
+      check(worstRatio < 1, `[${d}] ${hunters} hunters measured; the fastest chase is ${(worstRatio * 100).toFixed(0)}% of walking speed (${worstLabel})`);
+    }
+    setDifficulty('normal');
+    out.push(fails ? `*** ${fails} FAILURE(S)` : 'PASS you can always walk away from a chase');
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 250);
+</script></body></html>

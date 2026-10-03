@@ -1,4 +1,5 @@
-import { ctx, VIEW_WIDTH, drawBackground } from '../engine/renderer.js';
+import { ctx, VIEW_WIDTH } from '../engine/renderer.js';
+import { drawBackdrop } from '../engine/backdrop.js';
 import { camera, updateCamera, resetCamera } from '../engine/camera.js';
 import { state } from '../state.js';
 import {
@@ -24,6 +25,7 @@ import { levels } from '../levels/registry.js';
 import { showToast, updateToast, drawHUD, toast } from '../ui/hud.js';
 import { playHit, playWin, playGameOver } from '../audio/sfx.js';
 import { startMusic, setMusicMood } from '../audio/audio.js';
+import { getDifficulty } from '../difficulty.js';
 import { switchTo } from './sceneManager.js';
 import { recordProgress } from '../save.js';
 import { markCutsceneSeen, resetNarrative } from '../narrative.js';
@@ -299,7 +301,9 @@ function startLevel(index) {
   player.weaponCooldown = 0;
   resetCamera();
   state.gameState = 'playing';
-  showToast(level.name.toUpperCase(), 100);
+  // Easy and Hard say so on the way in; Normal is just the level's name.
+  const dk = getDifficulty();
+  showToast(dk.label === 'NORMAL' ? level.name.toUpperCase() : `${level.name.toUpperCase()} \u00b7 ${dk.label}`, 100);
 }
 
 // Same level, fresh attempt — what a game-over retry does. Never sends the
@@ -346,6 +350,11 @@ function startNewRun() {
   retryCurrentLevel();
 }
 
+// How long the player is untouchable after a cutscene ends. One second,
+// like a respawn — long enough to see where everything is, not long enough
+// to walk through a sphere on purpose.
+const CUTSCENE_GRACE_FRAMES = 60;
+
 export function drawWorldAndHUD() {
   // Deliberately drawn OUTSIDE the world rotation below, even though the
   // edge transition's spirit is "everything rotates together":
@@ -354,7 +363,7 @@ export function drawWorldAndHUD() {
   // covering the corners — real gaps flashing through, not a subtle seam.
   // It also doesn't make physical sense for a starfield light-years away to
   // spin from a local 90° tilt of one patch of planet surface.
-  drawBackground(camera.x, camera.y);
+  drawBackdrop(camera.x, camera.y, state.currentLevelIndex, state.frameCount);
   ctx.save();
   // Screen shake moves the WORLD, not the backdrop — same reasoning as the
   // edge transition's rotation, which is also applied here rather than to
@@ -473,8 +482,19 @@ export const playingScene = {
       const entry = pendingCutscene(getLevel());
       if (entry) beginCutscene(entry);
     }
+    const sceneWasRunning = isCutsceneActive();
     updateCutscene();
     if (state.gameState !== 'playing') return; // a cutscene can end the level
+    // The frame a cutscene hands control back, the player gets a breath:
+    // the same blink of invincibility a respawn gives. Reported from play:
+    // "make sure it isn't too easy to get caught off guard by the cut
+    // scenes." During the silent lead-in beats the world keeps living while
+    // the player is locked, so a patrolling sphere can be standing on them
+    // when the dialogue bar drops — and the first thing they knew about it
+    // was losing a life. One second to see the room and step away.
+    if (sceneWasRunning && !isCutsceneActive()) {
+      player.invincible = Math.max(player.invincible, CUTSCENE_GRACE_FRAMES);
+    }
     updateRescueNPCEntity();
 
     if (simulate) {
@@ -483,7 +503,10 @@ export const playingScene = {
       // One read, after everything that can hurt the player has run —
       // contact, a sphere's swing, and a sphere's shot all raise the same
       // flag (see weapons/combat.js).
-      if (consumePlayerHit()) {
+      // ...and nothing hurts you while a scene is running. The player
+      // can't move, so a hit here is never something they could have
+      // avoided; the flag is still consumed so it can't carry over.
+      if (consumePlayerHit() && !isCutsceneActive()) {
         playHit();
         loseLife();
         if (state.gameState !== 'playing') return;

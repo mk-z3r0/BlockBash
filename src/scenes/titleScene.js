@@ -1,4 +1,5 @@
-import { ctx, VIEW_WIDTH, VIEW_HEIGHT, drawBackground } from '../engine/renderer.js';
+import { ctx, VIEW_WIDTH, VIEW_HEIGHT } from '../engine/renderer.js';
+import { drawBackdrop } from '../engine/backdrop.js';
 import { drawOverlay, drawTitleDecor } from '../ui/overlays.js';
 import { switchTo } from './sceneManager.js';
 import { loadSave } from '../save.js';
@@ -10,6 +11,7 @@ let save = null;
 // Which level the arrows have landed on. Kept across visits to the title so
 // dying on level 5 and coming back doesn't put the cursor back on level 1.
 let selected = 0;
+let titleFrame = 0;
 
 // How far the arrows can go.
 //
@@ -35,7 +37,7 @@ export const titleScene = {
   },
 
   draw() {
-    drawBackground(0);
+    drawBackdrop(0, 0, 'title', titleFrame++);
     drawTitleDecor();
     drawOverlay(
       'BLOCK BASH',

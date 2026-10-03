@@ -33,6 +33,9 @@ const AGGRO_RANGE = { passive: 0, pursuer: 230, aggressor: 330 };
 const AGGRO_HEIGHT = 70;
 // Chase speed as a multiple of the patrol speed the level authored.
 const CHASE_MULTIPLIER = { pursuer: 1.35, aggressor: 1.6 };
+// ...and never faster than this fraction of the player's walk, whatever
+// the multiplier says. See the note at the chase() call.
+const CHASE_CAP = 0.92;
 // How close before it swings. Slightly inside the weapon's own reach so the
 // swing connects rather than whiffing at maximum extension.
 const SWING_RANGE = 44;
@@ -505,7 +508,13 @@ export function updateEnemies(player, cutsceneActive) {
       const range = AGGRO_RANGE[enemy.tier] || 0;
       const hunting = range > 0 && !cutsceneActive && playerIsNear(enemy, player, range);
       if (hunting) {
-        chase(enemy, player, Math.abs(enemy.speed) * (CHASE_MULTIPLIER[enemy.tier] || 1));
+        // Capped below the player's WALK speed, on every difficulty. A
+        // pursuer is pressure, not a death sentence: a kid who turns and
+        // walks away must always be able to. The leash (minX/maxX) is
+        // what actually ends the chase; this is what keeps it fair while
+        // it lasts. Hard's 1.15x enemies and 1.6x aggressor multiplier
+        // together put the fastest shooters past a walking player.
+        chase(enemy, player, Math.min(Math.abs(enemy.speed) * (CHASE_MULTIPLIER[enemy.tier] || 1), P.walkMax * CHASE_CAP));
         if (enemy.weapon && Math.abs((player.x + player.width / 2) - (enemy.x + enemy.w / 2)) < SWING_RANGE) {
           startAttack(enemy);
         }

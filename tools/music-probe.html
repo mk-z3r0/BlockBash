@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#000;">
+<canvas id="game" width="800" height="450"></canvas><pre id="out">running…</pre>
+<script>window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERROR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  // Every song, every step, every bar: a real note or a rest, never a NaN,
+  // never a frequency a speaker can't make — and the level-to-song mapping
+  // is total. Sound can't be heard headless; its tables can be checked.
+  import { SONGS, eventsAt, setMusicMood, currentSongName, initAudio, startMusic } from '../src/audio/audio.js';
+  import { levels } from '../src/levels/registry.js';
+  const out = []; let fails = 0;
+  const check = (ok, l) => { if (!ok) fails++; out.push(`  ${ok ? 'ok  ' : 'FAIL'} ${l}`); };
+  setTimeout(() => {
+    check(SONGS.length === levels.length, `${SONGS.length} songs for ${levels.length} levels`);
+    const names = new Set(SONGS.map(s => s.name));
+    check(names.size === SONGS.length, 'every song has its own name');
+    for (const s of SONGS) {
+      let tones = 0, drums = 0, bad = [];
+      for (const arr of [s.bass, s.arp, s.lead]) {
+        if (arr && arr.length % s.len !== 0) bad.push(`pattern length ${arr.length} is not a multiple of ${s.len}`);
+      }
+      for (let bar = 0; bar < 4; bar++) for (let st = 0; st < s.len; st++) {
+        for (const e of eventsAt(s, bar, st)) {
+          if (e.kind === 'tone') {
+            tones++;
+            if (!Number.isFinite(e.freq) || e.freq < 40 || e.freq > 4500) bad.push(`bar ${bar} step ${st}: ${e.freq}Hz`);
+            if (!(e.dur > 0) || !(e.gain > 0) || !e.wave) bad.push(`bar ${bar} step ${st}: dur ${e.dur} gain ${e.gain} wave ${e.wave}`);
+          } else drums++;
+        }
+      }
+      check(bad.length === 0 && tones > 0, `${s.name}: ${s.bpm} bpm, ${s.len} steps a bar, ${tones} notes and ${drums} drum hits over four bars${bad.length ? ' — ' + bad.slice(0, 3).join('; ') : ''}`);
+    }
+    // the mapping works with no audio context at all (before the first keypress)...
+    for (let i = 0; i < levels.length; i++) setMusicMood(i);
+    check(currentSongName() === SONGS[levels.length - 1].name, 'picking a song before audio exists just picks it');
+    // ...and with one.
+    try {
+      initAudio(); startMusic();
+      for (let i = 0; i < levels.length; i++) setMusicMood(i);
+      check(true, 'with an audio context, every song can be started');
+    } catch (e) { check(false, 'with an audio context: ' + e.message); }
+    setTimeout(() => {
+      out.push(fails ? `*** ${fails} FAILURE(S)` : 'PASS seven songs, one a level, all playable');
+      out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+      document.getElementById('out').textContent = out.join('\n');
+    }, 800);
+  }, 250);
+</script></body></html>

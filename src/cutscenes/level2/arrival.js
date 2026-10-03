@@ -43,11 +43,15 @@ export const l2Arrival = {
     say('player',   "What are they even doing?"),
     say('quarrick', "Digging. Straight down, all six sides."),
     say('quarrick', "They want the middle of the world."),
-    // The deterioration beat is supposed to land without being narrated —
-    // the player has been looking at the gap in his corner for four lines
-    // by now. This is the closest it gets to being acknowledged, and it's
-    // him refusing to.
-    say('quarrick', "...Don't. Keep moving."),
+    // The deterioration beat. The player has been looking at the gap in
+    // his corner for four lines by now, and finally says so — half a
+    // sentence, cut off — and he refuses to have the conversation.
+    //
+    // Reported from play: "Don't" on its own, with nobody having said or
+    // done anything, read as Quarrick warning the player off nothing. A
+    // refusal needs something to refuse.
+    say('player',   "Quarrick, your corner—"),
+    say('quarrick', "Don't. Keep moving."),
 
     {
       name: 'leave',

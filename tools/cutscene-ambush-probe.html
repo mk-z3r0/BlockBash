@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#000;">
+<canvas id="game" width="800" height="450"></canvas><pre id="out">running…</pre>
+<script>localStorage.setItem('blockbash-save', JSON.stringify({ saveVersion: 1, furthestLevelIndex: 0, bestScore: 0, hasSeenIntro: true, narrative: { seenCutscenes: {}, npcStage: 0, flags: {} } })); window.__errs=[];window.addEventListener('error',e=>window.__errs.push('ERROR: '+(e.message||e.error)));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+  // Can a cutscene get you killed?
+  //
+  // "Make sure it isn't too easy to get caught off guard by the cut
+  // scenes." Dialogue freezes the world, but the silent beats around it
+  // (a 46-frame look at Quarrick, a 90-frame watch of him walking away)
+  // keep the world alive while the player is locked. A patrolling sphere
+  // can be standing on the player when the bar drops.
+  //
+  // So: every cutscene in the game is played with the level's enemies live,
+  // the way a player reaches it — standing at its trigger, pressing space
+  // to read — and then the player stands still for a second. No life may
+  // be lost at any point, and the player must come out of it with the
+  // grace blink that lets them step away from whatever walked up.
+  import { player } from '../src/entities/player.js';
+  import { state } from '../src/state.js';
+  import { update, switchTo } from '../src/scenes/sceneManager.js';
+  import { getLevel, floorUnder } from '../src/levels/levelLoader.js';
+  import { levels } from '../src/levels/registry.js';
+  import { isCutsceneActive, activeCutsceneId } from '../src/cutscenes/runner.js';
+  import { isDialogueOpen, isDialogueRevealed } from '../src/ui/dialogue.js';
+
+  const out = [];
+  let fails = 0;
+  const check = (ok, label) => { if (!ok) fails++; out.push(`  ${ok ? 'ok  ' : 'FAIL'} ${label}`); };
+  const key = (t, k) => document.dispatchEvent(new KeyboardEvent(t, { key: k }));
+
+  function nearestEnemy() {
+    let best = Infinity;
+    for (const e of state.enemies) {
+      if (!e.alive || e.restored) continue;
+      const dx = Math.max(0, Math.max(e.x - (player.x + player.width), player.x - (e.x + e.w)));
+      const dy = Math.max(0, Math.max(e.y - (player.y + player.height), player.y - (e.y + e.w)));
+      best = Math.min(best, Math.hypot(dx, dy));
+    }
+    return best;
+  }
+
+  setTimeout(() => {
+    let played = 0;
+    for (let i = 0; i < levels.length; i++) {
+      for (const entry of (levels[i].cutscenes || [])) {
+        const w = entry.when;
+        // Boss-driven and edge scenes are the fight's business, tested by
+        // boss-fight-probe and the transition probes.
+        if (w.bossDefeated || w.bossInView || w.nearWorldEdge || w.manual) continue;
+        state.currentLevelIndex = i;
+        switchTo('playing', { retry: true });
+        const lv = getLevel();
+        state.lives = 99;
+        // Arrive the way a player does: on the floor at the trigger. A
+        // level-start scene plays out first (it would anyway), and the
+        // trigger x may be over a pit — level 5's reunion trigger is — so
+        // the player stands on the first footing at or past it.
+        if (w.reachX) {
+          let readFor0 = 0;
+          for (let g = 0; g < 2000 && (g < 5 || isCutsceneActive()); g++) {
+            if (isDialogueOpen() && isDialogueRevealed() && ++readFor0 > 12) { key('keydown', ' '); key('keyup', ' '); readFor0 = 0; }
+            update();
+          }
+          let x = w.reachX + 2, under = null;
+          for (; x < w.reachX + 400; x += 4) { under = floorUnder(x + player.width / 2, 0); if (under != null) break; }
+          player.x = x;
+          player.y = under - player.height;
+          player.velocityX = 0; player.velocityY = 0;
+        }
+        player.invincible = 0; player.respawnFreeze = 0;
+        const lives0 = state.lives;
+        let started = false, ended = false, f = 0, readFor = 0, closest = Infinity;
+        for (; f < 4000 && !ended; f++) {
+          // Read like a person: turn the page a beat after the line lands.
+          if (isDialogueOpen() && isDialogueRevealed() && ++readFor > 12) { key('keydown', ' '); key('keyup', ' '); readFor = 0; }
+          update();
+          if (isCutsceneActive() && activeCutsceneId() === entry.id) started = true;
+          if (started) closest = Math.min(closest, nearestEnemy());
+          if (started && !isCutsceneActive()) ended = true;
+        }
+        if (!started) { out.push(`  --   level ${i + 1}: ${entry.id} did not fire from its trigger (${JSON.stringify(w)})`); continue; }
+        played++;
+        const graceAtEnd = player.invincible;
+        // ...and then stand there for a second, taking it in.
+        for (let g = 0; g < 60; g++) update();
+        const lost = lives0 - state.lives;
+        check(lost === 0 && graceAtEnd >= 45,
+          `level ${i + 1}: ${entry.id} — ${lost} lives lost through the scene and the second after, ` +
+          `${graceAtEnd} frames of grace on exit, nearest sphere during it ${closest === Infinity ? 'none' : Math.round(closest) + 'px'}`);
+      }
+    }
+    check(played >= 6, `${played} scenes played from their triggers`);
+    out.push(fails ? `*** ${fails} FAILURE(S)` : 'PASS no cutscene costs a life, and every one hands back a breath');
+    out.push('errors: ' + (window.__errs.length ? window.__errs.join(' | ') : 'none'));
+    document.getElementById('out').textContent = out.join('\n');
+  }, 250);
+</script></body></html>
