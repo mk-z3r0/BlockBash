@@ -1,4 +1,4 @@
-import { keys } from '../engine/input.js';
+import { keys, actionHeld } from '../engine/input.js';
 import { ctx, VIEW_HEIGHT, drawStickLegs, drawMuscleArm } from '../engine/renderer.js';
 import { P, isColliding } from '../engine/physics.js';
 import { getLevel } from '../levels/levelLoader.js';
@@ -172,7 +172,7 @@ export function updatePlayer(inputLocked) {
   if (player.respawnFreeze > 0) player.respawnFreeze--;
   const left = !inputLocked && !frozen && (keys['ArrowLeft'] || keys['a']);
   const right = !inputLocked && !frozen && (keys['ArrowRight'] || keys['d']);
-  const running = !inputLocked && keys['Shift'];
+  const running = !inputLocked && actionHeld();
 
   // --- P-meter: fills while |vx| >= runMax, drains otherwise — driven
   // purely by current speed, not by which button is held (see physics.js).
@@ -344,8 +344,18 @@ export function drawPlayer(frameCount, suppressBlink = false) {
   ctx.save();
   ctx.translate(0, -legLength);
 
-  ctx.fillStyle = '#f2c14e';
+  const gold = ctx.createLinearGradient(-hw, -hh, hw, hh);
+  gold.addColorStop(0, '#fff0a1');
+  gold.addColorStop(0.45, '#f2c14e');
+  gold.addColorStop(1, '#dc892d');
+  ctx.fillStyle = gold;
   ctx.fillRect(-hw, -hh, player.width, player.height);
+  ctx.fillStyle = '#fff6bf';
+  ctx.fillRect(-hw + 2, -hh + 2, player.width - 4, 2);
+  ctx.fillStyle = '#342740';
+  ctx.fillRect(-5 + player.facing * 2, -5, 3, 4);
+  ctx.fillRect(2 + player.facing * 2, -5, 3, 4);
+  ctx.fillRect(-2 + player.facing * 2, 3, 5, 2);
   ctx.strokeStyle = '#c99a2e';
   ctx.lineWidth = 2;
   ctx.strokeRect(-hw, -hh, player.width, player.height);

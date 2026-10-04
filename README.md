@@ -85,8 +85,7 @@ right-click `index.html` → *Open with Live Server*.
 |---|---|---|
 | Move | `←` `→` or `A` `D` | D-pad or left stick |
 | Jump | `Space`, `↑`, or `W` | **B** (right button) |
-| Run | hold `Shift` | hold **A** (bottom button) |
-| Swing your weapon | `B` | **Y** |
+| Run + use weapon | hold `Shift` or `B` | hold **A** or **Y** |
 | Pause | `Esc` | **Start** |
 | Mute | `M` | — |
 
@@ -94,7 +93,7 @@ Jump height depends on how long you hold the button, and how fast you were
 moving when you left the ground. Running isn't just faster — several gaps in
 level 1 can't be crossed without it.
 
-The weapon button does nothing until you've earned a weapon. You start with
+The run button also uses your weapon once you've earned one. Melee repeats while held; the Cornerstone fires once per tap, so holding run won't spend your remaining triangles. You start with
 nothing, and what the button does changes with what you're holding — a short
 chop, a heavy overhead swing, or a fired triangle. From level 3 on, the
 triangles are counted: the pips at the top right are all you have, and putting
@@ -148,8 +147,9 @@ There's an opening cutscene the first time you play — skippable, and it only
 ever plays once. From level 2 onward the characters talk; `Space` advances a
 line and `Esc` skips a scene.
 
-Each level has three checkpoints, and dying puts you back at the last one
-rather than at the start of the game.
+Each level has three checkpoints. Dying puts you back at the last one. After
+all three tries, Space, Enter or R refills your tries and resumes from that
+same checkpoint, keeping your score, coins and weapon.
 
 Progress is saved to your browser's local storage. Clearing site data resets
 it.

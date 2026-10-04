@@ -3,6 +3,8 @@ import { muted } from '../audio/audio.js';
 import { state } from '../state.js';
 import { player } from '../entities/player.js';
 import { getWeapon } from '../weapons/registry.js';
+import { getLevel } from '../levels/levelLoader.js';
+import { isCutsceneActive } from '../cutscenes/runner.js';
 import { camera } from '../engine/camera.js';
 
 export const toast = { text: null, timer: 0 };
@@ -179,6 +181,11 @@ function drawBossBar() {
 }
 
 export function drawHUD() {
+  ctx.fillStyle = 'rgba(8, 13, 30, 0.82)';
+  ctx.fillRect(8, 8, 150, 48);
+  ctx.fillRect(VIEW_WIDTH - 112, 8, 104, 48);
+  ctx.fillStyle = '#f2c14e';
+  ctx.fillRect(8, 8, 3, 48);
   ctx.fillStyle = '#e8ecf7';
   ctx.font = 'bold 16px Trebuchet MS, Arial, sans-serif';
   ctx.textAlign = 'left';
@@ -199,6 +206,29 @@ export function drawHUD() {
     ctx.fillRect(VIEW_WIDTH - 30 - i * 26, 12, 16, 16);
   }
 
+  if (!isCutsceneActive()) {
+    const level = getLevel();
+    const progress = Math.max(0, Math.min(1, player.x / (level.worldEdgeX || level.worldWidth)));
+    ctx.fillStyle = 'rgba(8, 13, 30, 0.8)';
+    ctx.fillRect(14, VIEW_HEIGHT - 18, 110, 5);
+    ctx.fillStyle = '#8effc0';
+    ctx.fillRect(14, VIEW_HEIGHT - 18, 110 * progress, 5);
+    ctx.fillStyle = '#aebfe6';
+    ctx.font = 'bold 10px Trebuchet MS, Arial, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`FACE ${state.currentLevelIndex + 1} / 7`, 14, VIEW_HEIGHT - 25);
+    if (state.currentLevelIndex === 0 && player.x < 3700 && toast.timer <= 0) {
+      const hint = player.x < 380 ? 'MOVE →   •   HOLD JUMP FOR HEIGHT' :
+        player.x < 900 ? 'JUMP ON SPHERES TO BASH THEM!' :
+        player.x > 3100 ? 'BIG GAP! HOLD RUN + JUMP' : 'HOLD SHIFT / B TO RUN + BASH';
+      ctx.fillStyle = 'rgba(8, 13, 30, 0.88)';
+      ctx.fillRect(210, VIEW_HEIGHT - 40, 380, 28);
+      ctx.fillStyle = '#fff0a1';
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 12px Trebuchet MS, Arial, sans-serif';
+      ctx.fillText(hint, VIEW_WIDTH / 2, VIEW_HEIGHT - 22);
+    }
+  }
   drawAmmo();
   drawBossBar();
 

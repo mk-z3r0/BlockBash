@@ -1,0 +1,61 @@
+// Headless logic checks: node tools/refine-controls-probe.mjs
+import assert from 'node:assert/strict';
+const listeners = {};
+const gradient = { addColorStop() {} };
+const ctx = new Proxy({}, { get: (_, key) => key === 'createLinearGradient' || key === 'createRadialGradient' ? () => gradient : key === 'measureText' ? text => ({ width: text.length * 7 }) : () => {} , set: () => true });
+globalThis.document = {
+  getElementById: () => ({ width: 800, height: 450, getContext: () => ctx }),
+  addEventListener: (name, fn) => { listeners[name] = fn; }
+};
+globalThis.window = { addEventListener: (name, fn) => { listeners[name] = fn; }, location: { search: '', pathname: '/index.html' } };
+globalThis.location = window.location;
+globalThis.localStorage = { getItem: () => null, setItem() {} };
+const { keys, initInput } = await import('../src/engine/input.js');
+const { player, updatePlayer, setRespawnPoint } = await import('../src/entities/player.js');
+const { updatePlayerWeapon } = await import('../src/weapons/combat.js');
+const { state } = await import('../src/state.js');
+const { playingScene } = await import('../src/scenes/playingScene.js');
+const { gameOverScene } = await import('../src/scenes/gameOverScene.js');
+const { registerScene } = await import('../src/scenes/sceneManager.js');
+const { titleScene } = await import('../src/scenes/titleScene.js');
+const { drawHUD } = await import('../src/ui/hud.js');
+initInput();
+const press = key => listeners.keydown({ key, preventDefault() {} });
+const release = key => listeners.keyup({ key });
+playingScene.enter({ startAt: 3 });
+player.weapon = 'cornerstone'; player.hasWeapon = true; player.ammo = 10;
+player.weaponCooldown = 0;
+press('Shift'); updatePlayerWeapon(false);
+assert.equal(player.ammo, 9, 'fresh action tap fires a triangle');
+for (let i = 0; i < 180; i++) updatePlayerWeapon(false);
+assert.equal(player.ammo, 9, 'holding run does not drain scarce ammo');
+release('Shift'); press('b'); updatePlayerWeapon(false);
+assert.equal(player.ammo, 8, 'B is the same action');
+release('b');
+player.weapon = 'pickaxe'; player.weaponCooldown = 0;
+press('Shift'); updatePlayerWeapon(false);
+assert.ok(player.weaponCooldown > 0, 'Shift swings melee');
+for (let i = 0; i < 180; i++) updatePlayerWeapon(false);
+assert.ok(player.weaponCooldown > 0, 'held melee repeats');
+release('Shift');
+const speed = key => {
+  player.x = 100; player.y = 0; player.velocityX = 0; player.velocityY = 0;
+  player.respawnFreeze = 0; player.isOnGround = true;
+  press('ArrowRight'); press(key);
+  for (let i = 0; i < 15; i++) updatePlayer(false);
+  const result = player.velocityX; release(key); release('ArrowRight'); return result;
+};
+assert.equal(speed('b'), speed('Shift'), 'both buttons provide the same running speed');
+press('b'); listeners.blur(); assert.equal(keys.b, false, 'tab blur clears held buttons');
+playingScene.enter({ startAt: 3 }); setRespawnPoint(1000, 200);
+state.score = 123; state.coinsCollected = 7; state.lives = 0;
+player.weapon = 'cornerstone'; player.hasWeapon = true; player.ammo = 0;
+registerScene('playing', playingScene);
+gameOverScene.handleKeyDown({key:'Enter'});
+assert.equal(player.x, 1000, 'retry preserves checkpoint');
+assert.equal(state.score, 123); assert.equal(state.coinsCollected, 7);
+assert.equal(state.lives, 3); assert.equal(player.weapon, 'cornerstone');
+assert.ok(player.ammo > 0, 'retry replenishes boss ammo');
+assert.equal(state.gameState, 'playing');
+titleScene.enter(); titleScene.draw(); drawHUD(); playingScene.draw();
+console.log('PASS combined run/weapon, ammo hold, melee repeat, blur, checkpoint retry and render smoke checks');

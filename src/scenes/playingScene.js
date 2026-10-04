@@ -421,7 +421,15 @@ export const playingScene = {
   // data.retry: same level, fresh score/lives (a game-over retry).
   // Anything else (title screen, or no data at all): a brand new run.
   enter(data) {
-    if (data && data.retry) retryCurrentLevel();
+    if (data && data.checkpointRetry) {
+      state.lives = 3;
+      state.gameState = 'playing';
+      resetPlayer();
+      if (player.weapon === 'cornerstone') player.ammo = Math.max(player.ammo || 0, getLevel().startsWithAmmo || 0);
+      resetBossAndCutscene({ respawn: true });
+      showToast('BACK IN! YOUR CHECKPOINT IS SAFE', 100);
+    }
+    else if (data && data.retry) retryCurrentLevel();
     else if (data && data.startAt != null) startRunAt(data.startAt);
     else startNewRun();
   },

@@ -19,7 +19,7 @@ import { state } from '../state.js';
 import { getDifficulty } from '../difficulty.js';
 import { getLevel } from '../levels/levelLoader.js';
 import { player } from '../entities/player.js';
-import { keys } from '../engine/input.js';
+import { actionHeld, actionPress } from '../engine/input.js';
 import { isColliding } from '../engine/physics.js';
 import { getWeapon } from './registry.js';
 import { spawnExplosion, spawnDust } from '../entities/particles.js';
@@ -233,11 +233,17 @@ export function tickWeapon(owner) {
 // The player's own input path. Kept here rather than in the player module
 // so that "what the B button does" is decided by the registry entry for
 // whatever they're holding, not by an if/else over weapon names.
+let lastActionPress = 0;
+
 export function updatePlayerWeapon(inputLocked) {
   tickWeapon(player);
   // Cutscene-locked input mustn't swing, same gate the pickaxe had.
+  const pressed = actionPress !== lastActionPress;
+  lastActionPress = actionPress;
   if (inputLocked) return;
-  if (keys['b'] || keys['B']) startAttack(player);
+  const weapon = getWeapon(player.weapon);
+  // Repeat melee while running; scarce triangles require a fresh tap.
+  if (actionHeld() && (weapon?.ammo == null || pressed)) startAttack(player);
 }
 
 // --- damage -----------------------------------------------------------

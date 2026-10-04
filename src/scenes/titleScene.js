@@ -1,6 +1,6 @@
 import { ctx, VIEW_WIDTH, VIEW_HEIGHT } from '../engine/renderer.js';
 import { drawBackdrop } from '../engine/backdrop.js';
-import { drawOverlay, drawTitleDecor } from '../ui/overlays.js';
+import { drawTitleDecor } from '../ui/overlays.js';
 import { switchTo } from './sceneManager.js';
 import { loadSave } from '../save.js';
 import { levels } from '../levels/registry.js';
@@ -39,12 +39,34 @@ export const titleScene = {
   draw() {
     drawBackdrop(0, 0, 'title', titleFrame++);
     drawTitleDecor();
-    drawOverlay(
-      'BLOCK BASH',
-      'The smooth spheres have come to sand the corners off everything.',
-      'Press SPACE or ENTER to defend your world',
-      '#f2c14e'
-    );
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#91a9d7';
+    ctx.font = 'bold 12px Trebuchet MS, Arial, sans-serif';
+    ctx.fillText('SMALL HERO. BIG CORNERS.', VIEW_WIDTH / 2, 110);
+    ctx.shadowColor = '#f2c14e';
+    ctx.shadowBlur = 20;
+    ctx.fillStyle = '#fff0a1';
+    ctx.font = '900 64px Trebuchet MS, Arial, sans-serif';
+    ctx.fillText('BLOCK', 290, 181);
+    ctx.shadowColor = '#ff4d8d';
+    ctx.fillStyle = '#ff78ad';
+    ctx.fillText('BASH', 505, 181);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#e8ecf7';
+    ctx.font = '16px Trebuchet MS, Arial, sans-serif';
+    ctx.fillText('Bash the spheres. Save your square world.', VIEW_WIDTH / 2, 213);
+    ctx.fillStyle = '#f2c14e';
+    ctx.fillRect(260, 232, 280, 42);
+    ctx.fillStyle = '#15203a';
+    ctx.font = 'bold 16px Trebuchet MS, Arial, sans-serif';
+    ctx.fillText('SPACE / ENTER  •  LET’S GO!', VIEW_WIDTH / 2, 259);
+    ctx.fillStyle = '#b6c6e8';
+    ctx.font = '12px Trebuchet MS, Arial, sans-serif';
+    ctx.fillText('MOVE  ← →    JUMP  SPACE    RUN + BASH  SHIFT / B', VIEW_WIDTH / 2, 365);
+    ctx.fillStyle = '#91a9d7';
+    ctx.fillText('Triangles: tap to shoot • hold to run', VIEW_WIDTH / 2, 386);
+    ctx.restore();
 
     const top = highestSelectable();
     if (top > 0) {

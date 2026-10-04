@@ -2,14 +2,18 @@
 // (main.js wires these to audio/mute/scene behavior). Scenes read `keys`
 // directly each frame for held-key checks (movement, the earned weapon).
 export const keys = {};
+export const actionHeld = () => !!(keys.Shift || keys.b || keys.B);
+export let actionPress = 0;
 
 export function initInput({ onKeyDown, onKeyUp } = {}) {
   document.addEventListener('keydown', (e) => {
     if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
     const alreadyDown = keys[e.key];
+    if (['Shift', 'b', 'B'].includes(e.key) && !actionHeld()) actionPress++;
     keys[e.key] = true;
     if (onKeyDown) onKeyDown(e, alreadyDown);
   });
+  window.addEventListener('blur', () => { for (const key in keys) keys[key] = false; });
   document.addEventListener('keyup', (e) => {
     keys[e.key] = false;
     if (onKeyUp) onKeyUp(e);

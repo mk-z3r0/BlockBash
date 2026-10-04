@@ -224,6 +224,14 @@ export function drawPlatforms() {
     }
   });
 
+  // Lit landing edges distinguish solid foreground from the skyline.
+  for (const p of platforms) {
+    if (p.width <= 2) continue;
+    ctx.fillStyle = p.ground ? '#6579b3' : '#9bb6ee';
+    ctx.fillRect(p.x + 1, p.y, p.width - 2, 3);
+    ctx.fillStyle = 'rgba(7, 12, 30, 0.35)';
+    ctx.fillRect(p.x + 2, p.y + 7, p.width - 4, 3);
+  }
   drawHazardStripes(platforms);
 }
 

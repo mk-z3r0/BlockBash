@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Block Bash</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   :root {
     --bg-deep: #0a0d1c;
@@ -27,7 +28,8 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, var(--bg-deep) 0%, #060810 100%);
+    background: radial-gradient(ellipse at 20% 10%, #29345b 0%, transparent 55%), radial-gradient(ellipse at 85% 85%, #40233d 0%, transparent 50%), #080d1b;
+    padding: 24px 12px;
     font-family: 'Trebuchet MS', 'Segoe UI', Arial, sans-serif;
     color: var(--text);
   }
@@ -36,11 +38,12 @@
     position: relative;
     /* border-box is global, so this has to include the padding below —
        otherwise the frame ends up narrower than the 800px canvas inside it */
-    max-width: calc(800px + 2 * 18px);
+    width: min(100%, 840px);
     padding: 18px;
     background: var(--bg-panel);
     border: 2px solid var(--line);
-    clip-path: polygon(0 12px, 12px 0, calc(100% - 12px) 0, 100% 12px, 100% calc(100% - 12px), calc(100% - 12px) 100%, 12px 100%, 0 calc(100% - 12px));
+    border-radius: 18px;
+    box-shadow: 0 24px 80px #0008, 0 0 0 6px #ffffff03;
   }
 
   h1 {
@@ -63,6 +66,9 @@
 
   canvas {
     display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
     background: #10162c;
     border: 3px solid var(--line);
   }
@@ -73,7 +79,7 @@
        boundary to wrap against — .frame is a shrink-to-fit flex child of
        body (align-items:center), so its width chain doesn't reliably
        constrain this without something concrete to anchor to */
-    width: 800px;
+    width: 100%;
     flex-wrap: wrap;
     justify-content: space-between;
     gap: 6px 16px;
@@ -82,6 +88,8 @@
     margin-top: 10px;
     letter-spacing: 0.5px;
   }
+  .controls span { background: #1b2540; padding: 7px 9px; border-radius: 5px; color: #b6c6e8; }
+  @media (max-width: 600px) { .frame { padding: 8px; } h1 { font-size: 25px; } .controls { justify-content: center; } }
 </style>
 </head>
 <body>
@@ -93,13 +101,14 @@
   <div class="controls">
     <span>&larr; &rarr; / A D — move</span>
     <span>SPACE / &uarr; / W — jump</span>
-    <span>SHIFT — run</span>
-    <span>B — swing (once earned)</span>
+    <span>SHIFT / B — run + weapon</span>
+
     <span>ESC — pause</span>
     <span>M — mute</span>
-    <span>R — restart</span>
+
   </div>
-  <p class="tagline" style="margin-top:6px;">Xbox controller: A run &middot; B jump &middot; Y swing (once earned) &middot; Start pause</p>
+  <p class="tagline" style="margin-top:6px;">Xbox controller: A / Y run + weapon &middot; B jump &middot; Start pause</p>
+<p class="tagline" style="margin:10px 0 0;color:#b6c6e8">Hold to run + swing. With triangles: tap to shoot, hold to run.</p>
 </div>
 
 <script type="module" src="src/main.js"></script>
