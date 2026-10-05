@@ -1,7 +1,12 @@
 > **chat_refine control revision:** Run and weapon share Shift/B (controller A/Y).
 > The Cornerstone now fires unlimited triangles while held. Triangle crates grant
-> one of three fire-rate upgrades (26 → 20 → 15 → 11 frames between shots).
+> one of three fire-rate upgrades (60 → 45 → 30 → 20 frames between shots).
 > Upgrades persist between levels and reset on death; crates return after death.
+> The cooldown is silent. After the final life, Easy/Normal restart the level;
+> Hard restarts the game. Ordinary deaths still use checkpoints.
+> Boss pressure is slightly higher, retaining readable warnings and openings.
+> The core is rendered as a shaded 3D cube with cut corners that close over
+> twelve restoration hits. Level 6 ends with a jump clear of the ledge, then a fall.
 > This supersedes the finite-ammo and scarcity notes below.
 
 # Block Bash — Game Design Document

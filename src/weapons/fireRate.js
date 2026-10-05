@@ -1,5 +1,7 @@
 // Cornerstone upgrades survive level changes, but each death resets the tier.
-export const FIRE_COOLDOWNS = [26, 20, 15, 11];
+// Fixed 60 Hz ticks: one shot per second, then progressively shorter waits.
+// A blocked attack is silent; only a successfully fired triangle makes sound.
+export const FIRE_COOLDOWNS = [60, 45, 30, 20];
 export function fireCooldown(player) {
   return FIRE_COOLDOWNS[Math.max(0, Math.min(3, player.fireRateTier || 0))];
 }

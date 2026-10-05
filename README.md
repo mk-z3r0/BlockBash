@@ -95,7 +95,8 @@ level 1 can't be crossed without it.
 
 The run button also uses your weapon once you've earned one. Hold it to run
 and continuously swing or fire. The Cornerstone has unlimited triangles.
-Triangle crates increase its fire rate through three upgrades; the HUD shows
+It starts at one shot per second, with a silent cooldown between shots.
+Triangle crates shorten the cooldown to 0.75, 0.5, then about 0.33 seconds; the HUD shows
 three cyan pips. Dying resets the fire rate to normal and makes crates available
 again. Upgrades carry across levels until you die.
 
@@ -148,8 +149,9 @@ ever plays once. From level 2 onward the characters talk; `Space` advances a
 line and `Esc` skips a scene.
 
 Each level has three checkpoints. Dying puts you back at the last one. After
-all three tries, Space, Enter or R refills your tries and resumes from that
-same checkpoint, keeping your score, coins and weapon.
+all three tries, Space, Enter or R refills your tries and restarts the level
+from its beginning on Easy and Normal. On Hard, it restarts the whole game
+from level 1. Score, coins and fire-rate upgrades reset on either retry.
 
 Progress is saved to your browser's local storage. Clearing site data resets
 it.

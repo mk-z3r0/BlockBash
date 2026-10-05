@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html><body><canvas id="game" width="800" height="450"></canvas><pre id="out">running…</pre>
+<script>localStorage.setItem('blockbash-save', JSON.stringify({saveVersion:1,furthestLevelIndex:0,bestScore:0,hasSeenIntro:true}));window.__errs=[];window.addEventListener('error',e=>window.__errs.push(e.message));</script>
+<script type="module" src="../src/main.js"></script>
+<script type="module">
+import { player, setRespawnPoint } from '../src/entities/player.js';
+import { state } from '../src/state.js';
+import { switchTo, update, draw, getCurrentName } from '../src/scenes/sceneManager.js';
+import { getLevel } from '../src/levels/levelLoader.js';
+import { setDifficulty } from '../src/difficulty.js';
+import { getWeapon } from '../src/weapons/registry.js';
+import { startAttack, updatePlayerWeapon } from '../src/weapons/combat.js';
+import { fireCooldown, upgradeFireRate } from '../src/weapons/fireRate.js';
+import { spawnAmmoPickup, updateWeaponPickups } from '../src/entities/weaponPickup.js';
+import { activeCutsceneId, isCutsceneActive } from '../src/cutscenes/runner.js';
+import { isDialogueOpen, advanceDialogue } from '../src/ui/dialogue.js';
+import { coreMesh } from '../src/entities/coreBody.js';
+import { gameOverScene } from '../src/scenes/gameOverScene.js';
+const out = []; let fails = 0;
+const check = (ok, label) => { if (!ok) fails++; out.push(`${ok ? 'ok' : 'FAIL'} ${label}`); };
+const key = (type, key) => document.dispatchEvent(new KeyboardEvent(type, {key}));
+const begin = (difficulty, index = 3) => {
+  setDifficulty(difficulty); switchTo('playing', {startAt:index});
+  getLevel().cutscenes.length = 0;
+};
+const die = () => { player.y = 5000; player.velocityY = 40; player.respawnFreeze = 0; update(); };
+setTimeout(() => {
+  try {
+    begin('normal');
+    for (const [tier, expected] of [[0,2], [1,3], [2,4], [3,6]]) {
+      player.fireRateTier = tier; player.weaponCooldown = 0; state.projectiles = [];
+      key('keydown', 'Shift');
+      for (let f=0; f<120; f++) updatePlayerWeapon(false);
+      key('keyup', 'Shift');
+      check(state.projectiles.length === expected, `tier ${tier}: ${expected} shots in two seconds`);
+    }
+    const weapon = getWeapon('cornerstone'), sound = weapon.sound;
+    let sounds = 0; weapon.sound = () => sounds++;
+    player.weaponCooldown = 0; startAttack(player);
+    for (let i=0; i<100; i++) startAttack(player);
+    weapon.sound = sound;
+    check(sounds === 1, 'cooldown attempts are silent');
+    player.fireRateTier = 0; player.weaponCooldown = 60;
+    player.x = 100; player.y = 100;
+    spawnAmmoPickup(110,120); updateWeaponPickups(player);
+    check(player.fireRateTier === 1 && player.weaponCooldown === 45, 'collecting triangles immediately shortens the cooldown');
+    for(let i=0;i<5;i++) upgradeFireRate(player);
+    check(player.fireRateTier === 3 && fireCooldown(player) === 20, 'upgrades cap at three');
+
+    for (const difficulty of ['easy','normal','hard']) {
+      begin(difficulty);
+      setRespawnPoint(1000,200);
+      player.fireRateTier = 3; state.lives = 2;
+      die();
+      check(state.lives === 1 && player.x === 1000, `${difficulty}: an ordinary death uses the checkpoint`);
+      check(player.fireRateTier === 0 && fireCooldown(player) === 60, `${difficulty}: death resets to one shot per second`);
+      player.fireRateTier = 3;
+      die();
+      check(getCurrentName() === 'gameover' && player.fireRateTier === 0, `${difficulty}: final death resets upgrades before the retry`);
+      gameOverScene.draw(); gameOverScene.handleKeyDown({key:'Enter'});
+      check(state.currentLevelIndex === (difficulty === 'hard' ? 0 : 3), `${difficulty}: retry starts the ${difficulty === 'hard' ? 'whole game' : 'current level'}`);
+      check(player.x === getLevel().playerSpawn.x && state.lives === 3, `${difficulty}: retry uses the level start with three lives`);
+      check(state.score === 0 && state.coinsCollected === 0, `${difficulty}: retry clears run counters`);
+    }
+
+    begin('normal',5);
+    // Use the actual trigger and scene update sequence for the descent.
+    getLevel().cutscenes.push({id:'descent',when:{nearWorldEdge:100,bossDefeated:true}});
+    state.enemies.forEach(e => e.alive=false);
+    const edge = getLevel().worldEdgeX, surface = getLevel().groundY-player.height;
+    player.x=edge-100; player.y=surface; player.respawnFreeze=0;
+    player.velocityX=0; player.velocityY=0; player.fireRateTier=1;
+    let rose=false, cleared=false, dropped=false, throughFloor=false, sawDescent=false;
+    for(let f=0;f<700 && state.currentLevelIndex===5;f++) {
+      if(isDialogueOpen()) advanceDialogue();
+      update();
+      if(state.currentLevelIndex!==5) break;
+      sawDescent ||= activeCutsceneId()==='descent';
+      rose ||= player.y<surface-60;
+      cleared ||= player.x>edge;
+      dropped ||= player.y>surface+500;
+      throughFloor ||= player.y>surface+2 && player.x+player.width<=edge;
+      draw();
+    }
+    check(sawDescent && rose && cleared && dropped && !throughFloor, 'level 6 jumps above and beyond the ledge before falling');
+    check(state.currentLevelIndex===6 && state.lives===3, 'descent arrives at the core level without losing a life');
+    check(player.fireRateTier===1, 'fire-rate upgrades carry into the core level');
+
+    check(coreMesh(0).length===14 && coreMesh(1).length===6, 'core bevels close into six cube faces');
+    check(coreMesh(1).every(f=>new Set(f.points.map(p=>p.join(','))).size===4), 'every restored face is a square');
+    const core=state.enemies.find(e=>e.kind==='core');
+    for(const progress of [0,0.5,1]) {core.restoreHits=core.restoreTotal*(1-progress); draw();}
+    check(true, 'corrupted, partially restored and cubic core render');
+  } catch(err) {check(false, err.stack);}
+  out.push(fails ? `*** ${fails} FAILURE(S)` : 'PASS firing, death, difficulty retries, descent and core rendering');
+  out.push('errors: '+(window.__errs.length ? window.__errs.join(' | ') : 'none'));
+  document.getElementById('out').textContent=out.join('\n');
+},250);
+</script></body></html>

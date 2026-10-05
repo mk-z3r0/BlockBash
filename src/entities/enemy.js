@@ -11,6 +11,7 @@ import { addPopup } from '../ui/popups.js';
 import { isBlocked, hasFooting, surfaceYAt, solidTopAt, floorUnder } from '../levels/levelLoader.js';
 import { state } from '../state.js';
 import { getDifficulty } from '../difficulty.js';
+import { drawCoreBody } from './coreBody.js';
 
 // --- enemy tiers (GAME_DESIGN's "Enemies evolve across levels") ---------
 //
@@ -93,7 +94,9 @@ export function spawnEnemies(spawns) {
   // Speeds scale here, once, so patrol, chase, charge and the respawn reset
   // (which restores `baseSpeed`) all agree without the AI knowing.
   spawns = spawns.map(e => {
-    const out = e.speed ? { ...e, speed: e.speed * (e.boss ? dk.boss : dk.enemy) } : { ...e };
+    // A small combat-boss speed bump; keep the scripted Foreman unchanged.
+    const bossPace = e.boss && e.mode === 'fight' ? 1.05 : 1;
+    const out = e.speed ? { ...e, speed: e.speed * (e.boss ? dk.boss * bossPace : dk.enemy) } : { ...e };
     // Fightable bosses only; baseHp below is read from this, so a restarted
     // fight comes back at the scaled value too.
     if (e.boss && e.mode === 'fight' && e.hp != null) out.hp = Math.ceil(e.hp * dk.bossHp);
@@ -677,66 +680,6 @@ function drawOctagonBody(size, cornersLost, flash, wasQuarrick) {
   ctx.fillStyle = wasQuarrick ? '#3a2c0c' : '#20282a';
   ctx.fillRect(-h * 0.45, -h * 0.25, size * 0.14, size * 0.14);
   ctx.fillRect(h * 0.18, -h * 0.25, size * 0.14, size * 0.14);
-}
-
-// The core: a dodecahedron being argued back into a cube.
-//
-// GAME_DESIGN describes it as "every edge and vertex shaved off a cube, and
-// then some, leaving 12 pentagonal faces" — the octagon corruption at
-// planetary scale — and says each restoring hit "snaps one face back toward
-// square. The final hit makes it cubic again."
-//
-// So it's drawn as twelve vertices whose radius is interpolated between a
-// regular 12-gon and the outline of a square, by how much of it has been put
-// back. At full corruption the twelve points sit on a circle; at zero they
-// sit exactly on a square's edges and the shape IS a cube face-on. Nothing
-// switches over at the end — the player watches it square up, hit by hit,
-// which is the entire thesis of the game happening in one shape.
-function drawCoreBody(size, progress, frameCount, flash) {
-  const r = size / 2;
-  const POINTS = 12;
-  ctx.beginPath();
-  for (let i = 0; i < POINTS; i++) {
-    // -PI/4 so a vertex lands on each corner of the square it's becoming,
-    // rather than the square arriving rotated 15 degrees off true.
-    const a = (i / POINTS) * Math.PI * 2 - Math.PI / 4;
-    const cos = Math.cos(a), sin = Math.sin(a);
-    // Radius out to a square's edge along this angle: the square is
-    // |x| <= r and |y| <= r, so the boundary is r / max(|cos|, |sin|).
-    const squareR = r / Math.max(Math.abs(cos), Math.abs(sin));
-    const rad = r + (squareR - r) * progress;
-    const x = cos * rad, y = sin * rad;
-    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-  }
-  ctx.closePath();
-
-  const pulse = 0.5 + 0.5 * Math.sin(frameCount * 0.04);
-  const grad = ctx.createRadialGradient(0, 0, r * 0.15, 0, 0, r);
-  if (flash > 0) {
-    grad.addColorStop(0, '#ffffff');
-    grad.addColorStop(1, '#5ee7ff');
-  } else {
-    // Sphere pink while it's theirs, cyan as it comes back — the same cyan
-    // the cube's edges are drawn in, and the same the Cornerstone fires.
-    grad.addColorStop(0, `rgb(${255 - progress * 160}, ${150 + progress * 80}, ${200 + progress * 55})`);
-    grad.addColorStop(1, `rgb(${120 - progress * 60}, ${30 + progress * 90}, ${70 + progress * 90})`);
-  }
-  ctx.fillStyle = grad;
-  ctx.fill();
-  ctx.strokeStyle = flash > 0 ? '#ffffff' : `rgba(94, 231, 255, ${0.35 + 0.4 * pulse + progress * 0.25})`;
-  ctx.lineWidth = 3;
-  ctx.stroke();
-
-  // the seams between its faces, fading as they stop being faces
-  ctx.strokeStyle = `rgba(10, 13, 28, ${0.45 * (1 - progress)})`;
-  ctx.lineWidth = 1.5;
-  for (let i = 0; i < POINTS; i++) {
-    const a = (i / POINTS) * Math.PI * 2 - Math.PI / 4;
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(Math.cos(a) * r * 0.92, Math.sin(a) * r * 0.92);
-    ctx.stroke();
-  }
 }
 
 export function drawEnemies(frameCount, cutsceneDone) {

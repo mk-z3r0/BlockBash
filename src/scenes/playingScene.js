@@ -189,6 +189,9 @@ function loseLife() {
   spawnExplosion(player.x + player.width / 2, player.y + player.height / 2, '#f2c14e');
   addShake(10);
   state.lives--;
+  player.fireRateTier = 0;
+  player.weaponCooldown = 0;
+  player.weaponTimer = 0;
   if (state.lives <= 0) {
     recordProgress(state.currentLevelIndex, state.score);
     state.gameState = 'gameover';
@@ -196,9 +199,6 @@ function loseLife() {
     switchTo('gameover');
   } else {
     resetPlayer();
-    player.fireRateTier = 0;
-    player.weaponCooldown = 0;
-    player.weaponTimer = 0;
     // Drops any cutscene mid-flight, keeps what has already played. Not reachable with level 1's own
     // geometry (nothing near the edge can hit the player during the
     // walk-up, and the boss cutscene is barred from digging into that
@@ -416,17 +416,7 @@ export const playingScene = {
   // data.retry: same level, fresh score/lives (a game-over retry).
   // Anything else (title screen, or no data at all): a brand new run.
   enter(data) {
-    if (data && data.checkpointRetry) {
-      state.lives = 3;
-      state.gameState = 'playing';
-      resetPlayer();
-      player.fireRateTier = 0;
-      player.weaponCooldown = 0;
-      player.weaponTimer = 0;
-      resetBossAndCutscene({ respawn: true });
-      showToast('BACK IN! YOUR CHECKPOINT IS SAFE', 100);
-    }
-    else if (data && data.retry) retryCurrentLevel();
+    if (data && data.retry) retryCurrentLevel();
     else if (data && data.startAt != null) startRunAt(data.startAt);
     else startNewRun();
   },

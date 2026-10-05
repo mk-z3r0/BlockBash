@@ -4,8 +4,8 @@
 // Five times now, walking off the edge has meant the world turning under
 // them and a new face arriving to stand on. GAME_DESIGN's arc puts the
 // sixth face last: "After the sixth face, the player descends into the
-// planet's hollow centre." So this is the same walk, the same look down,
-// and then nothing catches them.
+// planet's hollow centre." The player still jumps clear of the ledge,
+// but this time nothing catches them.
 //
 // It reuses the edge transition's shape deliberately — approach, brink,
 // then the beat where something happens — because the whole effect depends
@@ -21,6 +21,9 @@ const APPROACH_ACCEL = 0.12;
 const APPROACH_MAX_FRAMES = 151;
 const BRINK_FRAMES = 96;
 const BRINK_CAMERA_EASE = 0.07;
+const LEAP_FRAMES = 48;
+const LEAP_HEIGHT = 88;
+const LEAP_REACH = 100;
 const FALL_FRAMES = 120;
 
 export const descent = {
@@ -62,11 +65,32 @@ export const descent = {
     say('narrator', "There is no seventh face."),
 
     {
+      name: 'leap',
+      frames: LEAP_FRAMES,
+      locks: { physics: 'freeze', camera: 'scripted' },
+      enter(c) {
+        playJump();
+        c.data.leapFromX = player.x;
+        c.data.leapFromY = player.y;
+        player.velocityX = 0;
+        player.velocityY = 0;
+        player.isOnGround = false;
+      },
+      update(c, frame) {
+        const t = (frame + 1) / LEAP_FRAMES;
+        player.x = c.data.leapFromX + LEAP_REACH * t;
+        player.y = c.data.leapFromY - LEAP_HEIGHT * Math.sin(Math.PI * t / 2);
+        player.facing = 1;
+        // Hold the ledge in view while the player rises and clears it.
+      }
+    },
+
+    {
       name: 'fall',
       frames: FALL_FRAMES,
       locks: { physics: 'freeze', camera: 'scripted' },
       enter(c) {
-        playJump();
+        c.data.fromX = player.x;
         c.data.fromY = player.y;
         c.data.fromCamY = c.camera.y;
       },
@@ -76,6 +100,7 @@ export const descent = {
         // them leave — the player is not falling past the world here, they
         // are falling INTO it.
         const drop = 1400 * t * t;
+        player.x = c.data.fromX + 70 * t;
         player.y = c.data.fromY + drop;
         c.camera.y = c.data.fromCamY + drop;
         player.facing = 1;

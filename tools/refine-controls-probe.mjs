@@ -18,6 +18,7 @@ const { playingScene } = await import('../src/scenes/playingScene.js');
 const { gameOverScene } = await import('../src/scenes/gameOverScene.js');
 const { registerScene } = await import('../src/scenes/sceneManager.js');
 const { titleScene } = await import('../src/scenes/titleScene.js');
+const { getLevel } = await import('../src/levels/levelLoader.js');
 const { drawHUD } = await import('../src/ui/hud.js');
 initInput();
 const press = key => listeners.keydown({ key, preventDefault() {} });
@@ -28,7 +29,7 @@ player.weaponCooldown = 0;
 press('Shift'); updatePlayerWeapon(false);
 assert.equal(state.projectiles.length, 1, 'holding action starts firing');
 for (let i = 0; i < 180; i++) updatePlayerWeapon(false);
-assert.ok(state.projectiles.length >= 7, 'held action continuously fires triangles');
+assert.ok(state.projectiles.length === 4, 'held action continuously fires triangles');
 assert.equal(player.ammo, 10, 'triangles never consume ammo');
 release('Shift'); press('b'); updatePlayerWeapon(false);
 assert.equal(player.ammo, 10, 'B also fires without consuming ammo');
@@ -53,13 +54,13 @@ state.score = 123; state.coinsCollected = 7; state.lives = 0;
 player.weapon = 'cornerstone'; player.hasWeapon = true; player.ammo = 0; player.fireRateTier = 3;
 registerScene('playing', playingScene);
 gameOverScene.handleKeyDown({key:'Enter'});
-assert.equal(player.x, 1000, 'retry preserves checkpoint');
-assert.equal(state.score, 123); assert.equal(state.coinsCollected, 7);
+assert.equal(player.x, getLevel().playerSpawn.x, 'retry starts at the beginning of the level');
+assert.equal(state.score, 0); assert.equal(state.coinsCollected, 0);
 assert.equal(state.lives, 3); assert.equal(player.weapon, 'cornerstone');
 assert.equal(player.fireRateTier, 0, 'game-over retry resets fire rate');
 assert.equal(state.gameState, 'playing');
 titleScene.enter(); titleScene.draw(); drawHUD(); playingScene.draw();
-console.log('PASS combined run/weapon, unlimited held fire, melee repeat, blur, checkpoint retry and render smoke checks');
+console.log('PASS combined run/weapon, unlimited held fire, melee repeat, blur, level retry and render smoke checks');
 
 const { quarrickCornerCuts, createQuarrick, drawRescueNPC } = await import('../src/entities/npc.js');
 for (let damage = 0; damage <= 4; damage++) {
@@ -107,7 +108,7 @@ for (let tier = 1; tier <= 4; tier++) {
   updateWeaponPickups(player);
   assert.equal(player.fireRateTier, Math.min(3, tier), 'crate upgrades one tier, capped at three');
 }
-assert.equal(fireCooldown(player), 11);
+assert.equal(fireCooldown(player), 20);
 for (let tier = 0; tier <= 3; tier++) {
   player.fireRateTier = tier; player.weaponCooldown = 0; state.projectiles = [];
   press('Shift');
@@ -130,6 +131,6 @@ player.weaponCooldown = 0; state.projectiles = [];
 press('Shift');
 for (let f = 0; f < 120; f++) updatePlayerWeapon(false);
 release('Shift');
-assert.equal(state.projectiles.length, 5, 'zero legacy ammo never blocks continuous fire');
+assert.equal(state.projectiles.length, 2, 'zero legacy ammo never blocks continuous fire');
 assert.equal(player.ammo, 0, 'firing does not decrement legacy ammo');
 console.log('PASS unlimited firing with zero legacy ammo');

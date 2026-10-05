@@ -192,11 +192,11 @@ export default {
       kind: 'octagon', restoreHits: 2 },
 
     // --- The Terraformer ---
-    // It never comes to you and it never swings. hp 3, and reaching it at
+    // It never comes to you and it never swings. hp 4, and reaching it at
     // all is the fight.
     { x: 7080, y: 150 - 33, w: 33, minX: 7000, maxX: 7250, speed: 0,
       boss: true, mode: 'fight', bossKind: 'terraformer', bossName: 'THE TERRAFORMER',
-      hp: 3, stompProof: true, dropsAmmo: 6 }
+      hp: 4, stompProof: true, dropsAmmo: 6 }
   ],
 
   coins: [

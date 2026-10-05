@@ -101,7 +101,7 @@ function stepTo(boss, x) {
 // It drops the drill, because it's a drill. That is now the player's
 // level-2 weapon — see weapons/drill.js.
 const EXCAVATOR = {
-  aim: 50,          // turn, rev; the bit dips to the floor for the last 14 frames
+  aim: 45,          // turn, rev; the bit dips to the floor for the last 14 frames
   hold: 42,         // the fissure has arrived and the floor is about to go
   // Long enough to walk up to it AND land three pickaxe swings (30-frame
   // cooldown) with slack. It was 150 and hp 4, which is four swings in the
@@ -271,8 +271,7 @@ function updateCrew(boss, player) {
     const wanted = player.x + player.width / 2 - dir * 260;
     stepTo(boss, boss.x + Math.sign(wanted - boss.x) * Math.abs(boss.speed) * 0.7);
     if (--boss.shotTimer <= 0) {
-      // 130, not 95. With the bruisers pressing in waves the shots are the
-      // thing that fills the gaps, and at 95 they filled them completely.
+      // Keep room to jump between shots while firing at the slower base rate.
       boss.shotTimer = Math.round(130 / getDifficulty().tempo);
       boss.charge = 0;
       spawnSphereShot(boss);
@@ -476,7 +475,7 @@ function updateGeneral(boss, player) {
     boss.telegraph = 0;
     boss.facing = dir;
     pose(boss, 1);
-    if (boss.phaseTimer <= 0) setPhase(boss, 'stalk', 90);
+    if (boss.phaseTimer <= 0) setPhase(boss, 'stalk', 82);
     return;
   }
 
@@ -489,7 +488,7 @@ function updateGeneral(boss, player) {
   // the reason to not simply stand next to it and trade hits.
   if (withinSwing(boss, player, 54)) startAttack(boss);
   if (--boss.shotTimer <= 0) {
-    boss.shotTimer = 150;
+    boss.shotTimer = 136;
     spawnSphereShot(boss);
   }
   // The wind-up. "The hardest FAIR fight in the game" is the whole brief, and
@@ -539,12 +538,12 @@ function updateCore(boss, player) {
   if (boss.phase === 'shockwave') {
     // Rolling out from the centre along the floor, both ways at once, so
     // there is no side of the arena that is simply safe.
-    if (boss.phaseTimer % 70 === 0) {
+    if (boss.phaseTimer % 63 === 0) {
       for (const dir of [-1, 1]) {
         state.projectiles.push({
           team: 'sphere', kind: 'wave',
           x: boss.x + boss.w / 2, y: level.groundY - 15,
-          vx: dir * 3.6, vy: 0,
+          vx: dir * 3.9, vy: 0,
           size: 15, life: 260, spin: 0, dead: false
         });
       }
@@ -575,7 +574,7 @@ function updateCore(boss, player) {
   // pull: it leans on gravity. Not enough to take control away — enough that
   // standing still stops being neutral.
   const dir = Math.sign((boss.x + boss.w / 2) - (player.x + player.width / 2)) || 1;
-  player.velocityX += dir * 0.075;
+  player.velocityX += dir * 0.082;
   if (boss.phaseTimer === CORE.pull - 1) showToast('IT IS PULLING YOU IN', 70);
   if (boss.phaseTimer <= 0) setPhase(boss, 'shockwave', CORE.shockwave);
 }
@@ -585,7 +584,7 @@ const OPENING_PHASE = { general: 'stalk', core: 'shockwave', excavator: 'aim' };
 export function initBoss(boss) {
   boss.phase = OPENING_PHASE[boss.bossKind] || 'advance';
   boss.phaseTimer = boss.bossKind === 'core' ? CORE.shockwave
-                  : boss.bossKind === 'general' ? 90
+                  : boss.bossKind === 'general' ? 82
                   : EXCAVATOR.aim;
   boss.collapses = 0;
   boss.pits = 0;

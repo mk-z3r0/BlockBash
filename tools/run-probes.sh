@@ -22,6 +22,7 @@ BROWSER="${BROWSER:-brave-browser}"
 # An entry may carry a query string; it's appended to the URL as-is.
 ASSERTING=(
   module-load-probe
+  mechanics-probe
   cutscene-runner-probe dialogue-probe cutscene-probe
   mining-and-nohop-probe progression-probe save-probe
   boot-flow-probe respawn-safety-probe coin-probe weapon-probe
