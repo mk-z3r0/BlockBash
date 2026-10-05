@@ -65,3 +65,9 @@ again. Legacy ammo amounts in level data no longer affect gameplay.
 The Node probe verifies held automatic fire without ammo consumption, all four
 actual shot cadences, crate stacking and cap, and resets after both ordinary death
 and game-over retry. Browser and hands-on validation remain outstanding.
+
+## Remove the ammo-shaped HUD
+
+The old `TRIANGLES ∞` label is replaced with `FIRE RATE: BASE` / `FIRE RATE: +N`.
+The three pips indicate speed upgrades only. An explicit regression check fires
+five shots over 120 frames with legacy ammo set to zero; no ammo is consumed.

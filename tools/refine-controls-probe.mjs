@@ -123,3 +123,13 @@ assert.equal(player.fireRateTier, 0, 'ordinary death resets fire rate');
 assert.ok(state.weaponPickups.filter(p => p.kind === 'ammo').every(p => !p.collected), 'speed crates return after death');
 assert.equal(player.weapon, 'cornerstone', 'death keeps the gun');
 console.log('PASS crate tiers, upgrade cap, all four firing cadences and ordinary-death reset');
+
+playingScene.enter({startAt: 3});
+player.weapon = 'cornerstone'; player.hasWeapon = true; player.ammo = 0;
+player.weaponCooldown = 0; state.projectiles = [];
+press('Shift');
+for (let f = 0; f < 120; f++) updatePlayerWeapon(false);
+release('Shift');
+assert.equal(state.projectiles.length, 5, 'zero legacy ammo never blocks continuous fire');
+assert.equal(player.ammo, 0, 'firing does not decrement legacy ammo');
+console.log('PASS unlimited firing with zero legacy ammo');

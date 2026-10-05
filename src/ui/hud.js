@@ -18,14 +18,15 @@ export function updateToast() {
   if (toast.timer > 0) toast.timer--;
 }
 
-// Unlimited triangles, with three readable fire-rate upgrade pips.
-function drawAmmo() {
+// Fire-rate upgrades only: there is no ammunition counter.
+function drawFireRate() {
   if (getWeapon(player.weapon)?.kind !== 'restore') return;
   ctx.save();
   ctx.textAlign = 'right';
   ctx.fillStyle = '#5ee7ff';
   ctx.font = 'bold 11px Trebuchet MS, Arial, sans-serif';
-  ctx.fillText('TRIANGLES ∞', VIEW_WIDTH - 14, 44);
+  const tier = Math.max(0, Math.min(3, player.fireRateTier || 0));
+  ctx.fillText(tier === 0 ? 'FIRE RATE: BASE' : `FIRE RATE: +${tier}`, VIEW_WIDTH - 14, 44);
   for (let i = 0; i < 3; i++) {
     ctx.fillStyle = i < (player.fireRateTier || 0) ? '#5ee7ff' : '#344763';
     ctx.fillRect(VIEW_WIDTH - 24 - i * 12, 49, 8, 4);
@@ -207,7 +208,7 @@ export function drawHUD() {
       ctx.fillText(hint, VIEW_WIDTH / 2, VIEW_HEIGHT - 22);
     }
   }
-  drawAmmo();
+  drawFireRate();
   drawBossBar();
 
   if (toast.timer > 0) {
