@@ -1,3 +1,4 @@
+import { spawnDust } from '../../entities/particles.js';
 // The level-edge transition — the cube-planet premise made literal. The
 // level doesn't end, the world turns: the player walks to the edge of this
 // face, looks down, jumps, and the world rotates 90° underneath them so
@@ -156,6 +157,11 @@ export const edgeTransition = {
         c.camera.x += ((player.x + player.width / 2 - VIEW_WIDTH / 2) - c.camera.x) * BRINK_CAMERA_EASE;
         c.camera.y += ((player.y + player.height / 2 - VIEW_HEIGHT / 2) - c.camera.y) * BRINK_CAMERA_EASE;
         if (c.data.quarrick) {
+          // His first scar appears here, before the next face's meeting.
+          const npc = c.data.quarrick;
+          npc.damage = Math.min(1, (npc.damage || 0) + 1 / 45);
+          if (npc.damage < 1) spawnDust(npc.x + npc.width, npc.y, 1,
+            { spread: 1.5, size: 3, life: 18, color: '#f2c14e' });
           updateCornerQuarrick(c.data.quarrick, c.level.worldEdgeX, c.level.groundY,
                                QUARRICK_STOP_ALONG, QUARRICK_WALK_SPEED);
         }

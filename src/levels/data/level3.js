@@ -55,7 +55,7 @@ export default {
   // The Excavator's drill, taken off it at the end of level 2. (The level
   // picker hands it over; a continuous run arrives already holding it.)
   startsWith: 'drill',
-  quarrickDamage: 3,
+  quarrickDamage: 2,
 
   // Six gaps, not seven, and wider ground between them. The vertical work is
   // the point here; pits would just be noise on top of it.

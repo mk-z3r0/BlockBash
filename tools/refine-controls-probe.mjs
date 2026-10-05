@@ -59,3 +59,39 @@ assert.ok(player.ammo > 0, 'retry replenishes boss ammo');
 assert.equal(state.gameState, 'playing');
 titleScene.enter(); titleScene.draw(); drawHUD(); playingScene.draw();
 console.log('PASS combined run/weapon, ammo hold, melee repeat, blur, checkpoint retry and render smoke checks');
+
+const { quarrickCornerCuts, createQuarrick, drawRescueNPC } = await import('../src/entities/npc.js');
+for (let damage = 0; damage <= 4; damage++) {
+  const cuts = quarrickCornerCuts(damage);
+  assert.equal(cuts.filter(c => c > 0).length, damage, 'only damaged corners are cut');
+  if (damage > 0) {
+    const previous = quarrickCornerCuts(damage - 1);
+    previous.forEach((cut, i) => { if (cut) assert.equal(cuts[i], cut, 'old scars stay in place'); });
+  }
+  drawRescueNPC(createQuarrick(100, 410, {damage}), 10);
+}
+assert.deepEqual(quarrickCornerCuts(1), [0, 12.8, 0, 0]);
+assert.equal(quarrickCornerCuts(2.5).filter(c => c === 6.4).length, 1, 'only newest corner animates');
+const { levels } = await import('../src/levels/registry.js');
+assert.equal(levels[1].quarrickDamage, 1);
+assert.equal(levels[2].quarrickDamage, 2);
+const { l3Handoff } = await import('../src/cutscenes/level3/handoff.js');
+const c = {state: {rescueNPC: createQuarrick(100, 410, {damage: 2})}};
+for (const name of ['another-corner', 'corrupt']) {
+  const beat = l3Handoff.beats.find(b => b.name === name);
+  const start = c.state.rescueNPC.damage;
+  for (let f = 0; f < beat.frames; f++) beat.update(c, f);
+  beat.exit(c);
+  assert.equal(c.state.rescueNPC.damage, start + 1);
+}
+const { introScene } = await import('../src/scenes/introScene.js');
+let starts = 0;
+registerScene('playing', {enter() { starts++; }});
+introScene.enter();
+for (let frame = 0; frame < 620; frame++) { introScene.update(); introScene.draw(); }
+assert.equal(starts, 1, 'opening finishes in about ten seconds');
+introScene.enter(); introScene.handleKeyDown({key:'Enter'}, true);
+assert.equal(starts, 1, 'held key does not skip');
+introScene.handleKeyDown({key:'Enter'}, false);
+assert.equal(starts, 2, 'fresh key still skips');
+console.log('PASS individual corner progression, animated handoff damage and complete opening render/skip smoke checks');

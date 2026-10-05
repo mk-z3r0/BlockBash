@@ -31,3 +31,22 @@ Playtest next: let a child start without explaining controls. Watch their first
 gap, first earned weapon, first long gap, and first game-over retry. Record
 confusion and time spent stuck. Later boss readability and levels 4–6 still need
 hands-on review; this pass does not claim a complete seven-level playtest.
+
+## Story continuity and opening follow-up
+
+Quarrick loses individual corners in a fixed order, rather than having all four
+chamfered at every damage stage. The first chip grows during the level-one edge
+transition and matches his level-two meeting. Level three starts with two lost
+corners; a third is lost visibly before the handoff, and the final corner is
+ground away during corruption. Restoration leaves one scar.
+
+The opening now lasts about 10.3 seconds. It gives the intact cube two seconds
+of peace, then shows converging sphere trails, persistent landing spheres, sparks
+and a progressive chamfer before the corner breaks away. A tinted space backdrop,
+letterboxing and five short captions connect the attack to the hero's home.
+The existing skip behavior, save flag and audio cues remain in use.
+
+The Node probe also verifies exact corner counts, stable prior scars, fractional
+corner animation, both handoff damage beats, all 620 opening update/draw steps
+with a mocked canvas, normal completion, and fresh-press versus held-key skipping.
+This still needs a real browser visual review and hands-on playtest.

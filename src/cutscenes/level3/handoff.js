@@ -65,12 +65,27 @@ export const l3Handoff = {
           facing: -1,
           // Worse than the player has ever seen him. The number is the
           // level's, so the arc is authored in one place.
-          damage: c.level.quarrickDamage || 3
+          damage: c.level.quarrickDamage ?? 2
         });
       }
     },
 
     say('quarrick', "There you are. Good."),
+    {
+      name: 'another-corner',
+      frames: 45,
+      enter(c) {
+        const npc = c.state.rescueNPC;
+        if (npc) spawnExplosion(npc.x, npc.y, '#f2c14e');
+        playHit();
+      },
+      update(c, frame) {
+        if (c.state.rescueNPC) c.state.rescueNPC.damage = 2 + Math.min(1, (frame + 1) / 35);
+      },
+      exit(c) {
+        if (c.state.rescueNPC) c.state.rescueNPC.damage = 3;
+      }
+    },
     say('quarrick', "I can't hold it off much longer."),
     say('player',   "Hold what off?"),
     say('quarrick', "Take this. I made it out of what they took from me."),
@@ -105,10 +120,16 @@ export const l3Handoff = {
           // silhouette every corrupted square in the game wears. He's still
           // gold, which is the whole point — the player has to be able to
           // tell it's him (see drawQuarrickBody in entities/npc.js).
-          npc.damage = 4;
+          npc.damage = 3;
           npc.facing = 1;
         }
         playHit();
+      },
+      update(c, frame) {
+        if (c.state.rescueNPC) c.state.rescueNPC.damage = 3 + Math.min(1, (frame + 1) / 40);
+      },
+      exit(c) {
+        if (c.state.rescueNPC) c.state.rescueNPC.damage = 4;
       }
     },
 

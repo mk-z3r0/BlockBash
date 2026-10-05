@@ -27,16 +27,16 @@ import { switchTo } from './sceneManager.js';
 import { markIntroSeen } from '../save.js';
 
 // ============================================
-// Beat boundaries, in frames at 60fps — a deliberate slow burn, ~17s total.
+// Beat boundaries, in frames at 60fps — a short shape-driven story, ~10s total.
 // ============================================
-const P1_PLANET_END = 260;    // wide shot, planet alone, slow pan begins
-const EXPLOSION_FRAME = 640;  // spheres have converged; the corner blows off
-const P3_IMPACT_END = 680;    // hard cut to the house — no crossfade
-const SHAKE_DURATION = 70;    // the shockwave reaching the house — visible
+const P1_PLANET_END = 120;    // two seconds of peace before the invasion
+const EXPLOSION_FRAME = 360;  // spheres have converged; the corner blows off
+const P3_IMPACT_END = 405;    // hard cut to the house — no crossfade
+const SHAKE_DURATION = 40;    // the shockwave reaching the house — visible
 const BUBBLE_START = P3_IMPACT_END + SHAKE_DURATION + 20; // a beat to settle first
-const BUBBLE_DURATION = 80;
+const BUBBLE_DURATION = 55;
 const DOOR_OPEN_AT = BUBBLE_START + BUBBLE_DURATION;
-const WALK_DURATION = 160;
+const WALK_DURATION = 100;
 const P5_END = DOOR_OPEN_AT + WALK_DURATION;
 
 const PLANET_CX = VIEW_WIDTH / 2;
@@ -55,6 +55,10 @@ const PLANET_BASE_ANGLE = 2.1;
 // crater texture — lives in planet.js now, shared with the ending, which
 // draws the same planet and puts the corner back.
 const CHAMFERED_FACES = buildChamferedFaces(EXPLODED_CORNER, CHAMFER_FRAC);
+const GRIND_START = EXPLOSION_FRAME - 100;
+const GRIND_STEPS = 32;
+const grindingFaces = Array.from({ length: GRIND_STEPS }, (_, i) =>
+  buildChamferedFaces(EXPLODED_CORNER, CHAMFER_FRAC * (i + 1) / GRIND_STEPS));
 function project(p) { return projectP(p, PLANET_CX, PLANET_CY); }
 
 let t = 0;
@@ -131,7 +135,10 @@ function makeSpheres() {
 }
 
 function drawStarfield() {
-  ctx.fillStyle = '#05070f';
+  const nebula = ctx.createRadialGradient(PLANET_CX, PLANET_CY, 30, PLANET_CX, PLANET_CY, 460);
+  nebula.addColorStop(0, t < P1_PLANET_END ? '#253651' : '#40203c');
+  nebula.addColorStop(1, '#040711');
+  ctx.fillStyle = nebula;
   ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
   for (const s of stars) {
     const twinkle = 0.5 + Math.sin(t * 0.04 + s.twinkle) * 0.5;
@@ -149,7 +156,9 @@ function drawStarfield() {
 // same 45-degree corner cut the game's damage language uses everywhere
 // else, once the explosion lands.
 function drawPlanet(angleY, scale) {
-  drawPlanetShared(cornerBlownOff ? CHAMFERED_FACES : BASE_FACES, angleY, scale, PLANET_CX, PLANET_CY);
+  const step = Math.min(GRIND_STEPS - 1, Math.floor((t - GRIND_START) / (EXPLOSION_FRAME - GRIND_START) * GRIND_STEPS));
+  const faces = cornerBlownOff ? CHAMFERED_FACES : t >= GRIND_START ? grindingFaces[step] : BASE_FACES;
+  drawPlanetShared(faces, angleY, scale, PLANET_CX, PLANET_CY);
 }
 
 function drawSpheres(angleY, scale, progress) {
@@ -164,12 +173,17 @@ function drawSpheres(angleY, scale, progress) {
     // happens late, like slowing into a landing rather than shrinking at a
     // constant rate.
     const shrink = Math.pow(Math.max(0, 1 - progress), 0.6);
-    const r = s.size * shrink;
+    const r = cornerBlownOff ? s.size * shrink : s.size * Math.max(0.3, shrink);
     if (r < 0.6) continue; // landed — nothing left to draw
 
     const grad = ctx.createRadialGradient(p.x - r * 0.3, p.y - r * 0.3, 1, p.x, p.y, r);
     grad.addColorStop(0, '#ff9fc4');
     grad.addColorStop(1, '#a12d5c');
+    // Trails show intent: the round invaders converge on the square world.
+    const tail = project(toCameraSpace(lerp3(s.start, s.target, Math.max(0, progress - 0.12)), angleY, scale));
+    ctx.strokeStyle = 'rgba(255, 77, 141, 0.4)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(tail.x, tail.y); ctx.lineTo(p.x, p.y); ctx.stroke();
     ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
@@ -233,6 +247,11 @@ export const introScene = {
 
     if (t === P1_PLANET_END) playApproach();
 
+    if (t >= GRIND_START && t < EXPLOSION_FRAME && t % 3 === 0) {
+      const p = project(toCameraSpace(EXPLODED_CORNER, PLANET_BASE_ANGLE + t * ROT_SPEED, 90 + t / EXPLOSION_FRAME * 20));
+      spawnDebris(p.x, p.y, 2, '#ffdf7a', { speed: 2.8, life: 25 });
+    }
+    if (t === GRIND_START) playRumble();
     if (t === EXPLOSION_FRAME) {
       const angleY = PLANET_BASE_ANGLE + t * ROT_SPEED;
       const scale = 90 + Math.min(1, t / EXPLOSION_FRAME) * 20;
@@ -326,9 +345,9 @@ export const introScene = {
         ctx.restore();
       }
 
-      if (t > 30) {
+      if (t >= P1_PLANET_END) {
         const descentProgress = Math.min(1, Math.max(0, (t - P1_PLANET_END) / (EXPLOSION_FRAME - P1_PLANET_END)));
-        drawSpheres(angleY, scale, descentProgress);
+        drawSpheres(angleY, scale, Math.min(1, descentProgress * 1.4));
       }
       drawParticles();
 
@@ -382,6 +401,18 @@ export const introScene = {
       ctx.restore();
     }
 
+    // Letterboxing and short captions frame the shape conflict, then hand off.
+    ctx.fillStyle = '#040711';
+    ctx.fillRect(0, 0, VIEW_WIDTH, 24);
+    ctx.fillRect(0, VIEW_HEIGHT - 60, VIEW_WIDTH, 60);
+    const caption = t < P1_PLANET_END ? 'A world with corners.' :
+      t < GRIND_START ? 'They came to make it smooth.' :
+      t < P3_IMPACT_END ? 'One corner at a time.' :
+      t < DOOR_OPEN_AT ? 'That was your world.' : 'Time to push back.';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = t < GRIND_START ? '#fff0b2' : '#ffd1e0';
+    ctx.font = 'bold 18px Trebuchet MS, Arial, sans-serif';
+    ctx.fillText(caption, VIEW_WIDTH / 2, VIEW_HEIGHT - 34);
     if (t > 20) {
       ctx.textAlign = 'right';
       ctx.fillStyle = 'rgba(122, 132, 168, 0.7)';

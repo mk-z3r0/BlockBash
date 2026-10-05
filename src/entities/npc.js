@@ -245,35 +245,26 @@ export function updateRescueNPC(npc, viewWidth, cameraX) {
   return false;
 }
 
-// `damage` is how many of his four corners are gone, and how deep. Drawn as
-// one path rather than a rect plus cuts so the outline follows the damage.
+// Corner order stays fixed: damage adds a new cut without changing old scars.
+// Fractional damage animates only the newest corner during a hit.
+export function quarrickCornerCuts(damage) {
+  const d = Math.max(0, Math.min(4, Number(damage) || 0));
+  const order = [2, 0, 3, 1]; // top-right, bottom-left, top-left, bottom-right
+  return order.map(stage => Math.max(0, Math.min(1, d - stage)) * 12.8);
+}
+
 function drawQuarrickBody(hw, hh, width, height, damage) {
-  // 3.2px per level of damage, not 5.5.
-  //
-  // At 5.5 a damage of 2 cut 11px off each corner of a 44px body, which is
-  // not "scarred" — it is the octagon silhouette, the exact shape the game
-  // uses to mean CORRUPTED. So the scene where the player restores him
-  // ended with him still looking like the thing they just cured, and his
-  // own next line is "I'm square. That'll do."
-  //
-  // At 3.2 the low end reads as chips and the high end (damage 3, just
-  // before the handoff) still reads as badly gone without tipping over into
-  // the corruption shape.
-  const cut = Math.min(4, damage) * 3.2;
+  const [tl, tr, br, bl] = quarrickCornerCuts(damage);
   ctx.beginPath();
-  if (cut <= 0.5) {
-    ctx.rect(-hw, -hh, width, height);
-  } else {
-    ctx.moveTo(-hw + cut, -hh);
-    ctx.lineTo(hw - cut, -hh);
-    ctx.lineTo(hw, -hh + cut);
-    ctx.lineTo(hw, hh - cut);
-    ctx.lineTo(hw - cut, hh);
-    ctx.lineTo(-hw + cut, hh);
-    ctx.lineTo(-hw, hh - cut);
-    ctx.lineTo(-hw, -hh + cut);
-    ctx.closePath();
-  }
+  ctx.moveTo(-hw + tl, -hh);
+  ctx.lineTo(hw - tr, -hh);
+  ctx.lineTo(hw, -hh + tr);
+  ctx.lineTo(hw, hh - br);
+  ctx.lineTo(hw - br, hh);
+  ctx.lineTo(-hw + bl, hh);
+  ctx.lineTo(-hw, hh - bl);
+  ctx.lineTo(-hw, -hh + tl);
+  ctx.closePath();
   // He dulls as he goes. Still unmistakably the gold square who saved you
   // in level 1 — the colour is his identity in the dialogue bar too
   // (cutscenes/speakers.js) — just less of it each time you meet him.
