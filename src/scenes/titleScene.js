@@ -65,7 +65,7 @@ export const titleScene = {
     ctx.font = '12px Trebuchet MS, Arial, sans-serif';
     ctx.fillText('MOVE  ← →    JUMP  SPACE    RUN + BASH  SHIFT / B', VIEW_WIDTH / 2, 365);
     ctx.fillStyle = '#91a9d7';
-    ctx.fillText('Triangles: tap to shoot • hold to run', VIEW_WIDTH / 2, 386);
+    ctx.fillText('Hold to run + fire • collect crates for faster shots', VIEW_WIDTH / 2, 386);
     ctx.restore();
 
     const top = highestSelectable();

@@ -1,3 +1,4 @@
+import { upgradeFireRate } from '../../weapons/fireRate.js';
 // Finding Quarrick, and putting him back. The fifth face.
 //
 // This is the payoff the level 3 handoff sets up and deliberately does not
@@ -78,14 +79,13 @@ export const l5Restored = {
     say('quarrick', "Was I."),
     say('player',   "You're all right?"),
     say('quarrick', "I'm square. That'll do."),
-    // He gives back what the rescue cost. Not charity — he made the thing,
-    // and the player has just spent half a load proving what it's for.
+    // The inventor improves the launcher after seeing it restore him.
     {
       name: 'repay',
       frames: 34,
       enter(c) {
-        c.player.ammo += 6;
-        c.showToast('+6 TRIANGLES', 100);
+        upgradeFireRate(c.player);
+        c.showToast('FIRE RATE BOOST!', 100);
       }
     },
     say('quarrick', "Go on. There are a lot more of them than there are of me."),

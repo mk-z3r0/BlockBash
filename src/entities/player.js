@@ -21,7 +21,8 @@ export const player = {
   // is kept alongside it as the plain "is the player armed at all" boolean
   // that the HUD, the probes and the level-1 gating already read.
   weapon: null,
-  ammo: 0,
+  ammo: 0, // legacy field; Cornerstone no longer consumes ammunition
+  fireRateTier: 0,
   hasWeapon: false,
   hitThisSwing: null,   // targets already struck by the current swing
   weaponTimer: 0,

@@ -26,11 +26,12 @@ playingScene.enter({ startAt: 3 });
 player.weapon = 'cornerstone'; player.hasWeapon = true; player.ammo = 10;
 player.weaponCooldown = 0;
 press('Shift'); updatePlayerWeapon(false);
-assert.equal(player.ammo, 9, 'fresh action tap fires a triangle');
+assert.equal(state.projectiles.length, 1, 'holding action starts firing');
 for (let i = 0; i < 180; i++) updatePlayerWeapon(false);
-assert.equal(player.ammo, 9, 'holding run does not drain scarce ammo');
+assert.ok(state.projectiles.length >= 7, 'held action continuously fires triangles');
+assert.equal(player.ammo, 10, 'triangles never consume ammo');
 release('Shift'); press('b'); updatePlayerWeapon(false);
-assert.equal(player.ammo, 8, 'B is the same action');
+assert.equal(player.ammo, 10, 'B also fires without consuming ammo');
 release('b');
 player.weapon = 'pickaxe'; player.weaponCooldown = 0;
 press('Shift'); updatePlayerWeapon(false);
@@ -49,16 +50,16 @@ assert.equal(speed('b'), speed('Shift'), 'both buttons provide the same running 
 press('b'); listeners.blur(); assert.equal(keys.b, false, 'tab blur clears held buttons');
 playingScene.enter({ startAt: 3 }); setRespawnPoint(1000, 200);
 state.score = 123; state.coinsCollected = 7; state.lives = 0;
-player.weapon = 'cornerstone'; player.hasWeapon = true; player.ammo = 0;
+player.weapon = 'cornerstone'; player.hasWeapon = true; player.ammo = 0; player.fireRateTier = 3;
 registerScene('playing', playingScene);
 gameOverScene.handleKeyDown({key:'Enter'});
 assert.equal(player.x, 1000, 'retry preserves checkpoint');
 assert.equal(state.score, 123); assert.equal(state.coinsCollected, 7);
 assert.equal(state.lives, 3); assert.equal(player.weapon, 'cornerstone');
-assert.ok(player.ammo > 0, 'retry replenishes boss ammo');
+assert.equal(player.fireRateTier, 0, 'game-over retry resets fire rate');
 assert.equal(state.gameState, 'playing');
 titleScene.enter(); titleScene.draw(); drawHUD(); playingScene.draw();
-console.log('PASS combined run/weapon, ammo hold, melee repeat, blur, checkpoint retry and render smoke checks');
+console.log('PASS combined run/weapon, unlimited held fire, melee repeat, blur, checkpoint retry and render smoke checks');
 
 const { quarrickCornerCuts, createQuarrick, drawRescueNPC } = await import('../src/entities/npc.js');
 for (let damage = 0; damage <= 4; damage++) {
@@ -95,3 +96,30 @@ assert.equal(starts, 1, 'held key does not skip');
 introScene.handleKeyDown({key:'Enter'}, false);
 assert.equal(starts, 2, 'fresh key still skips');
 console.log('PASS individual corner progression, animated handoff damage and complete opening render/skip smoke checks');
+
+const { fireCooldown, upgradeFireRate, FIRE_COOLDOWNS } = await import('../src/weapons/fireRate.js');
+const { spawnAmmoPickup, updateWeaponPickups } = await import('../src/entities/weaponPickup.js');
+playingScene.enter({startAt: 3});
+player.weapon = 'cornerstone'; player.hasWeapon = true;
+player.x = 100; player.y = 100;
+for (let tier = 1; tier <= 4; tier++) {
+  spawnAmmoPickup(110, 120);
+  updateWeaponPickups(player);
+  assert.equal(player.fireRateTier, Math.min(3, tier), 'crate upgrades one tier, capped at three');
+}
+assert.equal(fireCooldown(player), 11);
+for (let tier = 0; tier <= 3; tier++) {
+  player.fireRateTier = tier; player.weaponCooldown = 0; state.projectiles = [];
+  press('Shift');
+  for (let f = 0; f < 120; f++) updatePlayerWeapon(false);
+  release('Shift');
+  assert.equal(state.projectiles.length, Math.ceil(120 / FIRE_COOLDOWNS[tier]), 'actual cadence matches tier');
+}
+player.fireRateTier = 3;
+state.lives = 2; player.invincible = 0; player.y = 1000;
+playingScene.update();
+assert.equal(state.lives, 1, 'ordinary death occurred');
+assert.equal(player.fireRateTier, 0, 'ordinary death resets fire rate');
+assert.ok(state.weaponPickups.filter(p => p.kind === 'ammo').every(p => !p.collected), 'speed crates return after death');
+assert.equal(player.weapon, 'cornerstone', 'death keeps the gun');
+console.log('PASS crate tiers, upgrade cap, all four firing cadences and ordinary-death reset');

@@ -16,6 +16,7 @@
   import { state } from '../src/state.js';
   import { update, switchTo, getCurrentName , handleKeyDown } from '../src/scenes/sceneManager.js';
   import { getLevel, surfaceYAt } from '../src/levels/levelLoader.js';
+  import { getWeapon } from '../src/weapons/registry.js';
   import { startAttack } from '../src/weapons/combat.js';
   import { levels } from '../src/levels/registry.js';
   import { markCutsceneSeen, hasSeenCutscene, resetNarrative } from '../src/narrative.js';
@@ -80,7 +81,7 @@
     skipCutscene();
     tick(2);
     check(player.weapon === 'cornerstone', `skipping still hands over the Cornerstone (${player.weapon})`);
-    check(player.ammo >= 10, `arrives loaded (${player.ammo} triangles)`);
+    check(getWeapon(player.weapon)?.ammo == null, 'arrives with unlimited triangles');
 
     // 4. he is TAKEN here, not restored here.
     //
@@ -191,8 +192,8 @@
       // Affordable. The whole point of moving the rescue this late is that
       // it costs something real — but a player who has spent normally must
       // still be able to pay, or the story has a paywall in it.
-      check(lost.restoreHits <= player.ammo,
-        `affordable on arrival (${lost.restoreHits} triangles, carrying ${player.ammo})`);
+      check(getWeapon(player.weapon)?.ammo == null,
+        'restoration cannot run out of triangles');
 
       // the scene that names him fires before he can be shot
       player.x = 4302;
@@ -240,7 +241,7 @@
     state.lives = 999;
     player.invincible = 999999;
     out.push(`== level 6 (${lv6.name}) ==`);
-    check(player.weapon === 'cornerstone' && player.ammo >= 12,
+    check(player.weapon === 'cornerstone' && getWeapon(player.weapon).ammo == null,
       `arrives with the Cornerstone loaded (${player.weapon}, ${player.ammo})`);
     // Ammo caches are weaponPickups too; they top up, they don't trade.
     const WEAPONS = ['pickaxe', 'drill', 'sledgehammer', 'chainsaw', 'cornerstone'];
@@ -259,7 +260,7 @@
 
     const core = state.enemies.find(e => e.kind === 'core');
     check(!!core, 'the core is there');
-    check(player.weapon === 'cornerstone' && player.ammo >= 12,
+    check(player.weapon === 'cornerstone' && getWeapon(player.weapon).ammo == null,
       `arrives able to finish it (${player.weapon}, ${player.ammo} triangles)`);
 
     if (core) {

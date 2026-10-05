@@ -50,3 +50,18 @@ The Node probe also verifies exact corner counts, stable prior scars, fractional
 corner animation, both handoff damage beats, all 620 opening update/draw steps
 with a mocked canvas, normal completion, and fresh-press versus held-key skipping.
 This still needs a real browser visual review and hands-on playtest.
+
+## Unlimited triangles and rapid-fire crates
+
+This supersedes the earlier limited-ammo, tap-to-fire design. Holding the shared
+run/weapon button now continuously fires unlimited triangles. Each old ammo crate
+grants one fire-rate tier (26, 20, 15, then 11 frames between shots at 60 Hz),
+with a cap of three upgrades. The HUD shows infinity and three upgrade pips;
+pickups have a cyan crate outline. Quarrick's later gifts now boost fire rate.
+Upgrades carry across level transitions; normal death and game-over retry reset
+them and clear weapon cooldown. Death also makes the level's crates collectable
+again. Legacy ammo amounts in level data no longer affect gameplay.
+
+The Node probe verifies held automatic fire without ammo consumption, all four
+actual shot cadences, crate stacking and cap, and resets after both ordinary death
+and game-over retry. Browser and hands-on validation remain outstanding.

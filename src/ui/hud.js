@@ -1,4 +1,4 @@
-import { ctx, VIEW_WIDTH, VIEW_HEIGHT, drawRestoreTriangle } from '../engine/renderer.js';
+import { ctx, VIEW_WIDTH, VIEW_HEIGHT } from '../engine/renderer.js';
 import { muted } from '../audio/audio.js';
 import { state } from '../state.js';
 import { player } from '../entities/player.js';
@@ -18,41 +18,19 @@ export function updateToast() {
   if (toast.timer > 0) toast.timer--;
 }
 
-// Ammo is only ever shown for a weapon that HAS ammo, which today means
-// the Cornerstone alone. A counter that reads "-" or "unlimited" for every
-// other weapon would be three quarters of the game showing a number that
-// never moves.
-//
-// Drawn as the triangles themselves rather than a digit: the player already
-// knows the shape (it's what the weapon fires and what an ammo pickup looks
-// like), and at these counts — ten and down — pips are read at a glance
-// where a number has to be read as a number. Below four they pulse, which
-// is the only warning the scarcity gets.
+// Unlimited triangles, with three readable fire-rate upgrade pips.
 function drawAmmo() {
-  const weapon = getWeapon(player.weapon);
-  if (!weapon || weapon.ammo == null) return;
-
-  const count = Math.max(0, player.ammo);
-  const low = count > 0 && count <= 3;
+  if (getWeapon(player.weapon)?.kind !== 'restore') return;
   ctx.save();
-  ctx.globalAlpha = low ? 0.55 + 0.45 * Math.abs(Math.sin(state.frameCount * 0.12)) : 1;
-  for (let i = 0; i < count; i++) {
-    ctx.save();
-    ctx.translate(VIEW_WIDTH - 22 - i * 15, 42);
-    ctx.rotate(-Math.PI / 2);   // pointing up, so a row of them reads as a magazine
-    drawRestoreTriangle(6, 1);
-    ctx.restore();
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#5ee7ff';
+  ctx.font = 'bold 11px Trebuchet MS, Arial, sans-serif';
+  ctx.fillText('TRIANGLES ∞', VIEW_WIDTH - 14, 44);
+  for (let i = 0; i < 3; i++) {
+    ctx.fillStyle = i < (player.fireRateTier || 0) ? '#5ee7ff' : '#344763';
+    ctx.fillRect(VIEW_WIDTH - 24 - i * 12, 49, 8, 4);
   }
   ctx.restore();
-
-  if (count === 0) {
-    ctx.save();
-    ctx.textAlign = 'right';
-    ctx.fillStyle = '#7a84a8';
-    ctx.font = 'bold 12px Trebuchet MS, Arial, sans-serif';
-    ctx.fillText('NO TRIANGLES', VIEW_WIDTH - 14, 47);
-    ctx.restore();
-  }
 }
 
 // A boss bar, shown only while a boss is actually on screen.

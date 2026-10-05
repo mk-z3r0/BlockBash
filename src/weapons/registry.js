@@ -188,12 +188,8 @@ const WEAPONS = {
     damage: 1,
     knockback: 0,
     score: 150,
-    // Scarce on purpose. The tension the design doc protects is "every
-    // rescue costs offence" — at this count a level's field octagons and
-    // its spheres are genuinely competing for the same triangles, and
-    // ammo pickups (entities/weaponPickup.js) top you back up rather than
-    // making you rich.
-    ammo: 10,
+    // Run and fire share a button: triangles are unlimited.
+    ammo: null,
     sound: playCornerstoneFire,
     angleAt: cornerstoneAngleAt,
     fistAt: cornerstoneFistAt,

@@ -93,11 +93,11 @@ Jump height depends on how long you hold the button, and how fast you were
 moving when you left the ground. Running isn't just faster — several gaps in
 level 1 can't be crossed without it.
 
-The run button also uses your weapon once you've earned one. Melee repeats while held; the Cornerstone fires once per tap, so holding run won't spend your remaining triangles. You start with
-nothing, and what the button does changes with what you're holding — a short
-chop, a heavy overhead swing, or a fired triangle. From level 3 on, the
-triangles are counted: the pips at the top right are all you have, and putting
-a corrupted square back costs two of them.
+The run button also uses your weapon once you've earned one. Hold it to run
+and continuously swing or fire. The Cornerstone has unlimited triangles.
+Triangle crates increase its fire rate through three upgrades; the HUD shows
+three cyan pips. Dying resets the fire rate to normal and makes crates available
+again. Upgrades carry across levels until you die.
 
 You carry **one weapon at a time**. There's a sledgehammer lying on a shelf
 in level 6, and picking it up means putting the Cornerstone down.

@@ -34,7 +34,6 @@ import { getWeapon } from '../../weapons/registry.js';
 import { say } from '../say.js';
 import { setNpcStage, setFlag } from '../../narrative.js';
 
-const CORNERSTONE_AMMO = 10;
 
 // Everything that must be true when this is over, whether it was watched or
 // skipped. Idempotent for the reason the runner's notes give: a skip at the
@@ -42,7 +41,7 @@ const CORNERSTONE_AMMO = 10;
 function completeHandoff(c) {
   c.player.weapon = 'cornerstone';
   c.player.hasWeapon = true;
-  c.player.ammo = Math.max(c.player.ammo, CORNERSTONE_AMMO);
+  c.player.ammo = 0;
   // Stage 3 is "corrupted" in the arc narrative.js documents. He stays
   // there for two levels now instead of two minutes.
   setNpcStage(3);
@@ -98,7 +97,7 @@ export const l3Handoff = {
       enter(c) {
         c.player.weapon = 'cornerstone';
         c.player.hasWeapon = true;
-        c.player.ammo = Math.max(c.player.ammo, CORNERSTONE_AMMO);
+        c.player.ammo = 0;
         c.showToast(`${getWeapon('cornerstone').label} — PRESS B`, 150);
         playWeaponPickup();
       }

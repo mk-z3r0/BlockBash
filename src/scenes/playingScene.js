@@ -172,6 +172,8 @@ function resetBossAndCutscene({ respawn = false } = {}) {
   // level vanish, and in level 7 that could leave a player unable to finish
   // the core with no way to get more.
   state.weaponPickups = state.weaponPickups.filter(p => p.collected || !p.fromBoss);
+  // Let the player earn lost speed upgrades again after a death.
+  if (respawn) state.weaponPickups.forEach(p => { if (p.kind === 'ammo') p.collected = false; });
   // and put back whatever ground the boss mined out
   restoreCarvedGaps(getLevel());
   clearCracks(getLevel());
@@ -194,12 +196,9 @@ function loseLife() {
     switchTo('gameover');
   } else {
     resetPlayer();
-    // Never respawn into a fight you can no longer win. Dying keeps your
-    // weapon, but a player who spent their triangles and died in a boss fight
-    // came back with none — and on Hard, where each Crew member takes three
-    // hits, that is a soft lock. Top up to what the level starts you with
-    // (never down).
-    if (player.weapon === 'cornerstone') player.ammo = Math.max(player.ammo || 0, getLevel().startsWithAmmo || 0);
+    player.fireRateTier = 0;
+    player.weaponCooldown = 0;
+    player.weaponTimer = 0;
     // Drops any cutscene mid-flight, keeps what has already played. Not reachable with level 1's own
     // geometry (nothing near the edge can hit the player during the
     // walk-up, and the boss cutscene is barred from digging into that
@@ -292,11 +291,7 @@ function startLevel(index) {
   const canonical = level.startsWith || null;
   player.weapon = (canonical === 'cornerstone' || !carried) ? canonical : carried;
   player.hasWeapon = !!player.weapon;
-  // Ammo likewise: never LESS than the level is authored to start with, so
-  // arriving low can't make a level unwinnable, and never thrown away.
-  player.ammo = player.weapon === 'cornerstone'
-    ? Math.max(player.ammo || 0, level.startsWithAmmo || 0)
-    : (level.startsWithAmmo || 0);
+  player.ammo = 0;
   player.weaponTimer = 0;
   player.weaponCooldown = 0;
   resetCamera();
@@ -309,7 +304,7 @@ function startLevel(index) {
 // Same level, fresh attempt — what a game-over retry does. Never sends the
 // player back to level 1 just because they ran out of lives.
 function retryCurrentLevel() {
-  player.weapon = null; player.hasWeapon = false; player.ammo = 0;
+  player.weapon = null; player.hasWeapon = false; player.ammo = 0; player.fireRateTier = 0;
   state.score = 0;
   state.lives = 3;
   state.coinsCollected = 0;
@@ -323,7 +318,7 @@ function retryCurrentLevel() {
 // holding, which is why dropping into the middle of the game works at all.
 function startRunAt(index) {
   resetNarrative();
-  player.weapon = null; player.hasWeapon = false; player.ammo = 0;
+  player.weapon = null; player.hasWeapon = false; player.ammo = 0; player.fireRateTier = 0;
   state.currentLevelIndex = Math.max(0, Math.min(index, levels.length - 1));
   state.score = 0;
   state.lives = 3;
@@ -425,7 +420,9 @@ export const playingScene = {
       state.lives = 3;
       state.gameState = 'playing';
       resetPlayer();
-      if (player.weapon === 'cornerstone') player.ammo = Math.max(player.ammo || 0, getLevel().startsWithAmmo || 0);
+      player.fireRateTier = 0;
+      player.weaponCooldown = 0;
+      player.weaponTimer = 0;
       resetBossAndCutscene({ respawn: true });
       showToast('BACK IN! YOUR CHECKPOINT IS SAFE', 100);
     }

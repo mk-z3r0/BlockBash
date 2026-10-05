@@ -1,3 +1,9 @@
+> **chat_refine control revision:** Run and weapon share Shift/B (controller A/Y).
+> The Cornerstone now fires unlimited triangles while held. Triangle crates grant
+> one of three fire-rate upgrades (26 → 20 → 15 → 11 frames between shots).
+> Upgrades persist between levels and reset on death; crates return after death.
+> This supersedes the finite-ammo and scarcity notes below.
+
 # Block Bash — Game Design Document
 
 ## Story Premise

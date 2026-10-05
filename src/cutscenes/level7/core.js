@@ -1,3 +1,4 @@
+import { upgradeFireRate } from '../../weapons/fireRate.js';
 // The hollow centre: arriving, and ending.
 //
 // GAME_DESIGN is unusually specific about what this has to be, so both
@@ -50,8 +51,8 @@ export const l7Arrival = {
       name: 'give-ammo',
       frames: 34,
       enter(c) {
-        c.player.ammo += 8;
-        c.showToast('+8 TRIANGLES', 100);
+        upgradeFireRate(c.player);
+        c.showToast('FIRE RATE BOOST!', 100);
       }
     },
     say('player',   "What do I do?"),

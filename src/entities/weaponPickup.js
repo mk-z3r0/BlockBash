@@ -1,3 +1,4 @@
+import { upgradeFireRate } from '../weapons/fireRate.js';
 import { ctx } from '../engine/renderer.js';
 import { isColliding } from '../engine/physics.js';
 import { playWeaponPickup, playAmmoPickup } from '../audio/sfx.js';
@@ -27,18 +28,16 @@ export function spawnWeaponPickup(x, groundY, type = 'pickaxe', fromBoss = true)
   state.weaponPickups.push({ x, y: groundY, size: 22, type, kind: 'weapon', fromBoss, collected: false });
 }
 
-// Triangles for the Cornerstone. Placed in levels rather than dropped,
-// because running dry needs a visible way back — the scarcity is meant to
-// make each rescue a decision, not to soft-lock a 7-year-old who spent the
-// lot on the first octagon they met.
+// Legacy level-data ammo locations now hold one fire-rate upgrade each.
 export function spawnAmmoPickup(x, y, amount = 4) {
   state.weaponPickups.push({ x, y, size: 18, kind: 'ammo', amount, collected: false });
 }
 
 function give(pickup, player) {
   if (pickup.kind === 'ammo') {
-    player.ammo += pickup.amount;
-    showToast(`+${pickup.amount} TRIANGLES`, 80);
+    const previous = player.fireRateTier || 0;
+    const tier = upgradeFireRate(player);
+    showToast(tier === previous ? 'FIRE RATE MAXED!' : `RAPID FIRE ${tier}/3 — FASTER TRIANGLES!`, 100);
     playAmmoPickup();
     return;
   }
@@ -46,11 +45,11 @@ function give(pickup, player) {
   if (!weapon) return;
 
   // Say what it COST, not just what it gave. The player carries one weapon,
-  // so picking up level 6's sledgehammer puts the Cornerstone down and takes
-  // every triangle with it — and a toast reading "SLEDGEHAMMER ACQUIRED!"
+  // so picking up level 6's sledgehammer puts the Cornerstone down —
+  // a toast reading "SLEDGEHAMMER ACQUIRED!"
   // tells a seven-year-old they gained something, which is half the story.
   const had = getWeapon(player.weapon);
-  const tradedAway = had && had.id !== weapon.id && had.ammo != null && player.ammo > 0;
+  const tradedAway = had && had.id !== weapon.id && had.kind === 'restore';
 
   player.weapon = weapon.id;
   player.hasWeapon = true;
@@ -84,10 +83,14 @@ export function drawWeaponPickups(frameCount) {
     const bob = Math.sin((frameCount + pickup.x) * 0.08) * 3;
 
     if (pickup.kind === 'ammo') {
-      // a small cluster of triangles, spinning slowly — the same shape the
-      // weapon fires, so what it refills needs no explaining
+      // Triangle cluster in a cyan crate: a fire-rate upgrade.
       ctx.save();
       ctx.translate(pickup.x, pickup.y - pickup.size / 2 + bob);
+      ctx.fillStyle = '#12374a';
+      ctx.fillRect(-13, -13, 26, 26);
+      ctx.strokeStyle = '#5ee7ff';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(-13, -13, 26, 26);
       for (let i = 0; i < 3; i++) {
         ctx.save();
         ctx.rotate(frameCount * 0.02 + (i * Math.PI * 2) / 3);

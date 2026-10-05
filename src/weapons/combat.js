@@ -1,3 +1,4 @@
+import { fireCooldown } from './fireRate.js';
 // Entity-agnostic combat.
 //
 // IMPLEMENTATION_PLAN's architecture constraints open with this one:
@@ -19,7 +20,7 @@ import { state } from '../state.js';
 import { getDifficulty } from '../difficulty.js';
 import { getLevel } from '../levels/levelLoader.js';
 import { player } from '../entities/player.js';
-import { actionHeld, actionPress } from '../engine/input.js';
+import { actionHeld } from '../engine/input.js';
 import { isColliding } from '../engine/physics.js';
 import { getWeapon } from './registry.js';
 import { spawnExplosion, spawnDust } from '../entities/particles.js';
@@ -80,14 +81,14 @@ export function startAttack(owner) {
   // Difficulty speeds an enemy's swing up or down by dividing its scale.
   const scale = owner === player ? 1 : (weapon.enemyScale || 1) / getDifficulty().tempo;
   owner.swingLen = Math.max(1, Math.round(weapon.duration * scale));
-  owner.weaponCooldown = Math.round(weapon.cooldown * scale);
+  owner.weaponCooldown = Math.round((owner === player && weapon.kind === 'restore' ? fireCooldown(player) : weapon.cooldown) * scale);
   owner.weaponTimer = owner.swingLen;
   // A melee swing's hitbox is live for its whole animation (see the note in
   // weapons/pickaxe.js on why), so it needs to remember who it has already
   // hit — otherwise one swing lands `duration` times.
   owner.hitThisSwing = new Set();
   if (weapon.kind === 'restore') {
-    owner.ammo--;
+    if (weapon.ammo != null) owner.ammo--;
     spawnRestoreTriangle(owner);
   }
   if (weapon.sound) weapon.sound();
@@ -233,17 +234,11 @@ export function tickWeapon(owner) {
 // The player's own input path. Kept here rather than in the player module
 // so that "what the B button does" is decided by the registry entry for
 // whatever they're holding, not by an if/else over weapon names.
-let lastActionPress = 0;
-
 export function updatePlayerWeapon(inputLocked) {
   tickWeapon(player);
   // Cutscene-locked input mustn't swing, same gate the pickaxe had.
-  const pressed = actionPress !== lastActionPress;
-  lastActionPress = actionPress;
   if (inputLocked) return;
-  const weapon = getWeapon(player.weapon);
-  // Repeat melee while running; scarce triangles require a fresh tap.
-  if (actionHeld() && (weapon?.ammo == null || pressed)) startAttack(player);
+  if (actionHeld()) startAttack(player);
 }
 
 // --- damage -----------------------------------------------------------
